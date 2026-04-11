@@ -1,7 +1,10 @@
+import { redirect } from "next/navigation";
+import { createAuthServerClient } from "../../../lib/supabase/auth-server";
 import { createAdminClient } from "../../../lib/supabase/server";
 
 type Cliente = {
   id: string;
+  user_id: string | null;
   nombre: string;
   telefono: string;
   estado: string;
@@ -62,14 +65,6 @@ function Sidebar() {
           >
             Clientes
           </a>
-
-          <a className="block rounded-2xl px-4 py-3 text-sm text-slate-600 hover:bg-slate-100">
-            Seguimientos
-          </a>
-
-          <a className="block rounded-2xl px-4 py-3 text-sm text-slate-600 hover:bg-slate-100">
-            Configuración
-          </a>
         </div>
       </nav>
     </aside>
@@ -86,11 +81,21 @@ function formatFecha(fecha: string) {
 }
 
 export default async function CalendarioPage() {
+  const authSupabase = await createAuthServerClient();
+  const {
+    data: { user },
+  } = await authSupabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   const supabase = createAdminClient();
 
   const { data } = await supabase
     .from("clientes")
     .select("*")
+    .eq("user_id", user.id)
     .not("proximo_contacto", "is", null)
     .order("proximo_contacto", { ascending: true });
 
