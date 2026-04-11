@@ -55,11 +55,11 @@ function Sidebar() {
     <aside className="hidden w-72 border-r border-slate-200 bg-white lg:flex lg:flex-col">
       <div className="border-b border-slate-200 px-6 py-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-black text-lg font-bold text-white">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-lg font-bold text-white">
             C
           </div>
           <div>
-            <p className="text-lg font-bold">ClienteYA</p>
+            <p className="text-lg font-bold text-slate-900">ClienteYA</p>
             <p className="text-sm text-slate-500">Dashboard</p>
           </div>
         </div>
@@ -69,35 +69,35 @@ function Sidebar() {
         <div className="space-y-2">
           <a
             href="/dashboard"
-            className="block rounded-2xl bg-black px-4 py-3 text-sm font-semibold text-white"
+            className="block rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
           >
             Resumen
           </a>
 
           <a
             href="/dashboard/nuevo"
-            className="block rounded-2xl px-4 py-3 text-sm text-slate-600 hover:bg-slate-100"
+            className="block rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
           >
             + Nuevo cliente
           </a>
 
           <a
             href="/dashboard/calendario"
-            className="block rounded-2xl px-4 py-3 text-sm text-slate-600 hover:bg-slate-100"
+            className="block rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
           >
             Calendario
           </a>
 
           <a
             href="/dashboard"
-            className="block rounded-2xl px-4 py-3 text-sm text-slate-600 hover:bg-slate-100"
+            className="block rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
           >
             Clientes
           </a>
 
           <a
             href="/billing"
-            className="block rounded-2xl px-4 py-3 text-sm text-slate-600 hover:bg-slate-100"
+            className="block rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
           >
             Activar plan
           </a>
@@ -169,20 +169,20 @@ export default async function DashboardPage() {
 
         <div className="flex-1 px-6 py-10">
           <div className="mx-auto max-w-7xl">
-            <div className="mb-6 flex items-center justify-between">
-              <h1 className="text-3xl font-bold">Dashboard</h1>
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
 
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <a
                   href="/dashboard/nuevo"
-                  className="rounded-2xl bg-black px-4 py-2 text-sm text-white"
+                  className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
                 >
                   + Nuevo cliente
                 </a>
 
                 <a
                   href="/billing"
-                  className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700"
+                  className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
                 >
                   Activar plan
                 </a>
@@ -256,12 +256,12 @@ export default async function DashboardPage() {
             <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
               <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-sm text-slate-500">Clientes</p>
-                <p className="mt-2 text-3xl font-bold">{clientes.length}</p>
+                <p className="mt-2 text-3xl font-bold text-slate-900">{clientes.length}</p>
               </div>
 
               <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-sm text-slate-500">Nuevos</p>
-                <p className="mt-2 text-3xl font-bold">{nuevos.length}</p>
+                <p className="mt-2 text-3xl font-bold text-slate-900">{nuevos.length}</p>
               </div>
 
               <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
@@ -294,8 +294,8 @@ export default async function DashboardPage() {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-              <div className="rounded-3xl border bg-white p-6">
-                <h2 className="mb-4 text-lg font-semibold">Clientes</h2>
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-lg font-semibold text-slate-900">Clientes</h2>
 
                 {clientes.length === 0 && (
                   <p className="text-sm text-slate-500">No hay clientes todavía.</p>
@@ -304,11 +304,11 @@ export default async function DashboardPage() {
                 {clientes.map((cliente) => (
                   <div
                     key={cliente.id}
-                    className="border-b py-4 last:border-b-0"
+                    className="border-b border-slate-200 py-4 last:border-b-0"
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
-                        <p className="font-semibold text-lg">{cliente.nombre}</p>
+                        <p className="text-lg font-semibold text-slate-900">{cliente.nombre}</p>
                         <p className="text-sm text-slate-500">{cliente.telefono}</p>
 
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -358,7 +358,7 @@ export default async function DashboardPage() {
                       <div className="flex flex-wrap gap-2">
                         <a
                           href={`/dashboard/editar?id=${cliente.id}`}
-                          className="rounded-xl border px-3 py-2 text-xs"
+                          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-100"
                         >
                           Editar
                         </a>
@@ -370,7 +370,7 @@ export default async function DashboardPage() {
                           )}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="rounded-xl bg-green-600 px-3 py-2 text-xs text-white"
+                          className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-emerald-700"
                         >
                           WhatsApp
                         </a>
@@ -381,8 +381,8 @@ export default async function DashboardPage() {
               </div>
 
               <div className="space-y-6">
-                <div className="rounded-3xl border bg-white p-6">
-                  <h2 className="mb-4 text-lg font-semibold">Hoy</h2>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="mb-4 text-lg font-semibold text-slate-900">Hoy</h2>
 
                   {hoyClientes.length === 0 && (
                     <p className="text-sm text-slate-500">
@@ -391,8 +391,8 @@ export default async function DashboardPage() {
                   )}
 
                   {hoyClientes.map((c) => (
-                    <div key={c.id} className="border-b py-3 last:border-b-0">
-                      <p className="font-semibold">{c.nombre}</p>
+                    <div key={c.id} className="border-b border-slate-200 py-3 last:border-b-0">
+                      <p className="font-semibold text-slate-900">{c.nombre}</p>
                       <p className="text-sm text-slate-500">
                         {c.recordatorio || "Sin nota"}
                       </p>
@@ -404,7 +404,7 @@ export default async function DashboardPage() {
                         )}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-block mt-2 rounded-xl bg-green-600 px-3 py-2 text-xs text-white"
+                        className="mt-2 inline-block rounded-xl bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-emerald-700"
                       >
                         Abrir WhatsApp
                       </a>
@@ -412,8 +412,8 @@ export default async function DashboardPage() {
                   ))}
                 </div>
 
-                <div className="rounded-3xl border bg-white p-6">
-                  <h2 className="mb-4 text-lg font-semibold">Próximos contactos</h2>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="mb-4 text-lg font-semibold text-slate-900">Próximos contactos</h2>
 
                   {proximosClientes.length === 0 && (
                     <p className="text-sm text-slate-500">
@@ -422,8 +422,8 @@ export default async function DashboardPage() {
                   )}
 
                   {proximosClientes.slice(0, 5).map((c) => (
-                    <div key={c.id} className="border-b py-3 last:border-b-0">
-                      <p className="font-semibold">{c.nombre}</p>
+                    <div key={c.id} className="border-b border-slate-200 py-3 last:border-b-0">
+                      <p className="font-semibold text-slate-900">{c.nombre}</p>
                       <p className="text-xs text-slate-500">
                         {c.proximo_contacto || "—"}
                       </p>
@@ -434,42 +434,42 @@ export default async function DashboardPage() {
                   ))}
                 </div>
 
-                <div className="rounded-3xl border bg-white p-6">
-                  <h2 className="mb-4 text-lg font-semibold">Estado del negocio</h2>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="mb-4 text-lg font-semibold text-slate-900">Estado del negocio</h2>
 
                   <div className="space-y-3 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600">Nuevos</span>
-                      <span className="font-semibold">{nuevos.length}</span>
+                      <span className="font-semibold text-slate-900">{nuevos.length}</span>
                     </div>
 
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600">Interesados</span>
-                      <span className="font-semibold">{interesados.length}</span>
+                      <span className="font-semibold text-slate-900">{interesados.length}</span>
                     </div>
 
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600">Pagados</span>
-                      <span className="font-semibold">{pagados.length}</span>
+                      <span className="font-semibold text-slate-900">{pagados.length}</span>
                     </div>
 
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600">Entregados</span>
-                      <span className="font-semibold">{entregados.length}</span>
+                      <span className="font-semibold text-slate-900">{entregados.length}</span>
                     </div>
                   </div>
                 </div>
 
                 {!isActive && (
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6">
-                    <h2 className="mb-2 text-lg font-semibold">Activar plan</h2>
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h2 className="mb-2 text-lg font-semibold text-slate-900">Activar plan</h2>
                     <p className="text-sm text-slate-500">
                       Sube tu comprobante de transferencia para activar ClienteYA.
                     </p>
 
                     <a
                       href="/billing"
-                      className="mt-4 inline-block rounded-2xl bg-black px-4 py-2 text-sm font-semibold text-white"
+                      className="mt-4 inline-block rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
                     >
                       Ir a activación
                     </a>
