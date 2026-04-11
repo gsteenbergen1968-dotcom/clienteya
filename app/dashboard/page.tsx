@@ -15,6 +15,14 @@ type Cliente = {
   created_at: string;
 };
 
+type Profile = {
+  id: string;
+  subscription_status: string | null;
+  trial_ends_at: string | null;
+  payment_proof_url: string | null;
+  payment_notes: string | null;
+};
+
 function getBadgeClasses(estado: string) {
   if (estado === "Pagó") return "bg-emerald-100 text-emerald-700";
   if (estado === "Interesado") return "bg-amber-100 text-amber-700";
@@ -35,6 +43,11 @@ function manana() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   return d.toISOString().split("T")[0];
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("es-ES");
 }
 
 function Sidebar() {
@@ -81,6 +94,13 @@ function Sidebar() {
           >
             Clientes
           </a>
+
+          <a
+            href="/billing"
+            className="block rounded-2xl px-4 py-3 text-sm text-slate-600 hover:bg-slate-100"
+          >
+            Activar plan
+          </a>
         </div>
       </nav>
     </aside>
@@ -99,13 +119,17 @@ export default async function DashboardPage() {
 
   const supabase = createAdminClient();
 
-  const { data } = await supabase
-    .from("clientes")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+  const [{ data: clientesData }, { data: profile }] = await Promise.all([
+    supabase
+      .from("clientes")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false }),
+    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+  ]);
 
-  const clientes: Cliente[] = data || [];
+  const clientes: Cliente[] = clientesData || [];
+  const userProfile: Profile | null = profile || null;
 
   const hoyDate = hoy();
   const mananaDate = manana();
@@ -132,6 +156,12 @@ export default async function DashboardPage() {
       ? Math.round((pagados.length / clientes.length) * 100)
       : 0;
 
+  const status = userProfile?.subscription_status || "trial";
+  const isActive = status === "active";
+  const isPending = status === "pending_review";
+  const isTrial = status === "trial";
+  const isCanceled = status === "canceled";
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <div className="flex min-h-screen">
@@ -150,11 +180,52 @@ export default async function DashboardPage() {
                   + Nuevo cliente
                 </a>
 
+                <a
+                  href="/billing"
+                  className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700"
+                >
+                  Activar plan
+                </a>
+
                 <LogoutButton />
               </div>
             </div>
 
             <div className="mb-6 space-y-3">
+              {isActive && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                  ✅ Tu cuenta está activa.
+                </div>
+              )}
+
+              {isPending && (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                  🔵 Tu comprobante fue enviado y está pendiente de revisión.
+                </div>
+              )}
+
+              {isTrial && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  🟠 Estás usando el período de prueba. Trial hasta:{" "}
+                  <span className="font-semibold">
+                    {formatDate(userProfile?.trial_ends_at || null)}
+                  </span>{" "}
+                  ·{" "}
+                  <a href="/billing" className="font-semibold underline">
+                    Activar ahora
+                  </a>
+                </div>
+              )}
+
+              {isCanceled && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  🔴 Tu cuenta no está activa.{" "}
+                  <a href="/billing" className="font-semibold underline">
+                    Sube tu comprobante para activar el plan
+                  </a>
+                </div>
+              )}
+
               {atrasados.length > 0 && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                   🔴 Tienes {atrasados.length} cliente(s) atrasado(s) para seguimiento.
@@ -388,6 +459,22 @@ export default async function DashboardPage() {
                     </div>
                   </div>
                 </div>
+
+                {!isActive && (
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6">
+                    <h2 className="mb-2 text-lg font-semibold">Activar plan</h2>
+                    <p className="text-sm text-slate-500">
+                      Sube tu comprobante de transferencia para activar ClienteYA.
+                    </p>
+
+                    <a
+                      href="/billing"
+                      className="mt-4 inline-block rounded-2xl bg-black px-4 py-2 text-sm font-semibold text-white"
+                    >
+                      Ir a activación
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           </div>
