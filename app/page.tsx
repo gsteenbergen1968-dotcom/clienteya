@@ -1,110 +1,109 @@
+"use client";
+
+import { useState } from "react";
+
 export default function HomePage() {
+  const [email, setEmail] = useState("");
+
   return (
     <main className="min-h-screen bg-white text-slate-900">
-      {/* HERO */}
-      <section className="px-6 py-16 text-center">
-        <h1 className="text-4xl font-bold leading-tight md:text-5xl">
+      <section className="px-6 py-20 text-center">
+        <h1 className="text-4xl font-bold mb-4">
           Nunca pierdas un cliente de WhatsApp
         </h1>
 
-        <p className="mx-auto mt-6 max-w-xl text-lg text-slate-600">
-          Organiza tus contactos, seguimientos y ventas en un solo lugar.
+        <p className="text-slate-600 mb-8">
           Diseñado para vendedores de Paraguay.
         </p>
 
-        <div className="mt-8 flex justify-center gap-4">
+        <div className="flex justify-center gap-4">
+          {/* PRIMARY BUTTON */}
           <a
-            href="/dashboard"
-            className="rounded-2xl bg-black px-6 py-4 text-lg font-semibold text-white"
+            href="/login"
+            className="rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
           >
             Empezar gratis
           </a>
 
+          {/* SECONDARY BUTTON */}
           <a
-            href="/dashboard"
-            className="rounded-2xl border px-6 py-4 text-lg"
+            href="/login"
+            className="rounded-2xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
           >
             Ver demo
           </a>
         </div>
       </section>
 
-      {/* BENEFICIOS */}
       <section className="bg-slate-50 px-6 py-16">
-        <div className="mx-auto max-w-5xl grid gap-8 md:grid-cols-3">
-          <div className="rounded-3xl bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold">📲 Todo en WhatsApp</h3>
-            <p className="mt-3 text-sm text-slate-600">
+        <div className="mx-auto max-w-5xl grid gap-6 md:grid-cols-3">
+          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <p className="font-semibold mb-2">📲 Todo en WhatsApp</p>
+            <p className="text-sm text-slate-600">
               Envía mensajes, seguimientos y recordatorios con un solo clic.
             </p>
           </div>
 
-          <div className="rounded-3xl bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold">📅 Nunca olvides clientes</h3>
-            <p className="mt-3 text-sm text-slate-600">
+          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <p className="font-semibold mb-2">🗓 Nunca olvides clientes</p>
+            <p className="text-sm text-slate-600">
               Recordatorios automáticos para hoy, mañana o cuando necesites.
             </p>
           </div>
 
-          <div className="rounded-3xl bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold">💰 Más ventas</h3>
-            <p className="mt-3 text-sm text-slate-600">
+          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <p className="font-semibold mb-2">💰 Más ventas</p>
+            <p className="text-sm text-slate-600">
               Convierte más interesados en clientes pagados fácilmente.
             </p>
           </div>
         </div>
       </section>
 
-      {/* COMO FUNCIONA */}
-      <section className="px-6 py-16">
-        <div className="mx-auto max-w-5xl">
-          <h2 className="text-center text-3xl font-bold">
-            Así funciona
-          </h2>
+      <section className="px-6 py-16 text-center">
+        <h2 className="text-2xl font-bold mb-10">Así funciona</h2>
 
-          <div className="mt-12 grid gap-8 md:grid-cols-3 text-center">
-            <div>
-              <p className="text-4xl">1️⃣</p>
-              <p className="mt-4 font-semibold">Agrega clientes</p>
-              <p className="text-sm text-slate-600">
-                Guarda contactos en segundos
-              </p>
-            </div>
+        <div className="grid gap-8 md:grid-cols-3 max-w-5xl mx-auto">
+          <div>
+            <div className="mb-3 text-xl">1️⃣</div>
+            <p className="font-semibold">Agrega clientes</p>
+            <p className="text-sm text-slate-600">
+              Guarda contactos en segundos
+            </p>
+          </div>
 
-            <div>
-              <p className="text-4xl">2️⃣</p>
-              <p className="mt-4 font-semibold">Haz seguimiento</p>
-              <p className="text-sm text-slate-600">
-                Usa recordatorios y WhatsApp
-              </p>
-            </div>
+          <div>
+            <div className="mb-3 text-xl">2️⃣</div>
+            <p className="font-semibold">Haz seguimiento</p>
+            <p className="text-sm text-slate-600">
+              Usa recordatorios y WhatsApp
+            </p>
+          </div>
 
-            <div>
-              <p className="text-4xl">3️⃣</p>
-              <p className="mt-4 font-semibold">Cierra ventas</p>
-              <p className="text-sm text-slate-600">
-                Convierte más clientes fácilmente
-              </p>
-            </div>
+          <div>
+            <div className="mb-3 text-xl">3️⃣</div>
+            <p className="font-semibold">Cierra ventas</p>
+            <p className="text-sm text-slate-600">
+              Convierte más clientes fácilmente
+            </p>
           </div>
         </div>
       </section>
 
-      {/* CTA FINAL */}
-      <section className="bg-black px-6 py-16 text-center text-white">
-        <h2 className="text-3xl font-bold">
+      <section className="bg-slate-900 px-6 py-16 text-center text-white">
+        <h2 className="text-2xl font-bold mb-4">
           Empieza hoy y vende más
         </h2>
 
-        <p className="mt-4 text-slate-300">
+        <p className="mb-6 text-slate-300">
           No necesitas experiencia técnica.
         </p>
 
         <a
-          href="/dashboard"
-          className="mt-8 inline-block rounded-2xl bg-white px-8 py-4 font-semibold text-black"
+          href="/login"
+          className="rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
         >
-          Crear mi CRM gratis
+          Crear cuenta gratis
         </a>
       </section>
     </main>
