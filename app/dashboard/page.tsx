@@ -1,7 +1,6 @@
 import { createAdminClient } from "../../lib/supabase/server";
 import { createAuthServerClient } from "../../lib/supabase/auth-server";
 import LogoutButton from "../components/logout-button";
-import ParaguayFlag from "../components/paraguay-flag";
 import { redirect } from "next/navigation";
 
 type Cliente = {
@@ -56,8 +55,8 @@ function Sidebar() {
     <aside className="hidden w-72 border-r border-slate-200 bg-white lg:flex lg:flex-col">
       <div className="border-b border-slate-200 px-6 py-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <ParaguayFlag className="h-8 w-8" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-2xl">
+            🇵🇾
           </div>
           <div>
             <p className="text-lg font-bold text-slate-900">ClienteYA</p>
@@ -180,7 +179,7 @@ export default async function DashboardPage() {
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="mb-2 flex items-center gap-2">
-                  <ParaguayFlag className="h-5 w-5" />
+                  <span className="text-lg">🇵🇾</span>
                   <span className="text-sm font-medium text-slate-500">
                     Paraguay
                   </span>

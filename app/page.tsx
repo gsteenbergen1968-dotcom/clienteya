@@ -1,11 +1,9 @@
-import ParaguayFlag from "./components/paraguay-flag";
-
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-white text-slate-900">
       <section className="px-6 py-20 text-center">
         <div className="mb-6 flex items-center justify-center gap-3">
-          <ParaguayFlag className="h-6 w-6 rounded-full overflow-hidden" />
+          <span className="text-2xl">🇵🇾</span>
           <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
             Hecho para vendedores de Paraguay
           </span>
@@ -95,7 +93,7 @@ export default function HomePage() {
 
       <section className="bg-slate-900 px-6 py-16 text-center text-white">
         <div className="mb-4 flex items-center justify-center gap-3">
-          <ParaguayFlag className="h-6 w-6 rounded-full overflow-hidden" />
+          <span className="text-2xl">🇵🇾</span>
           <span className="text-sm text-slate-300">
             Plataforma local para Paraguay
           </span>
