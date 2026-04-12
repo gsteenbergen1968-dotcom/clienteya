@@ -1,13 +1,11 @@
+import ParaguayFlag from "./components/paraguay-flag";
+
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-white text-slate-900">
       <section className="px-6 py-20 text-center">
         <div className="mb-6 flex items-center justify-center gap-3">
-          <img
-            src="/paraguay.svg"
-            alt="Bandera de Paraguay"
-            className="h-6 w-6 rounded-full object-cover"
-          />
+          <ParaguayFlag className="h-6 w-6 rounded-full overflow-hidden" />
           <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
             Hecho para vendedores de Paraguay
           </span>
@@ -41,7 +39,7 @@ export default function HomePage() {
       </section>
 
       <section className="bg-slate-50 px-6 py-16">
-        <div className="mx-auto max-w-5xl grid gap-6 md:grid-cols-3">
+        <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
           <div className="rounded-2xl border bg-white p-6 shadow-sm">
             <p className="mb-2 font-semibold">📲 Todo en WhatsApp</p>
             <p className="text-sm text-slate-600">
@@ -97,11 +95,7 @@ export default function HomePage() {
 
       <section className="bg-slate-900 px-6 py-16 text-center text-white">
         <div className="mb-4 flex items-center justify-center gap-3">
-          <img
-            src="/paraguay.svg"
-            alt="Bandera de Paraguay"
-            className="h-6 w-6 rounded-full object-cover"
-          />
+          <ParaguayFlag className="h-6 w-6 rounded-full overflow-hidden" />
           <span className="text-sm text-slate-300">
             Plataforma local para Paraguay
           </span>
