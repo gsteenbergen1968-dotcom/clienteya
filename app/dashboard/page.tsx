@@ -55,12 +55,16 @@ function Sidebar() {
     <aside className="hidden w-72 border-r border-slate-200 bg-white lg:flex lg:flex-col">
       <div className="border-b border-slate-200 px-6 py-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-lg font-bold text-white">
-            C
+          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <img
+              src="/paraguay.svg"
+              alt="Bandera de Paraguay"
+              className="h-8 w-8 object-cover"
+            />
           </div>
           <div>
             <p className="text-lg font-bold text-slate-900">ClienteYA</p>
-            <p className="text-sm text-slate-500">Dashboard</p>
+            <p className="text-sm text-slate-500">Hecho para Paraguay</p>
           </div>
         </div>
       </div>
@@ -100,6 +104,13 @@ function Sidebar() {
             className="block rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
           >
             Activar plan
+          </a>
+
+          <a
+            href="/admin"
+            className="block rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+          >
+            Admin
           </a>
         </div>
       </nav>
@@ -170,7 +181,19 @@ export default async function DashboardPage() {
         <div className="flex-1 px-6 py-10">
           <div className="mx-auto max-w-7xl">
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-              <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <img
+                    src="/paraguay.svg"
+                    alt="Bandera de Paraguay"
+                    className="h-5 w-5 rounded-full object-cover"
+                  />
+                  <span className="text-sm font-medium text-slate-500">
+                    Paraguay
+                  </span>
+                </div>
+                <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+              </div>
 
               <div className="flex flex-wrap gap-3">
                 <a
