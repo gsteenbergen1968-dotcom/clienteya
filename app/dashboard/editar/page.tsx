@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+
 import { AppHeader } from "../../components/AppHeader";
 import SidebarNav from "../SidebarNav";
+import PageHeader from "../components/PageHeader";
+
 import { createAuthServerClient } from "../../../lib/supabase/auth-server";
 import { createAdminClient } from "../../../lib/supabase/server";
 
@@ -9,52 +12,83 @@ export const dynamic = "force-dynamic";
 
 type Cliente = {
   id: string;
-  user_id: string | null;
   nombre: string;
   telefono: string;
-  estado: string;
-  notas: string | null;
-  recordatorio: string | null;
-  proximo_contacto: string | null;
-  created_at: string;
-  pagado?: boolean | null;
-  monto?: number | null;
-  fecha_pago?: string | null;
+  estado?: string | null;
+  notas?: string | null;
+  recordatorio?: string | null;
+  proximo_contacto?: string | null;
 };
 
-function formatDateDisplay(value: string | null | undefined) {
-  if (!value) return "—";
-  const [year, month, day] = value.slice(0, 10).split("-");
-  if (!year || !month || !day) return value;
-  return `${day}/${month}/${year}`;
+type ActivityLog = {
+  id: string;
+  type: string;
+  created_at: string;
+};
+
+function formatDate(date: string | null | undefined) {
+  if (!date) return "—";
+
+  const parts = date.split("-");
+
+  if (parts.length !== 3) {
+    return date;
+  }
+
+  const [y, m, d] = parts;
+
+  return `${d}/${m}/${y}`;
 }
 
-function dateInputValue(value: string | null | undefined) {
-  if (!value) return "";
-  return value.slice(0, 10);
+function formatDateTime(date: string) {
+  return new Intl.DateTimeFormat("es-PY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(date));
 }
 
-function ParaguayBadge() {
-  return (
-    <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-      <div className="absolute inset-x-0 top-0 h-1/3 bg-red-500" />
-      <div className="absolute inset-x-0 top-1/3 h-1/3 bg-white" />
-      <div className="absolute inset-x-0 bottom-0 h-1/3 bg-blue-600" />
-      <span className="relative z-10 text-[10px] font-bold text-slate-900">
-        PY
-      </span>
-    </div>
-  );
+function getActivityLabel(type: string) {
+  if (type === "contactado") {
+    return "✅ Cliente contactado";
+  }
+
+  if (type === "followup_scheduled") {
+    return "⏰ Follow-up agendado";
+  }
+
+  if (type === "closed") {
+    return "💰 Oportunidad cerrada";
+  }
+
+  if (type === "no_response") {
+    return "🚫 Cliente sin respuesta";
+  }
+
+  if (type === "followup") {
+    return "📨 Automation ejecutada";
+  }
+
+  return "📌 Actividad registrada";
 }
 
 export default async function EditarClientePage({
   searchParams,
 }: {
-  searchParams: Promise<{ id?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ id?: string }>;
 }) {
-  const { id, ok, error } = await searchParams;
+  const params = await searchParams;
+
+  const clienteId = params.id;
+
+  if (!clienteId) {
+    redirect("/dashboard/clientes");
+  }
 
   const supabase = await createAuthServerClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -63,14 +97,31 @@ export default async function EditarClientePage({
     redirect("/login");
   }
 
-  if (!id) {
+  const admin = createAdminClient();
+
+  const { data: cliente, error } = await admin
+    .from("clientes")
+    .select("*")
+    .eq("id", clienteId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (error || !cliente) {
     redirect("/dashboard/clientes");
   }
 
-  async function saveCliente(formData: FormData) {
+  const { data: logs } = await admin
+    .from("activity_logs")
+    .select("id,type,created_at")
+    .eq("cliente_id", clienteId)
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  async function updateCliente(formData: FormData) {
     "use server";
 
     const supabase = await createAuthServerClient();
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -79,80 +130,45 @@ export default async function EditarClientePage({
       redirect("/login");
     }
 
-    const clienteId = String(formData.get("id") || "").trim();
-    const nombre = String(formData.get("nombre") || "").trim();
-    const telefono = String(formData.get("telefono") || "").trim();
-    const estado = String(formData.get("estado") || "Nuevo").trim();
-    const notas = String(formData.get("notas") || "").trim();
-    const recordatorio = String(formData.get("recordatorio") || "").trim();
-    const proximoContacto = String(
-      formData.get("proximo_contacto") || ""
-    ).trim();
-
-    if (!clienteId || !nombre || !telefono) {
-      redirect(`/dashboard/editar?id=${clienteId}&error=missing`);
-    }
-
-    if (proximoContacto && !/^\d{4}-\d{2}-\d{2}$/.test(proximoContacto)) {
-      redirect(`/dashboard/editar?id=${clienteId}&error=date`);
-    }
-
     const admin = createAdminClient();
 
-    const { error } = await admin
+    const id = String(formData.get("id") || "");
+
+    const nombre = String(formData.get("nombre") || "");
+    const telefono = String(formData.get("telefono") || "");
+    const estado = String(formData.get("estado") || "");
+    const notas = String(formData.get("notas") || "");
+    const recordatorio = String(formData.get("recordatorio") || "");
+    const proximo_contacto = String(
+      formData.get("proximo_contacto") || ""
+    );
+
+    await admin
       .from("clientes")
       .update({
         nombre,
         telefono,
         estado,
-        notas: notas || null,
-        recordatorio: recordatorio || null,
-        proximo_contacto: proximoContacto || null,
+        notas,
+        recordatorio,
+        proximo_contacto: proximo_contacto || null,
       })
-      .eq("id", clienteId)
+      .eq("id", id)
       .eq("user_id", user.id);
 
-    if (error) {
-      redirect(`/dashboard/editar?id=${clienteId}&error=save`);
-    }
+    await admin.from("activity_logs").insert({
+      user_id: user.id,
+      cliente_id: id,
+      type: "manual_update",
+    });
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clientes");
     revalidatePath("/dashboard/automations");
-    revalidatePath("/dashboard/calendario");
-    revalidatePath(`/dashboard/whatsapp?id=${clienteId}`);
-    revalidatePath(`/dashboard/editar?id=${clienteId}`);
+    revalidatePath(`/dashboard/editar?id=${id}`);
 
-    redirect(`/dashboard/editar?id=${clienteId}&ok=1`);
+    redirect(`/dashboard/editar?id=${id}`);
   }
-
-  const admin = createAdminClient();
-
-  const { data } = await admin
-    .from("clientes")
-    .select("*")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const cliente = data as Cliente | null;
-
-  if (!cliente) {
-    redirect("/dashboard/clientes");
-  }
-
-  const message =
-    ok === "1"
-      ? "Cliente actualizado correctamente."
-      : error === "missing"
-      ? "Completa nombre y teléfono."
-      : error === "date"
-      ? "La fecha debe tener formato válido."
-      : error === "save"
-      ? "No pudimos guardar los cambios."
-      : null;
-
-  const isSuccess = ok === "1";
 
   return (
     <div className="dashboard-shell">
@@ -166,74 +182,25 @@ export default async function EditarClientePage({
 
           <div className="flex-1 px-6 py-10">
             <div className="mx-auto max-w-5xl">
-              <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="mb-3">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
-                      <ParaguayBadge />
-                      Paraguay
-                    </span>
-                  </div>
+              <PageHeader
+                title={cliente.nombre}
+                description="Editar cliente y revisar actividad."
+              />
 
-                  <h1 className="text-5xl font-bold tracking-tight text-slate-950">
-                    Editar cliente
-                  </h1>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                    Actualiza datos, seguimiento y fecha de próximo contacto sin
-                    errores de zona horaria.
-                  </p>
-                </div>
+              <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <form action={updateCliente} className="space-y-5">
+                    <input type="hidden" name="id" value={cliente.id} />
 
-                <a
-                  href="/dashboard/clientes"
-                  className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
-                >
-                  Volver a clientes
-                </a>
-              </div>
-
-              {message && (
-                <div
-                  className={`mb-6 rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                    isSuccess
-                      ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border border-red-200 bg-red-50 text-red-800"
-                  }`}
-                >
-                  {isSuccess ? "✅ " : "⚠️ "}
-                  {message}
-                </div>
-              )}
-
-              <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-                <form
-                  action={saveCliente}
-                  className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm"
-                >
-                  <input type="hidden" name="id" value={cliente.id} />
-
-                  <div className="mb-5">
-                    <div className="mb-3 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                      Edición principal
-                    </div>
-                    <h2 className="text-2xl font-semibold text-slate-900">
-                      Datos del cliente
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      Guarda nombre, teléfono, estado y fecha de seguimiento.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-5 md:grid-cols-2">
                     <div>
                       <label className="mb-2 block text-sm font-medium text-slate-700">
                         Nombre
                       </label>
+
                       <input
-                        type="text"
                         name="nombre"
-                        defaultValue={cliente.nombre || ""}
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
+                        defaultValue={cliente.nombre}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500"
                       />
                     </div>
 
@@ -241,147 +208,146 @@ export default async function EditarClientePage({
                       <label className="mb-2 block text-sm font-medium text-slate-700">
                         Teléfono
                       </label>
+
                       <input
-                        type="text"
                         name="telefono"
-                        defaultValue={cliente.telefono || ""}
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
+                        defaultValue={cliente.telefono}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500"
                       />
                     </div>
-                  </div>
 
-                  <div className="mt-5 grid gap-5 md:grid-cols-2">
                     <div>
                       <label className="mb-2 block text-sm font-medium text-slate-700">
                         Estado
                       </label>
-                      <select
+
+                      <input
                         name="estado"
-                        defaultValue={cliente.estado || "Nuevo"}
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
-                      >
-                        <option value="Nuevo">Nuevo</option>
-                        <option value="Interesado">Interesado</option>
-                        <option value="Pagó">Pagó</option>
-                        <option value="Entregado">Entregado</option>
-                      </select>
+                        defaultValue={cliente.estado || ""}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500"
+                      />
                     </div>
 
                     <div>
                       <label className="mb-2 block text-sm font-medium text-slate-700">
                         Próximo contacto
                       </label>
+
                       <input
                         type="date"
                         name="proximo_contacto"
-                        defaultValue={dateInputValue(cliente.proximo_contacto)}
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
+                        defaultValue={cliente.proximo_contacto || ""}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500"
                       />
-                      <p className="mt-2 text-xs text-slate-500">
-                        Esta fecha se guarda exactamente como la eliges.
-                      </p>
                     </div>
-                  </div>
 
-                  <div className="mt-5">
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Recordatorio
-                    </label>
-                    <input
-                      type="text"
-                      name="recordatorio"
-                      defaultValue={cliente.recordatorio || ""}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
-                    />
-                  </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        Recordatorio
+                      </label>
 
-                  <div className="mt-5">
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Notas
-                    </label>
-                    <textarea
-                      name="notas"
-                      rows={6}
-                      defaultValue={cliente.notas || ""}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-500"
-                    />
-                  </div>
+                      <textarea
+                        name="recordatorio"
+                        defaultValue={cliente.recordatorio || ""}
+                        rows={3}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500"
+                      />
+                    </div>
 
-                  <div className="mt-6 flex flex-wrap gap-3">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        Notas
+                      </label>
+
+                      <textarea
+                        name="notas"
+                        defaultValue={cliente.notas || ""}
+                        rows={6}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500"
+                      />
+                    </div>
+
                     <button
                       type="submit"
                       className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
                     >
                       Guardar cambios
                     </button>
-
-                    <a
-                      href={`/dashboard/whatsapp?id=${cliente.id}`}
-                      className="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
-                    >
-                      Ver WhatsApp AI
-                    </a>
-                  </div>
-                </form>
+                  </form>
+                </div>
 
                 <div className="space-y-6">
-                  <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                      Resumen actual
-                    </div>
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      Cliente snapshot
+                    </h2>
 
-                    <div className="grid gap-4">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                          Nombre
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">
-                          {cliente.nombre}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                          Teléfono
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">
-                          {cliente.telefono}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                    <div className="mt-5 space-y-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-slate-400">
                           Estado
                         </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">
-                          {cliente.estado}
+
+                        <p className="mt-1 text-sm font-medium text-slate-700">
+                          {cliente.estado || "—"}
                         </p>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-slate-400">
                           Próximo contacto
                         </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">
-                          {formatDateDisplay(cliente.proximo_contacto)}
+
+                        <p className="mt-1 text-sm font-medium text-slate-700">
+                          {formatDate(cliente.proximo_contacto)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-slate-400">
+                          Reminder
+                        </p>
+
+                        <p className="mt-1 text-sm font-medium text-slate-700">
+                          {cliente.recordatorio || "—"}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                      Nota importante
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-semibold text-slate-900">
+                        Activity history
+                      </h2>
+
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                        {logs?.length || 0}
+                      </span>
                     </div>
 
-                    <p className="text-sm leading-6 text-slate-600">
-                      Esta página usa el valor de fecha en formato{" "}
-                      <span className="font-semibold text-slate-900">
-                        YYYY-MM-DD
-                      </span>{" "}
-                      internamente para evitar que el sistema reste un día por
-                      error.
-                    </p>
+                    <div className="mt-5 space-y-3">
+                      {!logs || logs.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                          No hay actividad todavía.
+                        </div>
+                      ) : (
+                        logs.map((log: ActivityLog) => (
+                          <div
+                            key={log.id}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                          >
+                            <p className="text-sm font-medium text-slate-800">
+                              {getActivityLabel(log.type)}
+                            </p>
+
+                            <p className="mt-1 text-xs text-slate-400">
+                              {formatDateTime(log.created_at)}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

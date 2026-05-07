@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 
 import { AppHeader } from "../../components/AppHeader";
 import SidebarNav from "../SidebarNav";
@@ -7,13 +8,18 @@ import PageHeader from "../components/PageHeader";
 
 import { createAuthServerClient } from "../../../lib/supabase/auth-server";
 import { createAdminClient } from "../../../lib/supabase/server";
-
 import { buildWhatsAppLink } from "../../../lib/whatsapp-link";
 
 import {
   applyAutomationRules,
   buildAutomationReminders,
 } from "../../../lib/automation-engine";
+
+import {
+  markClientContacted,
+  scheduleNextFollowup,
+  closeOpportunity,
+} from "../../../lib/client-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,41 +32,22 @@ type Cliente = {
   proximo_contacto?: string | null;
 };
 
+type FilterType = "todos" | "urgente" | "alta" | "media" | "normal";
+
 function formatDate(date: string | null | undefined) {
   if (!date) return "—";
 
   const parts = date.split("-");
-
-  if (parts.length !== 3) {
-    return date;
-  }
+  if (parts.length !== 3) return date;
 
   const [y, m, d] = parts;
-
   return `${d}/${m}/${y}`;
 }
 
-function addDaysISO(days: number) {
-  const d = new Date();
-
-  d.setDate(d.getDate() + days);
-
-  return d.toISOString().slice(0, 10);
-}
-
 function getPriorityClasses(priority: string) {
-  if (priority === "urgent") {
-    return "border-red-200 bg-red-50";
-  }
-
-  if (priority === "high") {
-    return "border-amber-200 bg-amber-50";
-  }
-
-  if (priority === "medium") {
-    return "border-sky-200 bg-sky-50";
-  }
-
+  if (priority === "urgent") return "border-red-200 bg-red-50";
+  if (priority === "high") return "border-amber-200 bg-amber-50";
+  if (priority === "medium") return "border-sky-200 bg-sky-50";
   return "border-slate-200 bg-white";
 }
 
@@ -81,141 +68,150 @@ function getBadgeClasses(priority: string) {
 }
 
 function getPriorityLabel(priority: string) {
-  if (priority === "urgent") {
-    return "Urgente";
-  }
-
-  if (priority === "high") {
-    return "Alta";
-  }
-
-  if (priority === "medium") {
-    return "Media";
-  }
-
+  if (priority === "urgent") return "Urgente";
+  if (priority === "high") return "Alta";
+  if (priority === "medium") return "Media";
   return "Normal";
 }
 
-export default async function AutomationsPage() {
+function filterToPriority(filter: FilterType) {
+  if (filter === "urgente") return "urgent";
+  if (filter === "alta") return "high";
+  if (filter === "media") return "medium";
+  if (filter === "normal") return "low";
+
+  return null;
+}
+
+function filterHref(filter: FilterType) {
+  if (filter === "todos") return "/dashboard/automations";
+  return `/dashboard/automations?filter=${filter}`;
+}
+
+function FilterTab({
+  label,
+  count,
+  filter,
+  activeFilter,
+}: {
+  label: string;
+  count: number;
+  filter: FilterType;
+  activeFilter: FilterType;
+}) {
+  const active = filter === activeFilter;
+
+  return (
+    <Link
+      href={filterHref(filter)}
+      className={`rounded-2xl border px-4 py-3 text-sm font-semibold shadow-sm transition ${
+        active
+          ? "border-slate-900 bg-slate-900 text-white"
+          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+      }`}
+    >
+      {label}{" "}
+      <span
+        className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
+          active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+        }`}
+      >
+        {count}
+      </span>
+    </Link>
+  );
+}
+
+export default async function AutomationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const { filter = "todos" } = await searchParams;
+
+  const activeFilter: FilterType = [
+    "todos",
+    "urgente",
+    "alta",
+    "media",
+    "normal",
+  ].includes(filter)
+    ? (filter as FilterType)
+    : "todos";
+
   const supabase = await createAuthServerClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
 
-  async function markContacted(formData: FormData) {
+  async function actionContacted(formData: FormData) {
     "use server";
 
     const supabase = await createAuthServerClient();
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      redirect("/login");
-    }
+    if (!user) redirect("/login");
 
     const id = String(formData.get("id") || "");
+    if (!id) redirect("/dashboard/automations");
 
-    if (!id) {
-      redirect("/dashboard/automations");
-    }
-
-    const admin = createAdminClient();
-
-    await admin
-      .from("clientes")
-      .update({
-        estado: "Contactado",
-        recordatorio: "Cliente contactado desde automations",
-        proximo_contacto: addDaysISO(3),
-      })
-      .eq("id", id)
-      .eq("user_id", user.id);
+    await markClientContacted(user.id, id);
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clientes");
     revalidatePath("/dashboard/automations");
+    revalidatePath(`/dashboard/editar?id=${id}`);
 
     redirect("/dashboard/automations");
   }
 
-  async function snoozeFollowup(formData: FormData) {
+  async function actionSchedule3Days(formData: FormData) {
     "use server";
 
     const supabase = await createAuthServerClient();
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      redirect("/login");
-    }
+    if (!user) redirect("/login");
 
     const id = String(formData.get("id") || "");
+    if (!id) redirect("/dashboard/automations");
 
-    if (!id) {
-      redirect("/dashboard/automations");
-    }
-
-    const admin = createAdminClient();
-
-    await admin
-      .from("clientes")
-      .update({
-        estado: "Sin respuesta",
-        recordatorio: "Reintentar contacto en 3 días",
-        proximo_contacto: addDaysISO(3),
-      })
-      .eq("id", id)
-      .eq("user_id", user.id);
+    await scheduleNextFollowup(user.id, id, 3);
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clientes");
     revalidatePath("/dashboard/automations");
+    revalidatePath(`/dashboard/editar?id=${id}`);
 
     redirect("/dashboard/automations");
   }
 
-  async function closeDeal(formData: FormData) {
+  async function actionClose(formData: FormData) {
     "use server";
 
     const supabase = await createAuthServerClient();
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      redirect("/login");
-    }
+    if (!user) redirect("/login");
 
     const id = String(formData.get("id") || "");
+    if (!id) redirect("/dashboard/automations");
 
-    if (!id) {
-      redirect("/dashboard/automations");
-    }
-
-    const admin = createAdminClient();
-
-    await admin
-      .from("clientes")
-      .update({
-        estado: "Pagado",
-        recordatorio: "Cliente convertido correctamente",
-      })
-      .eq("id", id)
-      .eq("user_id", user.id);
+    await closeOpportunity(user.id, id);
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clientes");
     revalidatePath("/dashboard/automations");
+    revalidatePath(`/dashboard/editar?id=${id}`);
 
     redirect("/dashboard/automations");
   }
@@ -232,8 +228,21 @@ export default async function AutomationsPage() {
   }
 
   const clientes = applyAutomationRules((data ?? []) as Cliente[]);
-
   const reminders = buildAutomationReminders(clientes);
+
+  const counts = {
+    todos: reminders.length,
+    urgente: reminders.filter((r) => r.priority === "urgent").length,
+    alta: reminders.filter((r) => r.priority === "high").length,
+    media: reminders.filter((r) => r.priority === "medium").length,
+    normal: reminders.filter((r) => r.priority === "low").length,
+  };
+
+  const priorityFilter = filterToPriority(activeFilter);
+
+  const visibleReminders = priorityFilter
+    ? reminders.filter((r) => r.priority === priorityFilter)
+    : reminders;
 
   return (
     <div className="dashboard-shell">
@@ -252,23 +261,53 @@ export default async function AutomationsPage() {
                 description="CRM intelligence, follow-ups y acciones recomendadas."
               />
 
-              {reminders.length === 0 ? (
+              <div className="mb-6 flex flex-wrap gap-3">
+                <FilterTab
+                  label="Todos"
+                  count={counts.todos}
+                  filter="todos"
+                  activeFilter={activeFilter}
+                />
+                <FilterTab
+                  label="Urgente"
+                  count={counts.urgente}
+                  filter="urgente"
+                  activeFilter={activeFilter}
+                />
+                <FilterTab
+                  label="Alta"
+                  count={counts.alta}
+                  filter="alta"
+                  activeFilter={activeFilter}
+                />
+                <FilterTab
+                  label="Media"
+                  count={counts.media}
+                  filter="media"
+                  activeFilter={activeFilter}
+                />
+                <FilterTab
+                  label="Normal"
+                  count={counts.normal}
+                  filter="normal"
+                  activeFilter={activeFilter}
+                />
+              </div>
+
+              {visibleReminders.length === 0 ? (
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
-                  No hay automatizaciones todavía.
+                  No hay automatizaciones en este filtro.
                 </div>
               ) : (
                 <div className="space-y-5">
-                  {reminders.map((reminder) => {
+                  {visibleReminders.map((reminder) => {
                     const cliente = reminder.cliente;
 
                     const message =
                       cliente.recordatorio ||
                       `Hola ${cliente.nombre}, te escribo para hacer seguimiento 👋`;
 
-                    const link = buildWhatsAppLink(
-                      cliente.telefono,
-                      message
-                    );
+                    const link = buildWhatsAppLink(cliente.telefono, message);
 
                     return (
                       <div
@@ -355,13 +394,12 @@ export default async function AutomationsPage() {
                               Abrir cliente
                             </a>
 
-                            <form action={markContacted}>
+                            <form action={actionContacted}>
                               <input
                                 type="hidden"
                                 name="id"
                                 value={cliente.id}
                               />
-
                               <button
                                 type="submit"
                                 className="w-full rounded-2xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
@@ -370,13 +408,12 @@ export default async function AutomationsPage() {
                               </button>
                             </form>
 
-                            <form action={snoozeFollowup}>
+                            <form action={actionSchedule3Days}>
                               <input
                                 type="hidden"
                                 name="id"
                                 value={cliente.id}
                               />
-
                               <button
                                 type="submit"
                                 className="w-full rounded-2xl bg-amber-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-amber-600"
@@ -385,13 +422,12 @@ export default async function AutomationsPage() {
                               </button>
                             </form>
 
-                            <form action={closeDeal}>
+                            <form action={actionClose}>
                               <input
                                 type="hidden"
                                 name="id"
                                 value={cliente.id}
                               />
-
                               <button
                                 type="submit"
                                 className="w-full rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
