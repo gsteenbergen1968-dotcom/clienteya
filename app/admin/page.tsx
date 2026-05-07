@@ -9,6 +9,8 @@ type ProfileRow = {
   subscription_status: string | null;
   trial_ends_at: string | null;
   created_at: string | null;
+  payment_proof_url: string | null;
+  payment_notes: string | null;
 };
 
 type AuthUser = {
@@ -27,6 +29,9 @@ function getStatusBadge(status: string | null) {
   }
   if (status === "trial") {
     return "bg-amber-100 text-amber-700";
+  }
+  if (status === "pending_review") {
+    return "bg-sky-100 text-sky-700";
   }
   if (status === "canceled") {
     return "bg-red-100 text-red-700";
@@ -85,14 +90,12 @@ export default async function AdminPage() {
             </p>
           </div>
 
-          <div className="flex gap-3">
-            <a
-              href="/dashboard"
-              className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Volver al dashboard
-            </a>
-          </div>
+          <a
+            href="/dashboard"
+            className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Volver al dashboard
+          </a>
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -112,6 +115,8 @@ export default async function AdminPage() {
                     <th className="px-6 py-4 text-left">Email</th>
                     <th className="px-6 py-4 text-left">Estado</th>
                     <th className="px-6 py-4 text-left">Trial hasta</th>
+                    <th className="px-6 py-4 text-left">Comprobante</th>
+                    <th className="px-6 py-4 text-left">Nota</th>
                     <th className="px-6 py-4 text-left">Creado</th>
                     <th className="px-6 py-4 text-left">Acciones</th>
                   </tr>
@@ -142,25 +147,33 @@ export default async function AdminPage() {
                       </td>
 
                       <td className="px-6 py-4">
+                        {item.payment_proof_url ? (
+                          <a
+                            href={item.payment_proof_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-xl border border-slate-300 px-3 py-2 text-xs"
+                          >
+                            Ver comprobante
+                          </a>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      <td className="px-6 py-4">
+                        {item.payment_notes || "—"}
+                      </td>
+
+                      <td className="px-6 py-4">
                         {formatDate(item.created_at)}
                       </td>
 
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-2">
-                          <form
-                            action="/api/admin/subscription"
-                            method="POST"
-                          >
-                            <input
-                              type="hidden"
-                              name="profile_id"
-                              value={item.id}
-                            />
-                            <input
-                              type="hidden"
-                              name="status"
-                              value="active"
-                            />
+                          <form action="/api/admin/subscription" method="POST">
+                            <input type="hidden" name="profile_id" value={item.id} />
+                            <input type="hidden" name="status" value="active" />
                             <button
                               type="submit"
                               className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-medium text-white"
@@ -169,20 +182,9 @@ export default async function AdminPage() {
                             </button>
                           </form>
 
-                          <form
-                            action="/api/admin/subscription"
-                            method="POST"
-                          >
-                            <input
-                              type="hidden"
-                              name="profile_id"
-                              value={item.id}
-                            />
-                            <input
-                              type="hidden"
-                              name="status"
-                              value="trial"
-                            />
+                          <form action="/api/admin/subscription" method="POST">
+                            <input type="hidden" name="profile_id" value={item.id} />
+                            <input type="hidden" name="status" value="trial" />
                             <button
                               type="submit"
                               className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700"
@@ -191,20 +193,9 @@ export default async function AdminPage() {
                             </button>
                           </form>
 
-                          <form
-                            action="/api/admin/subscription"
-                            method="POST"
-                          >
-                            <input
-                              type="hidden"
-                              name="profile_id"
-                              value={item.id}
-                            />
-                            <input
-                              type="hidden"
-                              name="status"
-                              value="canceled"
-                            />
+                          <form action="/api/admin/subscription" method="POST">
+                            <input type="hidden" name="profile_id" value={item.id} />
+                            <input type="hidden" name="status" value="canceled" />
                             <button
                               type="submit"
                               className="rounded-xl bg-red-600 px-3 py-2 text-xs font-medium text-white"

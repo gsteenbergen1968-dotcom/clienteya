@@ -1,198 +1,253 @@
-"use client";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { AppHeader } from "../components/AppHeader";
+import { createAuthServerClient } from "../../lib/supabase/auth-server";
+import { createAdminClient } from "../../lib/supabase/server";
 
-import { useState } from "react";
-import { createAuthClient } from "../../lib/supabase/auth-client";
+export const dynamic = "force-dynamic";
 
-export default function BillingPage() {
-  const supabase = createAuthClient();
+function formatGs(value: number) {
+  return `Gs. ${value.toLocaleString("es-ES")}`;
+}
 
-  const [file, setFile] = useState<File | null>(null);
-  const [notes, setNotes] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ok?: string }>;
+}) {
+  const { ok } = await searchParams;
 
-  async function handleUpload(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setMessage("");
-    setError("");
+  const supabase = await createAuthServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-      if (!user) {
-        setError("Debes iniciar sesión.");
-        setLoading(false);
-        return;
-      }
+  async function submitTransfer(formData: FormData) {
+    "use server";
 
-      if (!file) {
-        setError("Selecciona un comprobante.");
-        setLoading(false);
-        return;
-      }
+    const supabase = await createAuthServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-      const fileExt = file.name.split(".").pop();
-      const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+    if (!user) redirect("/login");
 
-      const { error: uploadError } = await supabase.storage
-        .from("payment-proofs")
-        .upload(filePath, file, {
-          upsert: true,
-        });
+    const plan = String(formData.get("plan") || "pro");
+    const amount = plan === "pro" ? 90000 : 50000;
 
-      if (uploadError) {
-        setError(uploadError.message);
-        setLoading(false);
-        return;
-      }
+    const admin = createAdminClient();
 
-      const { data: urlData } = supabase.storage
-        .from("payment-proofs")
-        .getPublicUrl(filePath);
+    await admin
+      .from("profiles")
+      .update({
+        plan_type: plan,
+        payment_amount: amount,
+        payment_method: "transferencia",
+        subscription_status: "pending_review",
+        payment_notes: `Solicitud de activación ${plan.toUpperCase()} por transferencia: ${formatGs(
+          amount
+        )}`,
+      })
+      .eq("id", user.id);
 
-      const proofUrl = urlData.publicUrl;
+    revalidatePath("/billing");
+    revalidatePath("/dashboard");
 
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          payment_proof_url: proofUrl,
-          payment_notes: notes,
-          subscription_status: "pending_review",
-        })
-        .eq("id", user.id);
-
-      if (updateError) {
-        setError(updateError.message);
-        setLoading(false);
-        return;
-      }
-
-      setMessage(
-        "Comprobante enviado correctamente. Revisaremos tu pago pronto."
-      );
-      setFile(null);
-      setNotes("");
-    } catch {
-      setError("No se pudo subir el comprobante.");
-    }
-
-    setLoading(false);
+    redirect("/billing?ok=1");
   }
 
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("subscription_status, plan_type, payment_amount, payment_notes")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const currentPlan = profile?.plan_type || "basic";
+
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-16 text-slate-900">
-      <div className="mx-auto max-w-4xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Activar ClienteYA</h1>
-          <p className="mt-2 text-slate-500">
-            Activa tu cuenta con transferencia bancaria y sube tu comprobante.
-          </p>
-        </div>
+    <div className="min-h-screen bg-slate-50">
+      <AppHeader />
 
-        <div className="grid gap-8 md:grid-cols-2">
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-            <p className="text-sm text-slate-500">Plan mensual</p>
-            <p className="mt-2 text-4xl font-bold">50.000 Gs</p>
-            <p className="mt-1 text-sm text-slate-500">por mes</p>
-
-            <ul className="mt-6 space-y-2 text-sm text-slate-700">
-              <li>✓ Clientes ilimitados</li>
-              <li>✓ Dashboard completo</li>
-              <li>✓ Recordatorios y calendario</li>
-              <li>✓ Plantillas de WhatsApp</li>
-              <li>✓ Panel admin y activación manual</li>
-            </ul>
-
-            <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 text-sm">
-              <p className="font-semibold">Datos para transferencia</p>
-
-              <div className="mt-4 space-y-2 text-slate-700">
-                <p>
-                  <span className="font-medium">Banco:</span> Familiar
-                </p>
-                <p>
-                  <span className="font-medium">Titular:</span> Gerard Henri Steenbergen
-                </p>
-                <p>
-                  <span className="font-medium">Alias:</span> 9192349
-                </p>
-                <p>
-                  <span className="font-medium">Número de cuenta:</span> 0-13905963
-                </p>
-                <p>
-                  <span className="font-medium">Monto:</span> 50.000 Gs
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Después de transferir, sube el comprobante para activar tu cuenta.
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-6">
-            <h2 className="text-lg font-semibold">Subir comprobante</h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Aceptamos imagen o PDF del comprobante de transferencia.
+      <main className="px-6 py-10">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-8">
+            <h1 className="text-5xl font-bold tracking-tight text-slate-950">
+              Activar plan
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
+              Elige tu plan y activa ClienteYA mediante transferencia bancaria.
             </p>
+          </div>
 
-            <form onSubmit={handleUpload} className="mt-6 space-y-5">
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Archivo
-                </label>
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-                />
+          {ok === "1" && (
+            <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              ✅ Solicitud enviada. Revisaremos tu transferencia y activaremos tu cuenta.
+            </div>
+          )}
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+                Básico
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Nota opcional
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={4}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none"
-                  placeholder="Ej. Transferencia hecha desde Banco Familiar"
-                />
+              <h2 className="text-3xl font-bold text-slate-900">
+                {formatGs(50000)}
+                <span className="text-sm font-medium text-slate-500"> / mes</span>
+              </h2>
+
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Para empezar simple y mantener tus clientes ordenados.
+              </p>
+
+              <div className="mt-6 space-y-3 text-sm text-slate-700">
+                <p>✅ CRM de clientes</p>
+                <p>✅ Dashboard básico</p>
+                <p>✅ WhatsApp manual</p>
+                <p>✅ Seguimientos simples</p>
               </div>
 
-              {message ? (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  {message}
-                </div>
-              ) : null}
+              <form action={submitTransfer} className="mt-6">
+                <input type="hidden" name="plan" value="basic" />
+                <button
+                  type="submit"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                >
+                  Activar Básico
+                </button>
+              </form>
+            </div>
 
-              {error ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {error}
-                </div>
-              ) : null}
+            <div className="relative rounded-[30px] border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 shadow-sm">
+              <div className="absolute right-5 top-5 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">
+                Recomendado
+              </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="rounded-2xl bg-black px-5 py-3 text-sm font-semibold text-white"
+              <div className="mb-4 inline-flex rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700">
+                Pro
+              </div>
+
+              <h2 className="text-3xl font-bold text-slate-900">
+                {formatGs(90000)}
+                <span className="text-sm font-medium text-slate-500"> / mes</span>
+              </h2>
+
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Para vender más rápido con AI, prioridades y follow-ups automáticos.
+              </p>
+
+              <div className="mt-6 space-y-3 text-sm text-slate-800">
+                <p>✅ Todo lo de Básico</p>
+                <p>✅ AI WhatsApp assistant</p>
+                <p>✅ Mensajes según estado del cliente</p>
+                <p>✅ Auto follow-up</p>
+                <p>✅ Automations y prioridades</p>
+                <p>✅ AI aprende tu estilo</p>
+              </div>
+
+              <form action={submitTransfer} className="mt-6">
+                <input type="hidden" name="plan" value="pro" />
+                <button
+                  type="submit"
+                  className="w-full rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                >
+                  Activar Pro
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_0.8fr]">
+            <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-2xl font-semibold text-slate-900">
+                Datos para transferencia
+              </h2>
+
+              <div className="mt-5 grid gap-4 text-sm">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                    Banco / Billetera
+                  </p>
+                  <p className="mt-1 font-semibold text-slate-900">
+                    Completar con tus datos
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                    Titular
+                  </p>
+                  <p className="mt-1 font-semibold text-slate-900">
+                    ClienteYA Paraguay
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                    Concepto
+                  </p>
+                  <p className="mt-1 font-semibold text-slate-900">
+                    ClienteYA + tu email
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-5 text-sm leading-6 text-slate-500">
+                Después de transferir, presiona el botón del plan elegido. Revisaremos
+                el pago y activaremos tu cuenta.
+              </p>
+            </div>
+
+            <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-2xl font-semibold text-slate-900">
+                Estado actual
+              </h2>
+
+              <div className="mt-5 space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                    Plan
+                  </p>
+                  <p className="mt-1 font-semibold text-slate-900">
+                    {currentPlan.toUpperCase()}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                    Estado
+                  </p>
+                  <p className="mt-1 font-semibold text-slate-900">
+                    {profile?.subscription_status || "trial"}
+                  </p>
+                </div>
+
+                {profile?.payment_amount && (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs uppercase tracking-wide text-slate-400">
+                      Monto solicitado
+                    </p>
+                    <p className="mt-1 font-semibold text-slate-900">
+                      {formatGs(Number(profile.payment_amount))}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <a
+                href="/dashboard"
+                className="mt-6 inline-block rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
               >
-                {loading ? "Subiendo..." : "Enviar comprobante"}
-              </button>
-            </form>
+                Volver al dashboard
+              </a>
+            </div>
           </div>
         </div>
-
-        <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          La activación se hace manualmente después de verificar el pago.
-        </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

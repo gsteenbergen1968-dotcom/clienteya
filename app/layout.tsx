@@ -1,16 +1,16 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import "../styles/brand.css";
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "ClienteYA",
-  description: "Dashboard de ventas por WhatsApp",
+  description: "ClienteYA para Paraguay",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="es">
       <body>{children}</body>
