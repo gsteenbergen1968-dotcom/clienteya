@@ -8,12 +8,21 @@ import PageHeader from "../components/PageHeader";
 
 import { createAuthServerClient } from "../../../lib/supabase/auth-server";
 import { createAdminClient } from "../../../lib/supabase/server";
+
 import { buildWhatsAppLink } from "../../../lib/whatsapp-link";
 
 import {
   applyAutomationRules,
   buildAutomationReminders,
 } from "../../../lib/automation-engine";
+
+import { buildAIRecommendations } from "../../../lib/ai-recommendations";
+import { buildWhatsAppDraft } from "../../../lib/whatsapp-drafts";
+
+import {
+  detectClientPhase,
+  getPhaseClasses,
+} from "../../../lib/phase-detection";
 
 import {
   markClientContacted,
@@ -28,6 +37,7 @@ type Cliente = {
   nombre: string;
   telefono: string;
   estado?: string | null;
+  notas?: string | null;
   recordatorio?: string | null;
   proximo_contacto?: string | null;
 };
@@ -38,9 +48,11 @@ function formatDate(date: string | null | undefined) {
   if (!date) return "—";
 
   const parts = date.split("-");
+
   if (parts.length !== 3) return date;
 
   const [y, m, d] = parts;
+
   return `${d}/${m}/${y}`;
 }
 
@@ -48,6 +60,7 @@ function getPriorityClasses(priority: string) {
   if (priority === "urgent") return "border-red-200 bg-red-50";
   if (priority === "high") return "border-amber-200 bg-amber-50";
   if (priority === "medium") return "border-sky-200 bg-sky-50";
+
   return "border-slate-200 bg-white";
 }
 
@@ -71,6 +84,7 @@ function getPriorityLabel(priority: string) {
   if (priority === "urgent") return "Urgente";
   if (priority === "high") return "Alta";
   if (priority === "medium") return "Media";
+
   return "Normal";
 }
 
@@ -84,7 +98,10 @@ function filterToPriority(filter: FilterType) {
 }
 
 function filterHref(filter: FilterType) {
-  if (filter === "todos") return "/dashboard/automations";
+  if (filter === "todos") {
+    return "/dashboard/automations";
+  }
+
   return `/dashboard/automations?filter=${filter}`;
 }
 
@@ -110,7 +127,8 @@ function FilterTab({
           : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
       }`}
     >
-      {label}{" "}
+      {label}
+
       <span
         className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
           active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
@@ -145,20 +163,28 @@ export default async function AutomationsPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) {
+    redirect("/login");
+  }
 
   async function actionContacted(formData: FormData) {
     "use server";
 
     const supabase = await createAuthServerClient();
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) redirect("/login");
+    if (!user) {
+      redirect("/login");
+    }
 
     const id = String(formData.get("id") || "");
-    if (!id) redirect("/dashboard/automations");
+
+    if (!id) {
+      redirect("/dashboard/automations");
+    }
 
     await markClientContacted(user.id, id);
 
@@ -174,14 +200,20 @@ export default async function AutomationsPage({
     "use server";
 
     const supabase = await createAuthServerClient();
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) redirect("/login");
+    if (!user) {
+      redirect("/login");
+    }
 
     const id = String(formData.get("id") || "");
-    if (!id) redirect("/dashboard/automations");
+
+    if (!id) {
+      redirect("/dashboard/automations");
+    }
 
     await scheduleNextFollowup(user.id, id, 3);
 
@@ -197,14 +229,20 @@ export default async function AutomationsPage({
     "use server";
 
     const supabase = await createAuthServerClient();
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) redirect("/login");
+    if (!user) {
+      redirect("/login");
+    }
 
     const id = String(formData.get("id") || "");
-    if (!id) redirect("/dashboard/automations");
+
+    if (!id) {
+      redirect("/dashboard/automations");
+    }
 
     await closeOpportunity(user.id, id);
 
@@ -220,7 +258,7 @@ export default async function AutomationsPage({
 
   const { data, error } = await admin
     .from("clientes")
-    .select("id,nombre,telefono,estado,recordatorio,proximo_contacto")
+    .select("id,nombre,telefono,estado,notas,recordatorio,proximo_contacto")
     .eq("user_id", user.id);
 
   if (error) {
@@ -268,24 +306,28 @@ export default async function AutomationsPage({
                   filter="todos"
                   activeFilter={activeFilter}
                 />
+
                 <FilterTab
                   label="Urgente"
                   count={counts.urgente}
                   filter="urgente"
                   activeFilter={activeFilter}
                 />
+
                 <FilterTab
                   label="Alta"
                   count={counts.alta}
                   filter="alta"
                   activeFilter={activeFilter}
                 />
+
                 <FilterTab
                   label="Media"
                   count={counts.media}
                   filter="media"
                   activeFilter={activeFilter}
                 />
+
                 <FilterTab
                   label="Normal"
                   count={counts.normal}
@@ -303,11 +345,20 @@ export default async function AutomationsPage({
                   {visibleReminders.map((reminder) => {
                     const cliente = reminder.cliente;
 
-                    const message =
-                      cliente.recordatorio ||
-                      `Hola ${cliente.nombre}, te escribo para hacer seguimiento 👋`;
+                    const aiRecommendations = buildAIRecommendations(cliente);
+                    const primaryRecommendation = aiRecommendations[0];
 
-                    const link = buildWhatsAppLink(cliente.telefono, message);
+                    const smartDraft = buildWhatsAppDraft(
+                      cliente,
+                      primaryRecommendation
+                    );
+
+                    const phase = detectClientPhase(cliente);
+
+                    const link = buildWhatsAppLink(
+                      cliente.telefono,
+                      smartDraft
+                    );
 
                     return (
                       <div
@@ -330,6 +381,18 @@ export default async function AutomationsPage({
                               <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">
                                 Score {reminder.score}
                               </span>
+
+                              <span
+                                className={`rounded-full border px-3 py-1 text-xs font-semibold ${getPhaseClasses(
+                                  phase.tone
+                                )}`}
+                              >
+                                {phase.label}
+                              </span>
+
+                              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500">
+                                {phase.confidence}% AI confidence
+                              </span>
                             </div>
 
                             <h2 className="text-3xl font-bold tracking-tight text-slate-900">
@@ -344,6 +407,20 @@ export default async function AutomationsPage({
                               Próximo contacto:{" "}
                               {formatDate(cliente.proximo_contacto)}
                             </p>
+
+                            <div className="mt-5 rounded-2xl border border-slate-200 bg-white/70 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                AI phase detection
+                              </p>
+
+                              <p className="mt-2 text-base font-semibold text-slate-900">
+                                {phase.label}
+                              </p>
+
+                              <p className="mt-1 text-sm text-slate-600">
+                                {phase.description}
+                              </p>
+                            </div>
 
                             <div className="mt-5">
                               <p className="text-lg font-semibold text-slate-900">
@@ -365,8 +442,41 @@ export default async function AutomationsPage({
                               </p>
                             </div>
 
-                            <div className="mt-4 rounded-2xl bg-white/80 p-4 text-sm text-slate-700">
-                              {message}
+                            <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                                AI WhatsApp draft
+                              </p>
+
+                              <p className="mt-3 text-sm leading-6 text-slate-700">
+                                {smartDraft}
+                              </p>
+                            </div>
+
+                            <div className="mt-4 space-y-3">
+                              {aiRecommendations.map(
+                                (recommendation, index) => (
+                                  <div
+                                    key={index}
+                                    className={`rounded-2xl border p-4 ${
+                                      recommendation.tone === "green"
+                                        ? "border-emerald-200 bg-emerald-50"
+                                        : recommendation.tone === "amber"
+                                        ? "border-amber-200 bg-amber-50"
+                                        : recommendation.tone === "red"
+                                        ? "border-red-200 bg-red-50"
+                                        : "border-sky-200 bg-sky-50"
+                                    }`}
+                                  >
+                                    <p className="text-sm font-semibold text-slate-900">
+                                      🤖 {recommendation.title}
+                                    </p>
+
+                                    <p className="mt-1 text-sm text-slate-600">
+                                      {recommendation.description}
+                                    </p>
+                                  </div>
+                                )
+                              )}
                             </div>
                           </div>
 
@@ -400,6 +510,7 @@ export default async function AutomationsPage({
                                 name="id"
                                 value={cliente.id}
                               />
+
                               <button
                                 type="submit"
                                 className="w-full rounded-2xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
@@ -414,6 +525,7 @@ export default async function AutomationsPage({
                                 name="id"
                                 value={cliente.id}
                               />
+
                               <button
                                 type="submit"
                                 className="w-full rounded-2xl bg-amber-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-amber-600"
@@ -428,6 +540,7 @@ export default async function AutomationsPage({
                                 name="id"
                                 value={cliente.id}
                               />
+
                               <button
                                 type="submit"
                                 className="w-full rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
