@@ -13,8 +13,10 @@ export type ClienteForAutomation = {
 export type AutomationReminder = {
   cliente: ClienteForAutomation;
   score: number;
+  priority: "urgent" | "high" | "medium" | "low";
   title: string;
   description: string;
+  nextBestAction: string;
   actionLabel: string;
   actionType: "contactado" | "listo" | "schedule";
 };
@@ -40,16 +42,59 @@ function tomorrowISO() {
   return addDaysISO(1);
 }
 
+function daysBetweenISO(from: string, to: string) {
+  return Math.floor(
+    (new Date(to).getTime() - new Date(from).getTime()) /
+      (1000 * 60 * 60 * 24)
+  );
+}
+
+function normalize(value?: string | null) {
+  return value?.toLowerCase().trim() || "";
+}
+
+function isPaid(cliente: ClienteForAutomation) {
+  return normalize(cliente.estado).includes("pagado");
+}
+
+function isInterested(cliente: ClienteForAutomation) {
+  return normalize(cliente.estado).includes("interes");
+}
+
+function isNoResponse(cliente: ClienteForAutomation) {
+  return normalize(cliente.estado).includes("sin respuesta");
+}
+
+function isClosed(cliente: ClienteForAutomation) {
+  return normalize(cliente.estado).includes("cerrado");
+}
+
 export function applyAutomationRules<T extends ClienteForAutomation>(
   clientes: T[]
 ): T[] {
   return clientes.map((cliente) => {
+    if (isPaid(cliente) || isClosed(cliente)) {
+      return cliente;
+    }
+
     if (!cliente.proximo_contacto) {
+      let nextDate = addDaysISO(3);
+      let reminder = "Seguimiento automático en 3 días";
+
+      if (isInterested(cliente)) {
+        nextDate = addDaysISO(1);
+        reminder = "Cliente interesado: responder rápido";
+      }
+
+      if (isNoResponse(cliente)) {
+        nextDate = addDaysISO(3);
+        reminder = "Reintentar contacto en 3 días";
+      }
+
       return {
         ...cliente,
-        proximo_contacto: addDaysISO(3),
-        recordatorio:
-          cliente.recordatorio || "Seguimiento automático en 3 días",
+        proximo_contacto: nextDate,
+        recordatorio: cliente.recordatorio || reminder,
       };
     }
 
@@ -65,13 +110,29 @@ export function buildAutomationReminders(
 
   return clientes
     .map((cliente) => {
+      if (isPaid(cliente) || isClosed(cliente)) {
+        return null;
+      }
+
       if (cliente.proximo_contacto && cliente.proximo_contacto < today) {
+        const overdueDays = daysBetweenISO(cliente.proximo_contacto, today);
+
         return {
           cliente,
-          score: 100,
-          title: "Seguimiento atrasado",
+          score: 100 + overdueDays,
+          priority: overdueDays >= 7 ? "urgent" : "high",
+          title:
+            overdueDays >= 7
+              ? "🚨 Cliente muy atrasado"
+              : "🔴 Seguimiento atrasado",
           description:
-            "Este cliente ya pasó su fecha de contacto y requiere atención inmediata.",
+            overdueDays >= 7
+              ? "Este cliente necesita atención urgente inmediata."
+              : "Este cliente ya pasó su fecha de contacto.",
+          nextBestAction:
+            overdueDays >= 7
+              ? "Llamar directamente al cliente"
+              : "Enviar mensaje hoy",
           actionLabel: "Contactar ahora",
           actionType: "contactado" as const,
         };
@@ -81,9 +142,11 @@ export function buildAutomationReminders(
         return {
           cliente,
           score: 90,
-          title: "Seguimiento para hoy",
+          priority: "high",
+          title: "📅 Seguimiento para hoy",
           description:
             "Este cliente está programado para hoy. Conviene cerrar el contacto.",
+          nextBestAction: "Abrir WhatsApp y hacer seguimiento",
           actionLabel: "Marcar listo",
           actionType: "listo" as const,
         };
@@ -93,34 +156,59 @@ export function buildAutomationReminders(
         return {
           cliente,
           score: 75,
-          title: "Preparar contacto de mañana",
+          priority: "medium",
+          title: "🕒 Seguimiento mañana",
           description:
             "Puedes dejar listo el mensaje o preparar el siguiente paso.",
+          nextBestAction: "Preparar mensaje automático",
           actionLabel: "Agendar siguiente",
           actionType: "schedule" as const,
         };
       }
 
-      if (
-        cliente.estado?.toLowerCase().includes("interes") &&
-        !cliente.proximo_contacto
-      ) {
+      if (isInterested(cliente)) {
         return {
           cliente,
-          score: 70,
-          title: "Interesado sin próxima fecha",
+          score: 85,
+          priority: "high",
+          title: "🔥 Cliente interesado",
           description:
-            "Este cliente mostró interés, pero no tiene seguimiento agendado.",
-          actionLabel: "Agendar siguiente",
+            "Este cliente mostró interés y necesita seguimiento rápido.",
+          nextBestAction: "Enviar propuesta o cerrar venta",
+          actionLabel: "Responder ahora",
+          actionType: "contactado" as const,
+        };
+      }
+
+      if (isNoResponse(cliente)) {
+        return {
+          cliente,
+          score: 60,
+          priority: "medium",
+          title: "📨 Cliente sin respuesta",
+          description:
+            "Este cliente no respondió el último contacto.",
+          nextBestAction: "Reintentar contacto en horario distinto",
+          actionLabel: "Reintentar",
           actionType: "schedule" as const,
         };
       }
 
-      return null;
+      return {
+        cliente,
+        score: 40,
+        priority: "low",
+        title: "Seguimiento general",
+        description:
+          "Cliente activo sin prioridad urgente.",
+        nextBestAction: "Mantener contacto semanal",
+        actionLabel: "Abrir cliente",
+        actionType: "schedule" as const,
+      };
     })
     .filter(Boolean)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 4) as AutomationReminder[];
+    .slice(0, 6) as AutomationReminder[];
 }
 
 export function buildDashboardAlerts(
@@ -129,18 +217,43 @@ export function buildDashboardAlerts(
   const today = todayISO();
   const tomorrow = tomorrowISO();
 
-  const atrasados = clientes.filter(
+  const activeClientes = clientes.filter(
+    (c) => !isPaid(c) && !isClosed(c)
+  );
+
+  const atrasados = activeClientes.filter(
     (c) => c.proximo_contacto && c.proximo_contacto < today
   );
 
-  const hoy = clientes.filter((c) => c.proximo_contacto === today);
-  const manana = clientes.filter((c) => c.proximo_contacto === tomorrow);
+  const muyAtrasados = atrasados.filter(
+    (c) =>
+      c.proximo_contacto &&
+      daysBetweenISO(c.proximo_contacto, today) >= 7
+  );
 
-  const interesadosSinFecha = clientes.filter(
-    (c) => c.estado?.toLowerCase().includes("interes") && !c.proximo_contacto
+  const hoy = activeClientes.filter(
+    (c) => c.proximo_contacto === today
+  );
+
+  const manana = activeClientes.filter(
+    (c) => c.proximo_contacto === tomorrow
+  );
+
+  const interesados = activeClientes.filter((c) =>
+    isInterested(c)
   );
 
   const alerts: DashboardAlert[] = [];
+
+  if (muyAtrasados.length > 0) {
+    alerts.push({
+      id: "very-overdue",
+      tone: "red",
+      title: `🚨 ${muyAtrasados.length} cliente(s) críticos`,
+      description:
+        "Estos clientes llevan más de 7 días sin seguimiento.",
+    });
+  }
 
   if (atrasados.length > 0) {
     alerts.push({
@@ -148,7 +261,7 @@ export function buildDashboardAlerts(
       tone: "red",
       title: `🔥 ${atrasados.length} seguimiento(s) atrasado(s)`,
       description:
-        "Hay clientes que ya pasaron su fecha de contacto. Conviene priorizarlos ahora.",
+        "Hay clientes que requieren atención inmediata.",
     });
   }
 
@@ -158,7 +271,7 @@ export function buildDashboardAlerts(
       tone: "amber",
       title: `📅 ${hoy.length} seguimiento(s) para hoy`,
       description:
-        "Tienes clientes programados para contactar hoy. Puedes abrir WhatsApp y avanzar rápido.",
+        "Clientes programados para contactar hoy.",
     });
   }
 
@@ -166,29 +279,37 @@ export function buildDashboardAlerts(
     alerts.push({
       id: "tomorrow",
       tone: "sky",
-      title: `🕒 ${manana.length} seguimiento(s) para mañana`,
+      title: `🕒 ${manana.length} seguimiento(s) mañana`,
       description:
-        "Puedes preparar mensajes ahora y dejar listo el seguimiento de mañana.",
+        "Puedes preparar mensajes hoy.",
     });
   }
 
-  if (interesadosSinFecha.length > 0) {
+  if (interesados.length > 0) {
     alerts.push({
-      id: "interested-no-date",
+      id: "interested",
       tone: "emerald",
-      title: `💡 ${interesadosSinFecha.length} interesado(s) sin próxima fecha`,
+      title: `💡 ${interesados.length} cliente(s) interesados`,
       description:
-        "Estos clientes mostraron interés, pero aún no tienen un próximo contacto agendado.",
+        "Clientes con potencial alto de conversión.",
     });
   }
 
-  return alerts.slice(0, 3);
+  return alerts.slice(0, 4);
 }
 
 export function getAlertClasses(tone: DashboardAlert["tone"]) {
-  if (tone === "red") return "border-red-200 bg-red-50 text-red-800";
-  if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-800";
-  if (tone === "sky") return "border-sky-200 bg-sky-50 text-sky-800";
+  if (tone === "red") {
+    return "border-red-200 bg-red-50 text-red-800";
+  }
+
+  if (tone === "amber") {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+
+  if (tone === "sky") {
+    return "border-sky-200 bg-sky-50 text-sky-800";
+  }
 
   return "border-emerald-200 bg-emerald-50 text-emerald-800";
 }
