@@ -4,7 +4,7 @@ export type ClienteForAutomation = {
   id: string;
   nombre: string;
   telefono: string;
-  estado: string;
+  estado?: string | null;
   notas?: string | null;
   recordatorio?: string | null;
   proximo_contacto?: string | null;
@@ -30,10 +30,31 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function tomorrowISO() {
+function addDaysISO(days: number) {
   const d = new Date();
-  d.setDate(d.getDate() + 1);
+  d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+function tomorrowISO() {
+  return addDaysISO(1);
+}
+
+export function applyAutomationRules<T extends ClienteForAutomation>(
+  clientes: T[]
+): T[] {
+  return clientes.map((cliente) => {
+    if (!cliente.proximo_contacto) {
+      return {
+        ...cliente,
+        proximo_contacto: addDaysISO(3),
+        recordatorio:
+          cliente.recordatorio || "Seguimiento automático en 3 días",
+      };
+    }
+
+    return cliente;
+  });
 }
 
 export function buildAutomationReminders(
@@ -116,8 +137,7 @@ export function buildDashboardAlerts(
   const manana = clientes.filter((c) => c.proximo_contacto === tomorrow);
 
   const interesadosSinFecha = clientes.filter(
-    (c) =>
-      c.estado?.toLowerCase().includes("interes") && !c.proximo_contacto
+    (c) => c.estado?.toLowerCase().includes("interes") && !c.proximo_contacto
   );
 
   const alerts: DashboardAlert[] = [];
@@ -166,17 +186,9 @@ export function buildDashboardAlerts(
 }
 
 export function getAlertClasses(tone: DashboardAlert["tone"]) {
-  if (tone === "red") {
-    return "border-red-200 bg-red-50 text-red-800";
-  }
-
-  if (tone === "amber") {
-    return "border-amber-200 bg-amber-50 text-amber-800";
-  }
-
-  if (tone === "sky") {
-    return "border-sky-200 bg-sky-50 text-sky-800";
-  }
+  if (tone === "red") return "border-red-200 bg-red-50 text-red-800";
+  if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (tone === "sky") return "border-sky-200 bg-sky-50 text-sky-800";
 
   return "border-emerald-200 bg-emerald-50 text-emerald-800";
 }
@@ -197,9 +209,7 @@ export async function runDueAutomations(userId: string) {
   for (const followup of due) {
     await admin
       .from("scheduled_followups")
-      .update({
-        status: "due",
-      })
+      .update({ status: "due" })
       .eq("id", followup.id)
       .eq("user_id", userId);
 

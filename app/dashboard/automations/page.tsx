@@ -5,6 +5,7 @@ import { createAuthServerClient } from "../../../lib/supabase/auth-server";
 import { createAdminClient } from "../../../lib/supabase/server";
 import { buildWhatsAppLink } from "../../../lib/whatsapp-link";
 import PageHeader from "../components/PageHeader";
+import { applyAutomationRules } from "../../../lib/automation-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -44,14 +45,14 @@ export default async function AutomationsPage() {
     .from("clientes")
     .select("id,nombre,telefono,estado,recordatorio,proximo_contacto")
     .eq("user_id", user.id)
-    .not("proximo_contacto", "is", null)
     .order("proximo_contacto", { ascending: true });
 
   if (error) {
     console.error("Error loading automations:", error.message);
   }
 
-  const clientes = (data ?? []) as Cliente[];
+  // 🔥 Automation rules toegepast
+  const clientes = applyAutomationRules((data ?? []) as Cliente[]);
 
   return (
     <div className="dashboard-shell">
@@ -64,11 +65,11 @@ export default async function AutomationsPage() {
           </aside>
 
           <div className="flex-1 px-6 py-10">
-  <div className="mx-auto max-w-5xl">
-    <PageHeader
-      title="Automations"
-      description="Follow-ups programados para clientes con próximo contacto."
-    />
+            <div className="mx-auto max-w-5xl">
+              <PageHeader
+                title="Automations"
+                description="Follow-ups programados para clientes con próximo contacto."
+              />
 
               {clientes.length === 0 ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
