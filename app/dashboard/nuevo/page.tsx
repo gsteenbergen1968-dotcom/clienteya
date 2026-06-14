@@ -1,14 +1,17 @@
-import { createAdminClient } from "../../../lib/supabase/server";
-import { createAuthServerClient } from "../../../lib/supabase/auth-server";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+
+import { createAuthServerClient } from "../../../lib/supabase/auth-server";
+
 import { AppHeader } from "../../components/AppHeader";
 import SidebarNav from "../SidebarNav";
 
 export default async function NuevoClientePage() {
-  const authSupabase = await createAuthServerClient();
+  const supabase = await createAuthServerClient();
+
   const {
     data: { user },
-  } = await authSupabase.auth.getUser();
+  } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/login");
@@ -17,39 +20,55 @@ export default async function NuevoClientePage() {
   async function createCliente(formData: FormData) {
     "use server";
 
-    const authSupabase = await createAuthServerClient();
+    const supabase = await createAuthServerClient();
+
     const {
       data: { user },
-    } = await authSupabase.auth.getUser();
+    } = await supabase.auth.getUser();
 
     if (!user) {
       redirect("/login");
     }
 
-    const admin = createAdminClient();
-
     const nombre = String(formData.get("nombre") || "").trim();
     const telefono = String(formData.get("telefono") || "").trim();
     const estado = String(formData.get("estado") || "Nuevo").trim();
-    const proximo_contactoRaw = String(formData.get("proximo_contacto") || "").trim();
-    const recordatorio = String(formData.get("recordatorio") || "").trim();
+
+    const proximoContacto = String(
+      formData.get("proximo_contacto") || ""
+    ).trim();
+
+    const recordatorio = String(
+      formData.get("recordatorio") || ""
+    ).trim();
+
     const notas = String(formData.get("notas") || "").trim();
 
     if (!nombre || !telefono) {
       redirect("/dashboard/nuevo");
     }
 
-    await admin.from("clientes").insert({
+    const { error } = await supabase.from("clientes").insert({
       user_id: user.id,
       nombre,
       telefono,
       estado,
-      proximo_contacto: proximo_contactoRaw || null,
+      proximo_contacto: proximoContacto || null,
       recordatorio: recordatorio || null,
       notas: notas || null,
     });
 
-    redirect("/dashboard/clientes");
+    if (error) {
+      console.error("CLIENTE INSERT ERROR:", error);
+
+      redirect("/dashboard/nuevo");
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/clientes");
+    revalidatePath("/dashboard/automations");
+
+    redirect("/dashboard");
   }
 
   return (
@@ -78,7 +97,8 @@ export default async function NuevoClientePage() {
                   </h1>
 
                   <p className="mt-2 text-sm text-slate-500">
-                    Agrega un nuevo contacto para empezar a hacer seguimiento, recordar tareas y cerrar más ventas.
+                    Agrega un nuevo contacto para empezar a hacer seguimiento,
+                    recordar tareas y cerrar más ventas.
                   </p>
                 </div>
 
@@ -99,8 +119,10 @@ export default async function NuevoClientePage() {
                     <h2 className="text-2xl font-semibold text-slate-900">
                       Datos del cliente
                     </h2>
+
                     <p className="mt-2 text-sm text-slate-500">
-                      Completa los datos básicos para guardar el cliente en tu tablero.
+                      Completa los datos básicos para guardar el cliente en tu
+                      tablero.
                     </p>
                   </div>
 
@@ -109,8 +131,10 @@ export default async function NuevoClientePage() {
                       <label className="mb-2 block text-sm font-medium text-slate-700">
                         Nombre
                       </label>
+
                       <input
                         name="nombre"
+                        required
                         placeholder="Ej. María González"
                         className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
                       />
@@ -120,8 +144,10 @@ export default async function NuevoClientePage() {
                       <label className="mb-2 block text-sm font-medium text-slate-700">
                         Teléfono
                       </label>
+
                       <input
                         name="telefono"
+                        required
                         placeholder="Ej. 981123456"
                         className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
                       />
@@ -131,6 +157,7 @@ export default async function NuevoClientePage() {
                       <label className="mb-2 block text-sm font-medium text-slate-700">
                         Estado
                       </label>
+
                       <select
                         name="estado"
                         defaultValue="Nuevo"
@@ -147,6 +174,7 @@ export default async function NuevoClientePage() {
                       <label className="mb-2 block text-sm font-medium text-slate-700">
                         Próximo contacto
                       </label>
+
                       <input
                         type="date"
                         name="proximo_contacto"
@@ -159,9 +187,10 @@ export default async function NuevoClientePage() {
                     <label className="mb-2 block text-sm font-medium text-slate-700">
                       Recordatorio
                     </label>
+
                     <input
                       name="recordatorio"
-                      placeholder="Ej. Llamar para confirmar interés"
+                      placeholder="Ej. seguimiento whatsapp"
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
                     />
                   </div>
@@ -170,10 +199,11 @@ export default async function NuevoClientePage() {
                     <label className="mb-2 block text-sm font-medium text-slate-700">
                       Notas
                     </label>
+
                     <textarea
                       name="notas"
                       rows={6}
-                      placeholder="Escribe detalles importantes del cliente, objeciones, interés, producto consultado, etc."
+                      placeholder="Escribe detalles importantes del cliente."
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
                     />
                   </div>
@@ -202,43 +232,9 @@ export default async function NuevoClientePage() {
                     </h2>
 
                     <p className="mt-3 text-sm leading-6 text-slate-600">
-                      Si agregas un próximo contacto y una nota clara, será mucho más fácil hacer seguimiento y convertir ese cliente más adelante.
+                      Mientras más claro sea el seguimiento, más fácil será
+                      convertir clientes y organizar ventas.
                     </p>
-                  </div>
-
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-2xl font-semibold text-slate-900">
-                      Flujo recomendado
-                    </h2>
-
-                    <div className="mt-4 space-y-4">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="font-semibold text-slate-900">
-                          1. Guardar cliente
-                        </p>
-                        <p className="mt-2 text-sm text-slate-600">
-                          Crea el contacto con nombre y teléfono.
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="font-semibold text-slate-900">
-                          2. Agendar seguimiento
-                        </p>
-                        <p className="mt-2 text-sm text-slate-600">
-                          Define fecha y recordatorio para no olvidarte.
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="font-semibold text-slate-900">
-                          3. Actualizar estado
-                        </p>
-                        <p className="mt-2 text-sm text-slate-600">
-                          Cambia de Nuevo a Interesado, Pagó o Entregado.
-                        </p>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
@@ -247,7 +243,8 @@ export default async function NuevoClientePage() {
                     </h2>
 
                     <p className="mt-3 text-sm leading-6 text-amber-800">
-                      Usa un número de teléfono limpio y real para que los accesos rápidos por WhatsApp funcionen bien después en el dashboard.
+                      Usa números reales y limpios para que los accesos rápidos
+                      por WhatsApp funcionen correctamente.
                     </p>
                   </div>
                 </div>

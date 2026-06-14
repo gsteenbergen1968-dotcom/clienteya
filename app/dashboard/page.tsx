@@ -1,17 +1,34 @@
-import { createAdminClient } from "../../lib/supabase/server";
-import { createAuthServerClient } from "../../lib/supabase/auth-server";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+
+import { createAuthServerClient } from "../../lib/supabase/auth-server";
+
 import { AppHeader } from "../components/AppHeader";
+import EmptyState from "../components/EmptyState";
+import FounderModeBadge from "../components/FounderModeBadge";
+import KpiCard from "../components/KpiCard";
+import SectionCard from "../components/SectionCard";
+import UpgradeTriggerCard from "../components/UpgradeTriggerCard";
+import MobileDashboardNav from "./MobileDashboardNav";
 import SidebarNav from "./SidebarNav";
+
 import {
-  applySuggestionAction,
-  type SuggestionActionType,
-} from "../../lib/action-engine";
-import { getAccessState } from "../../lib/access-control";
-import { getWeeklyStats } from "../../lib/activity";
-import TopReminders from "./TopReminders";
-import UpgradeTriggerCard from "./UpgradeTriggerCard";
+  canAccessAICockpit,
+  hasPlatformAccess,
+  type ProfileAccess,
+} from "../../lib/access-control";
+
+import {
+  buildSectorDecisionCopy,
+  getBusinessTypeLabel,
+  normalizeBusinessType,
+} from "../../lib/sector-intelligence";
+import { buildWhatsAppSectorMessage } from "../../lib/whatsapp-sector-intelligence";
+import {
+  buildSectorKpiIntelligence,
+  type SectorKpiIntelligenceResult,
+} from "../../lib/sector-kpi-intelligence";
+import DashboardMemoryIntegration from "./components/DashboardMemoryIntegration";
 
 export const dynamic = "force-dynamic";
 
@@ -25,88 +42,468 @@ type Cliente = {
   recordatorio: string | null;
   proximo_contacto: string | null;
   created_at: string;
+  updated_at?: string | null;
   monto?: number | null;
   pagado?: boolean | null;
   fecha_pago?: string | null;
 };
 
-type Profile = {
+type ClienteRaw = {
+  id?: string | null;
+  user_id?: string | null;
+  nombre?: string | null;
+  telefono?: string | null;
+  estado?: string | null;
+  notas?: string | null;
+  recordatorio?: string | null;
+  proximo_contacto?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  monto?: number | null;
+  pagado?: boolean | null;
+  fecha_pago?: string | null;
+};
+
+type Profile = ProfileAccess & {
   id: string;
   email?: string | null;
   full_name?: string | null;
-  subscription_status: string | null;
-  trial_ends_at: string | null;
-  payment_proof_url: string | null;
-  payment_notes: string | null;
-  created_at: string | null;
-  plan_type?: string | null;
+  payment_proof_url?: string | null;
+  payment_notes?: string | null;
+  created_at?: string | null;
 };
+
+type BusinessSettings = {
+  user_id?: string | null;
+  company_name?: string | null;
+  business_name?: string | null;
+  name?: string | null;
+  business_type?: string | null;
+  business_sector?: string | null;
+  sector?: string | null;
+  industry?: string | null;
+  rubro?: string | null;
+  category?: string | null;
+  business_tone?: string | null;
+  tone?: string | null;
+  business_email?: string | null;
+  business_phone?: string | null;
+  whatsapp_number?: string | null;
+  country_label?: string | null;
+  city?: string | null;
+  ai_prompt?: string | null;
+};
+
+type PriorityTone = "red" | "amber" | "emerald" | "sky" | "slate";
+
+type TodayPriority = {
+  id: string;
+  nombre: string;
+  telefono: string;
+  estado: string;
+  monto: number;
+  score: number;
+  label: string;
+  reason: string;
+  sectorHeadline: string;
+  sectorActionPhrase: string;
+  sectorReason: string;
+  sectorPrimaryVerb: string;
+  actionLabel: string;
+  actionHref: string;
+  tone: PriorityTone;
+};
+
+const primaryActionButtonClass =
+  "inline-flex items-center justify-center rounded-2xl bg-blue-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800";
+
+const secondaryActionButtonClass =
+  "inline-flex items-center justify-center rounded-2xl border border-blue-200 bg-white px-5 py-3 text-sm font-black text-blue-700 shadow-sm transition hover:bg-blue-50";
+
+function normalizeText(value: string | null | undefined) {
+  return (value || "").toLowerCase().trim();
+}
+
+function normalizeCliente(cliente: ClienteRaw): Cliente {
+  return {
+    id: String(cliente.id || ""),
+    user_id: cliente.user_id || null,
+    nombre: cliente.nombre || "Cliente sin nombre",
+    telefono: cliente.telefono || "",
+    estado: cliente.estado || "Nuevo",
+    notas: cliente.notas || null,
+    recordatorio: cliente.recordatorio || null,
+    proximo_contacto: cliente.proximo_contacto || null,
+    created_at: cliente.created_at || new Date().toISOString(),
+    updated_at: cliente.updated_at || null,
+    monto: cliente.monto ?? null,
+    pagado: cliente.pagado ?? false,
+    fecha_pago: cliente.fecha_pago || null,
+  };
+}
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function tomorrowISO() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
+
   const [year, month, day] = value.slice(0, 10).split("-");
+
   if (!year || !month || !day) return value;
+
   return `${day}/${month}/${year}`;
 }
 
-function formatGs(value: number) {
-  return `Gs. ${value.toLocaleString("es-ES")}`;
+function formatGs(value: number | null | undefined) {
+  return `Gs.\u00A0${Number(value || 0).toLocaleString("es-PY")}`;
 }
 
-function getBadgeClasses(estado: string) {
-  const value = estado.toLowerCase();
+function daysBetween(date: string | null | undefined, today: string) {
+  if (!date) return null;
 
-  if (value === "pagó" || value === "pagado") {
-    return "border-emerald-200 bg-emerald-100 text-emerald-700";
+  const target = new Date(`${date.slice(0, 10)}T00:00:00`);
+  const current = new Date(`${today}T00:00:00`);
+
+  if (Number.isNaN(target.getTime()) || Number.isNaN(current.getTime())) {
+    return null;
   }
 
-  if (value === "interesado") {
-    return "border-amber-200 bg-amber-100 text-amber-700";
-  }
+  return Math.round(
+    (target.getTime() - current.getTime()) / (1000 * 60 * 60 * 24)
+  );
+}
 
-  if (value === "sin respuesta") {
-    return "border-orange-200 bg-orange-100 text-orange-700";
-  }
+function getWhatsappHref(
+  telefono: string | null | undefined,
+  message?: string | null
+) {
+  const raw = String(telefono || "").replace(/\D/g, "");
 
-  if (value === "contactado") {
-    return "border-blue-200 bg-blue-100 text-blue-700";
-  }
+  if (!raw) return "";
 
-  if (value === "cerrado") {
-    return "border-red-200 bg-red-100 text-red-700";
-  }
+  let number = raw;
+
+  if (number.startsWith("00")) number = number.slice(2);
+  if (number.startsWith("0")) number = number.slice(1);
+  if (!number.startsWith("595")) number = `595${number}`;
+
+  const baseHref = `https://wa.me/${number}`;
+  const cleanMessage = message?.trim();
+
+  if (!cleanMessage) return baseHref;
+
+  return `${baseHref}?text=${encodeURIComponent(cleanMessage)}`;
+}
+
+function getBadgeClasses(tone: PriorityTone) {
+  if (tone === "red") return "border-red-200 bg-red-50 text-red-800";
+  if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (tone === "emerald") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (tone === "sky") return "border-sky-200 bg-sky-50 text-sky-800";
+
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function getStatusClasses(estado: string | null | undefined) {
+  const value = normalizeText(estado);
+
+  if (value.includes("pag")) return "border-emerald-200 bg-emerald-100 text-emerald-700";
+  if (value.includes("interes")) return "border-amber-200 bg-amber-100 text-amber-700";
+  if (value.includes("sin")) return "border-orange-200 bg-orange-100 text-orange-700";
+  if (value.includes("contact")) return "border-blue-200 bg-blue-100 text-blue-700";
+  if (value.includes("cerr")) return "border-red-200 bg-red-100 text-red-700";
 
   return "border-slate-200 bg-slate-100 text-slate-700";
 }
 
+function getGreetingName(profile: Profile | null, email?: string | null) {
+  const fullName = profile?.full_name?.trim();
 
+  if (fullName) return fullName.split(" ")[0];
 
+  const emailName = email?.split("@")[0];
 
-function FeedbackBanner({ ok }: { ok?: string }) {
-  if (!ok) return null;
+  return emailName || "Founder";
+}
 
-  const messages: Record<string, string> = {
-    contactado: "Cliente actualizado como contactado.",
-    listo: "Cliente marcado como listo.",
-    pagado: "Pago registrado correctamente.",
-    agendado: "Siguiente acción agendada correctamente.",
-  };
+function getCompanyName(
+  businessSettings: BusinessSettings | null,
+  profile: Profile | null,
+  email?: string | null
+) {
+  const companyName = businessSettings?.company_name?.trim();
+  const businessName = businessSettings?.business_name?.trim();
+  const name = businessSettings?.name?.trim();
 
+  return companyName || businessName || name || getGreetingName(profile, email);
+}
+
+function getConfiguredSectorValue(businessSettings: BusinessSettings | null) {
   return (
-    <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
-      ✅ {messages[ok] || "Cambios guardados correctamente."}
-    </div>
+    businessSettings?.business_type ||
+    businessSettings?.business_sector ||
+    businessSettings?.sector ||
+    businessSettings?.industry ||
+    businessSettings?.rubro ||
+    businessSettings?.category ||
+    "general"
   );
+}
+
+function getDashboardIntro(businessType: string) {
+  const normalized = normalizeBusinessType(businessType);
+  const sectorLabel = getBusinessTypeLabel(normalized);
+
+  if (normalized === "restaurant") {
+    return {
+      sectorLabel,
+      title: "Clientes que pueden volver hoy",
+      description:
+        "ClienteYA detecta clientes ausentes, reservas pendientes y oportunidades de nueva visita.",
+    };
+  }
+
+  if (normalized === "real_estate") {
+    return {
+      sectorLabel,
+      title: "Interesados que necesitan seguimiento",
+      description:
+        "ClienteYA detecta visitas pendientes, interesados calientes y oportunidades que pueden enfriarse.",
+    };
+  }
+
+  if (normalized === "fitness") {
+    return {
+      sectorLabel,
+      title: "Miembros que necesitan atención",
+      description:
+        "ClienteYA detecta miembros inactivos, renovaciones pendientes y riesgo de cancelación.",
+    };
+  }
+
+  if (normalized === "retail") {
+    return {
+      sectorLabel,
+      title: "Clientes con recompra probable",
+      description:
+        "ClienteYA detecta clientes sin retorno, tickets abiertos y oportunidades de recompra.",
+    };
+  }
+
+  if (normalized === "beauty") {
+    return {
+      sectorLabel,
+      title: "Clientes que pueden volver a reservar",
+      description:
+        "ClienteYA detecta citas pendientes, clientes sin retorno y oportunidades de nueva reserva.",
+    };
+  }
+
+  if (normalized === "automotive") {
+    return {
+      sectorLabel,
+      title: "Clientes con interés por convertir",
+      description:
+        "ClienteYA detecta cotizaciones pendientes, interés enfriándose y oportunidades de venta.",
+    };
+  }
+
+  if (normalized === "medical") {
+    return {
+      sectorLabel,
+      title: "Pacientes que necesitan seguimiento",
+      description:
+        "ClienteYA detecta consultas por confirmar, seguimiento pendiente y continuidad en riesgo.",
+    };
+  }
+
+  if (normalized === "education") {
+    return {
+      sectorLabel,
+      title: "Alumnos que necesitan orientación",
+      description:
+        "ClienteYA detecta inscripciones pendientes, interés por perder y oportunidades académicas.",
+    };
+  }
+
+  return {
+    sectorLabel,
+    title: "Clientes que necesitan acción",
+    description:
+      "ClienteYA detecta prioridades comerciales y convierte datos en acciones simples.",
+  };
+}
+
+function getDecisionActionLabel(
+  label: string,
+  hasWhatsapp: boolean,
+  whatsappActionLabel?: string | null
+) {
+  const value = normalizeText(label);
+
+  if (value.includes("preparar") || value.includes("monitorear")) {
+    return "Ver cliente";
+  }
+
+  return hasWhatsapp ? whatsappActionLabel || "Enviar WhatsApp" : "Ver cliente";
+}
+
+function getDecisionActionHref(
+  cliente: Cliente,
+  label: string,
+  hasWhatsapp: boolean,
+  whatsappMessage?: string | null
+) {
+  const value = normalizeText(label);
+
+  if (!hasWhatsapp) return `/dashboard/clientes/${cliente.id}`;
+
+  if (value.includes("preparar") || value.includes("monitorear")) {
+    return `/dashboard/clientes/${cliente.id}`;
+  }
+
+  return getWhatsappHref(cliente.telefono, whatsappMessage);
+}
+
+function buildTodayPriorities(
+  clientes: Cliente[],
+  today: string,
+  businessType?: string | null,
+  businessSettings?: BusinessSettings | null,
+  companyName?: string | null
+): TodayPriority[] {
+  return clientes
+    .map((cliente) => {
+      const estado = normalizeText(cliente.estado);
+      const days = daysBetween(cliente.proximo_contacto, today);
+      const value = Number(cliente.monto || 0);
+      const hasWhatsapp = Boolean(getWhatsappHref(cliente.telefono));
+      const isPaid = Boolean(cliente.pagado || estado.includes("pag"));
+
+      let score = 35;
+      let label = "Monitorear";
+      let reason = "Cliente sin urgencia inmediata.";
+      let tone: PriorityTone = "slate";
+
+      if (estado.includes("interes")) {
+        score += 24;
+        label = "Cerrar esta semana";
+        reason = "Muestra interés y puede avanzar con seguimiento concreto.";
+        tone = "amber";
+      }
+
+      if (estado.includes("contact")) {
+        score += 14;
+        label = "Mantener momentum";
+        reason = "Ya existe contacto previo. Conviene mantener el ritmo.";
+        tone = "sky";
+      }
+
+      if (estado.includes("sin")) {
+        score += 16;
+        label = "Reactivar cliente";
+        reason = "Necesita una reactivación corta y humana.";
+        tone = "amber";
+      }
+
+      if (value > 0 && !isPaid) {
+        score += 15;
+        label = "Proteger ingreso";
+        reason = `${formatGs(value)} de oportunidad comercial abierta.`;
+        tone = "amber";
+      }
+
+      if (typeof days === "number") {
+        if (days < 0) {
+          score += 30;
+          label = "Actuar hoy";
+          reason = `Seguimiento vencido hace ${Math.abs(days)} día(s).`;
+          tone = "red";
+        } else if (days === 0) {
+          score += 25;
+          label = "Actuar hoy";
+          reason = "Seguimiento programado para hoy.";
+          tone = "red";
+        } else if (days === 1) {
+          score += 12;
+          label = "Preparar seguimiento";
+          reason = "Seguimiento programado para mañana.";
+          tone = "sky";
+        }
+      }
+
+      if (isPaid) {
+        score = Math.max(45, score - 18);
+        label = "Mantener cliente";
+        reason = "Cliente convertido. Cuidar relación, recompra o recomendación.";
+        tone = "emerald";
+      }
+
+      if (hasWhatsapp) score += 5;
+
+      score = Math.max(0, Math.min(100, Math.round(score)));
+
+      const sectorDecision = buildSectorDecisionCopy({
+        businessType: businessType || "general",
+        decisionLabel: label,
+        reason,
+        estado: cliente.estado,
+        daysOverdue:
+          typeof days === "number" && days < 0 ? Math.abs(days) : null,
+        hasWhatsapp,
+        isPaid,
+        hasValue: value > 0,
+      });
+
+      const daysOverdue =
+        typeof days === "number" && days < 0 ? Math.abs(days) : null;
+
+      const whatsappSectorMessage = buildWhatsAppSectorMessage({
+        cliente,
+        business: {
+          company_name: companyName || businessSettings?.company_name || null,
+          business_type: businessType || businessSettings?.business_type || null,
+          business_tone:
+            businessSettings?.business_tone || businessSettings?.tone || null,
+          ai_prompt: businessSettings?.ai_prompt || null,
+          whatsapp_number: businessSettings?.whatsapp_number || null,
+        },
+        decisionLabel: label,
+        reason,
+        daysOverdue,
+      });
+
+      return {
+        id: cliente.id,
+        nombre: cliente.nombre,
+        telefono: cliente.telefono,
+        estado: cliente.estado,
+        monto: value,
+        score,
+        label,
+        reason,
+        sectorHeadline: sectorDecision.headline,
+        sectorActionPhrase: sectorDecision.actionPhrase,
+        sectorReason: sectorDecision.humanReason,
+        sectorPrimaryVerb: sectorDecision.primaryVerb,
+        actionLabel: getDecisionActionLabel(
+          label,
+          hasWhatsapp,
+          whatsappSectorMessage.actionLabel
+        ),
+        actionHref: getDecisionActionHref(
+          cliente,
+          label,
+          hasWhatsapp,
+          whatsappSectorMessage.message
+        ),
+        tone,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
 }
 
 function AccessNotice({
@@ -116,779 +513,424 @@ function AccessNotice({
   accessState: string;
   trialEndsAt?: string | null;
 }) {
-  if (accessState === "active") {
-    return (
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
-        ✅ Tu cuenta está activa.
-      </div>
-    );
-  }
+  if (accessState === "active") return null;
 
   if (accessState === "trial") {
     return (
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
-        🟠 Trial activo hasta {formatDate(trialEndsAt)}.
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 shadow-sm">
+        🟠 Prueba activa hasta {formatDate(trialEndsAt)}.
       </div>
     );
   }
 
   if (accessState === "pending") {
     return (
-      <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 shadow-sm">
-        🔎 Pago en revisión. Revisaremos tu comprobante y activaremos tu cuenta.
+      <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800 shadow-sm">
+        🔎 Pago en revisión.
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm">
-      ⛔ Tu acceso está pausado. Activa tu plan desde billing.
+    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800 shadow-sm">
+      ⛔ Tu acceso está pausado.
     </div>
   );
 }
 
-function EmptyStateHero() {
-  return (
-    <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-sm">
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-2xl shadow-sm">
-        🚀
-      </div>
-
-      <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-        Bienvenido a ClienteYA
-      </h2>
-
-      <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-        Carga tu primer cliente para empezar a usar seguimiento, WhatsApp y pagos desde un mismo lugar.
-      </p>
-
-      <div className="mt-6 flex flex-wrap justify-center gap-3">
-        <a
-          href="/dashboard/nuevo"
-          className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-        >
-          + Crear primer cliente
-        </a>
-
-        <a
-          href="/billing"
-          className="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
-        >
-          Ver plan
-        </a>
-      </div>
-    </div>
-  );
-}
-
-function NextActionCard({
-  cliente,
-  type,
+function FounderTodayHero({
+  name,
+  priorityCount,
+  sectorLabel,
+  introTitle,
+  introDescription,
 }: {
-  cliente: Cliente | null;
-  type: "overdue" | "today" | "tomorrow" | "none";
-}) {
-  if (!cliente) {
-    return (
-      <div className="rounded-[26px] border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-        <p className="text-sm font-semibold text-emerald-800">
-          ✅ Todo al día
-        </p>
-        <p className="mt-2 text-sm text-emerald-700">
-          No tienes seguimientos urgentes ahora.
-        </p>
-      </div>
-    );
-  }
-
-  const copy =
-    type === "overdue"
-      ? {
-          badge: "Urgente",
-          title: "Siguiente acción recomendada",
-          text: "Este cliente está atrasado. Conviene contactarlo primero.",
-          styles: "border-red-200 bg-red-50 text-red-800",
-        }
-      : type === "today"
-      ? {
-          badge: "Hoy",
-          title: "Siguiente acción para hoy",
-          text: "Este cliente tiene seguimiento programado para hoy.",
-          styles: "border-amber-200 bg-amber-50 text-amber-800",
-        }
-      : {
-          badge: "Mañana",
-          title: "Prepara este seguimiento",
-          text: "Este cliente tiene seguimiento próximo. Puedes dejar WhatsApp listo.",
-          styles: "border-sky-200 bg-sky-50 text-sky-800",
-        };
-
-  return (
-    <div className={`rounded-[28px] border p-5 shadow-sm ${copy.styles}`}>
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <span className="rounded-full border border-current bg-white/60 px-3 py-1 text-xs font-semibold">
-            {copy.badge}
-          </span>
-
-          <h2 className="mt-3 text-xl font-bold text-slate-950">
-            {copy.title}
-          </h2>
-
-          <p className="mt-1 text-sm">{copy.text}</p>
-
-          <p className="mt-3 text-lg font-semibold text-slate-950">
-            {cliente.nombre}
-          </p>
-
-          <p className="text-sm">
-            {formatDate(cliente.proximo_contacto)} · {cliente.telefono}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <a
-            href={`/dashboard/whatsapp?id=${cliente.id}`}
-            className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-          >
-            Abrir WhatsApp
-          </a>
-
-          <a
-            href="/dashboard/automations"
-            className="rounded-2xl border border-current bg-white px-5 py-3 text-sm font-semibold shadow-sm transition hover:bg-white/80"
-          >
-            Ver automations
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MiniStat({
-  label,
-  value,
-  tone = "slate",
-}: {
-  label: string;
-  value: string | number;
-  tone?: "slate" | "amber" | "emerald" | "red" | "sky";
-}) {
-  const tones = {
-    slate: "border-slate-200 bg-white text-slate-900",
-    amber: "border-amber-200 bg-amber-50 text-amber-900",
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    red: "border-red-200 bg-red-50 text-red-900",
-    sky: "border-sky-200 bg-sky-50 text-sky-900",
-  };
-
-  const labels = {
-    slate: "text-slate-500",
-    amber: "text-amber-700",
-    emerald: "text-emerald-700",
-    red: "text-red-700",
-    sky: "text-sky-700",
-  };
-
-  return (
-    <div className={`rounded-[22px] border p-4 shadow-sm ${tones[tone]}`}>
-      <p className={`text-xs font-medium ${labels[tone]}`}>{label}</p>
-      <p className="mt-2 text-3xl font-bold tracking-tight">{value}</p>
-    </div>
-  );
-}
-
-function ActivityStatsCard({
-  ai,
-  contacted,
-  followup,
-  whatsapp,
-}: {
-  ai: number;
-  contacted: number;
-  followup: number;
-  whatsapp: number;
+  name: string;
+  priorityCount: number;
+  sectorLabel: string;
+  introTitle: string;
+  introDescription: string;
 }) {
   return (
-    <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <div className="mb-2 inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-            Actividad semanal
-          </div>
-          <h2 className="text-xl font-semibold text-slate-900">
-            Tu impacto
-          </h2>
-        </div>
-      </div>
+    <section className="overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
+      <div className="bg-gradient-to-br from-blue-50 via-white to-slate-50 p-5 sm:p-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="mb-4 flex flex-wrap gap-2">
+              <span className="inline-flex rounded-full border border-blue-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-blue-700 shadow-sm">
+                V20.5.2 Inteligencia comercial
+              </span>
 
-      <div className="grid gap-3 sm:grid-cols-4">
-        <MiniStat label="AI" value={ai} />
-        <MiniStat label="WhatsApp" value={whatsapp} tone="sky" />
-        <MiniStat label="Contactados" value={contacted} tone="emerald" />
-        <MiniStat label="Seguimientos" value={followup} tone="amber" />
-      </div>
+              <span className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-700 shadow-sm">
+                Sector: {sectorLabel}
+              </span>
+            </div>
 
-      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-        {whatsapp > 0 ? (
-          <>
-            📲 Abriste <strong>{whatsapp}</strong> conversaciones en WhatsApp.
-          </>
-        ) : (
-          <>Empieza usando WhatsApp AI para generar actividad.</>
-        )}
-      </div>
-    </div>
-  );
-}
+            <h1 className="text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">
+              Buenos días {name}
+            </h1>
 
-function QuickSummary({
-  clientes,
-  atrasados,
-  hoyClientes,
-  mananaClientes,
-  pagados,
-  totalRevenue,
-}: {
-  clientes: Cliente[];
-  atrasados: Cliente[];
-  hoyClientes: Cliente[];
-  mananaClientes: Cliente[];
-  pagados: Cliente[];
-  totalRevenue: number;
-}) {
-  const conversion =
-    clientes.length > 0 ? Math.round((pagados.length / clientes.length) * 100) : 0;
-
-  return (
-    <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-      <MiniStat label="Clientes" value={clientes.length} />
-      <MiniStat label="Atrasados" value={atrasados.length} tone="red" />
-      <MiniStat label="Hoy" value={hoyClientes.length} tone="amber" />
-      <MiniStat label="Mañana" value={mananaClientes.length} tone="sky" />
-      <MiniStat label="Pagados" value={pagados.length} tone="emerald" />
-      <MiniStat label="Conv." value={`${conversion}%`} tone="sky" />
-
-      <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm md:col-span-3 xl:col-span-6">
-        <p className="text-xs font-medium text-slate-500">Ingresos acumulados</p>
-        <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
-          {formatGs(totalRevenue)}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function ClientCompactCard({
-  cliente,
-  today,
-  tomorrow,
-  onMarkPaid,
-}: {
-  cliente: Cliente;
-  today: string;
-  tomorrow: string;
-  onMarkPaid: (formData: FormData) => Promise<void>;
-}) {
-  const isOverdue = cliente.proximo_contacto && cliente.proximo_contacto < today;
-  const isToday = cliente.proximo_contacto === today;
-  const isTomorrow = cliente.proximo_contacto === tomorrow;
-
-  return (
-    <div
-      className={`rounded-[22px] border p-4 shadow-sm ${
-        isOverdue
-          ? "border-red-200 bg-red-50"
-          : "border-slate-200 bg-slate-50"
-      }`}
-    >
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-lg font-semibold leading-tight text-slate-900">
-              {cliente.nombre}
+            <p className="mt-4 text-base font-black leading-7 text-blue-700 sm:text-lg">
+              {priorityCount === 0
+                ? "Todo está bajo control."
+                : `${introTitle}: ${priorityCount}`}
             </p>
 
-            <span
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getBadgeClasses(
-                cliente.estado
-              )}`}
-            >
-              {cliente.estado}
-            </span>
-
-            {isOverdue && (
-              <span className="rounded-full border border-red-200 bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-                atrasado
-              </span>
-            )}
-
-            {isToday && (
-              <span className="rounded-full border border-amber-200 bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                hoy
-              </span>
-            )}
-
-            {isTomorrow && (
-              <span className="rounded-full border border-sky-200 bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
-                mañana
-              </span>
-            )}
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600 sm:text-base">
+              {introDescription}
+            </p>
           </div>
 
-          <p className="mt-1 text-sm text-slate-500">{cliente.telefono}</p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
+            <Link href="/dashboard/clientes" className={primaryActionButtonClass}>
+              Ver todos los clientes
+            </Link>
 
-          <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                Próximo
-              </p>
-              <p className="mt-1 text-slate-700">
-                {formatDate(cliente.proximo_contacto)}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 md:col-span-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                Recordatorio
-              </p>
-              <p className="mt-1 line-clamp-2 text-slate-700">
-                {cliente.recordatorio || cliente.notas || "—"}
-              </p>
-            </div>
+            <Link href="/dashboard/cockpit" className={secondaryActionButtonClass}>
+              Abrir AI Cockpit
+            </Link>
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
 
-        <div className="flex flex-wrap gap-2 lg:justify-end">
-          <a
-            href={`/dashboard/editar?id=${cliente.id}`}
-            className="rounded-2xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
-          >
-            Editar
-          </a>
+function FounderPriorityCard({
+  priority,
+  index,
+}: {
+  priority: TodayPriority;
+  index: number;
+}) {
+  const isExternal = priority.actionHref.startsWith("https://");
 
-          <a
-            href={`/dashboard/whatsapp?id=${cliente.id}`}
-            className="rounded-2xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-          >
-            WhatsApp AI
-          </a>
+  return (
+    <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_14px_44px_rgba(15,23,42,0.06)]">
+      <div className="p-4 sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-blue-700 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white">
+                #{index + 1}
+              </span>
 
-          <form action={onMarkPaid}>
-            <input type="hidden" name="id" value={cliente.id} />
-            <button
-              type="submit"
-              className="rounded-2xl bg-emerald-700 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800"
+              <span
+                className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${getBadgeClasses(
+                  priority.tone
+                )}`}
+              >
+                {priority.sectorHeadline}
+              </span>
+
+              <span
+                className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${getStatusClasses(
+                  priority.estado
+                )}`}
+              >
+                {priority.estado}
+              </span>
+            </div>
+
+            <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+              {priority.nombre}
+            </h2>
+
+            <p className="mt-2 max-w-2xl text-sm font-black leading-6 text-blue-700">
+              {priority.sectorActionPhrase}
+            </p>
+
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
+              {priority.sectorReason}
+            </p>
+
+            {priority.monto > 0 ? (
+              <p className="mt-2 text-sm font-black text-emerald-700">
+                {formatGs(priority.monto)} potencial
+              </p>
+            ) : null}
+          </div>
+
+          <div className="grid gap-2 sm:min-w-[240px]">
+            <a
+              href={priority.actionHref}
+              target={isExternal ? "_blank" : undefined}
+              rel={isExternal ? "noreferrer" : undefined}
+              className={primaryActionButtonClass}
             >
-              💰 Pagado
-            </button>
-          </form>
+              {priority.actionLabel} →
+            </a>
+
+            <Link
+              href={`/dashboard/clientes/${priority.id}`}
+              className={secondaryActionButtonClass}
+            >
+              Ver detalle
+            </Link>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-export default async function DashboardPage({
-  searchParams,
+function FounderTodaySection({
+  priorities,
+  sectorLabel,
 }: {
-  searchParams: Promise<{ ok?: string }>;
+  priorities: TodayPriority[];
+  sectorLabel: string;
 }) {
-  const { ok } = await searchParams;
+  return (
+    <SectionCard
+      badge="V20.5.2"
+      title={`Prioridades de hoy · ${sectorLabel}`}
+      description="ClienteYA adapta la decisión al sector configurado en tu negocio. Misma inteligencia, lenguaje más preciso."
+    >
+      {priorities.length === 0 ? (
+        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-sm font-semibold leading-6 text-emerald-800">
+          ✅ No hay prioridades críticas ahora. Mantén el ritmo y agrega nuevos clientes cuando sea necesario.
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {priorities.map((priority, index) => (
+            <FounderPriorityCard
+              key={priority.id}
+              priority={priority}
+              index={index}
+            />
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
 
+function CompactFounderActions({
+  intelligence,
+}: {
+  intelligence: SectorKpiIntelligenceResult;
+}) {
+  return (
+    <SectionCard
+      badge="V20.7.2 Sector KPI Intelligence"
+      title={intelligence.dashboardTitle}
+      description={intelligence.dashboardDescription}
+    >
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {intelligence.metrics.map((metric) => (
+          <KpiCard
+            key={metric.key}
+            label={metric.label}
+            value={metric.formattedValue}
+            tone={metric.tone}
+          />
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+export default async function DashboardPage() {
   const authSupabase = await createAuthServerClient();
+
   const {
     data: { user },
   } = await authSupabase.auth.getUser();
 
   if (!user) redirect("/login");
 
-  async function marcarPagado(formData: FormData) {
-    "use server";
-
-    const authSupabase = await createAuthServerClient();
-    const {
-      data: { user },
-    } = await authSupabase.auth.getUser();
-
-    if (!user) redirect("/login");
-
-    const id = String(formData.get("id") || "");
-    if (!id) redirect("/dashboard");
-
-    const admin = createAdminClient();
-
-    await admin
-      .from("clientes")
-      .update({
-        estado: "Pagó",
-        pagado: true,
-        monto: 50000,
-        fecha_pago: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    revalidatePath("/dashboard");
-    revalidatePath("/dashboard/clientes");
-    revalidatePath("/dashboard/automations");
-
-    redirect("/dashboard?ok=pagado");
-  }
-
-  async function aplicarSugerencia(formData: FormData) {
-    "use server";
-
-    const authSupabase = await createAuthServerClient();
-    const {
-      data: { user },
-    } = await authSupabase.auth.getUser();
-
-    if (!user) redirect("/login");
-
-    const id = String(formData.get("id") || "");
-    const actionType = String(
-      formData.get("actionType") || ""
-    ) as SuggestionActionType;
-
-    if (!id) redirect("/dashboard");
-
-    await applySuggestionAction({
-      userId: user.id,
-      clienteId: id,
-      actionType,
-    });
-
-    revalidatePath("/dashboard");
-    revalidatePath("/dashboard/clientes");
-    revalidatePath("/dashboard/automations");
-
-    if (actionType === "contactado") redirect("/dashboard?ok=contactado");
-    if (actionType === "listo") redirect("/dashboard?ok=listo");
-
-    redirect("/dashboard?ok=agendado");
-  }
-
-  const admin = createAdminClient();
-
-  const [{ data: profileData }, { data: clientesData }, stats] =
+  const [{ data: profileData }, { data: businessSettingsData }, { data: clientesData }] =
     await Promise.all([
-      admin.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-      admin
+      authSupabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+
+      authSupabase
+        .from("business_settings")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+
+      authSupabase
         .from("clientes")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
-      getWeeklyStats(user.id),
     ]);
 
   const profile = (profileData || null) as Profile | null;
-  const clientes: Cliente[] = clientesData || [];
+  const businessSettings = (businessSettingsData || null) as BusinessSettings | null;
 
-  const access = getAccessState({
-    subscription_status: profile?.subscription_status || null,
-    trial_ends_at: profile?.trial_ends_at || null,
-  });
+  const clientes: Cliente[] = ((clientesData || []) as ClienteRaw[])
+    .map(normalizeCliente)
+    .filter((cliente) => cliente.id);
+
+  const profileAccess = {
+    ...(profile || {}),
+    email: profile?.email || user.email || null,
+  } as ProfileAccess;
+
+  const platformAccess = hasPlatformAccess(profileAccess);
+  const cockpitAccess = canAccessAICockpit(profileAccess);
+
+  const hasAccess = platformAccess.allowed;
+  const hasCockpitAccess = cockpitAccess.allowed;
+  const founderModeActive = platformAccess.reason === "founder_mode";
+
+  const accessState =
+    platformAccess.reason === "founder_mode"
+      ? "active"
+      : profile?.subscription_status === "pending"
+        ? "pending"
+        : platformAccess.reason === "active"
+          ? "active"
+          : platformAccess.reason === "trial"
+            ? "trial"
+            : "inactive";
 
   const today = todayISO();
-  const tomorrow = tomorrowISO();
+
+  const greetingName = getCompanyName(
+    businessSettings,
+    profile,
+    user.email || null
+  );
+
+  const configuredSectorValue = getConfiguredSectorValue(businessSettings);
+  const normalizedBusinessType = normalizeBusinessType(configuredSectorValue);
+  const businessType = normalizedBusinessType;
+  const dashboardIntro = getDashboardIntro(businessType);
+  const sectorKpiIntelligence = buildSectorKpiIntelligence({
+    clientes,
+    businessType,
+    today,
+  });
 
   const atrasados = clientes.filter(
-    (c) => c.proximo_contacto && c.proximo_contacto < today
+    (cliente) => cliente.proximo_contacto && cliente.proximo_contacto < today
   );
 
-  const hoyClientes = clientes.filter((c) => c.proximo_contacto === today);
-  const mananaClientes = clientes.filter((c) => c.proximo_contacto === tomorrow);
-
-  const pagados = clientes.filter(
-    (c) =>
-      c.pagado === true ||
-      c.estado === "Pagó" ||
-      c.estado.toLowerCase() === "pagado"
+  const hoyClientes = clientes.filter(
+    (cliente) => cliente.proximo_contacto === today
   );
 
-  const totalRevenue = clientes.reduce((sum, c) => {
-    if (
-      c.pagado ||
-      c.estado === "Pagó" ||
-      c.estado.toLowerCase() === "pagado"
-    ) {
-      return sum + Number(c.monto || 0);
-    }
+  const priorities = buildTodayPriorities(
+    clientes,
+    today,
+    businessType,
+    businessSettings,
+    greetingName
+  );
 
-    return sum;
-  }, 0);
-
-  const compactClients = [...clientes].slice(0, 8);
-
-  const nextActionCliente =
-    atrasados[0] || hoyClientes[0] || mananaClientes[0] || null;
-
-  const nextActionType = atrasados[0]
-    ? "overdue"
-    : hoyClientes[0]
-    ? "today"
-    : mananaClientes[0]
-    ? "tomorrow"
-    : "none";
+  const revenuePotential = priorities.reduce(
+    (sum, priority) => sum + Number(priority.monto || 0),
+    0
+  );
 
   return (
     <div className="dashboard-shell">
       <AppHeader />
 
       <main className="dashboard-main">
-        <div className="flex min-h-screen bg-slate-50/60">
-          <aside className="hidden w-72 border-r border-slate-200 bg-white lg:flex lg:flex-col">
+        <div className="flex min-h-screen w-full bg-slate-50/60">
+          <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:flex lg:flex-col">
             <SidebarNav />
           </aside>
 
-          <div className="flex-1 px-6 py-8">
-            <div className="mx-auto max-w-7xl">
-              <FeedbackBanner ok={ok} />
+          <div className="min-w-0 flex-1 px-4 pb-36 pt-5 sm:px-6 lg:px-8 lg:pb-8 lg:pt-7">
+            <div className="mx-auto w-full max-w-[1180px]">
+              <FounderModeBadge enabled={founderModeActive} />
 
-              <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="mb-3">
-                    
-                  </div>
+              <div className="space-y-5">
+                <FounderTodayHero
+                  name={greetingName}
+                  priorityCount={priorities.length}
+                  sectorLabel={dashboardIntro.sectorLabel}
+                  introTitle={dashboardIntro.title}
+                  introDescription={dashboardIntro.description}
+                />
 
-                  <h1 className="text-5xl font-bold tracking-tight text-slate-950">
-                    Dashboard
-                  </h1>
-
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                    Resumen compacto de clientes, seguimiento, WhatsApp AI e ingresos.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <a
-                    href="/dashboard/nuevo"
-                    className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-                  >
-                    + Nuevo cliente
-                  </a>
-
-                  <a
-                    href="/billing"
-                    className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
-                  >
-                    Activar plan
-                  </a>
-                </div>
-              </div>
-
-              <div className="mb-5">
                 <AccessNotice
-                  accessState={access.accessState}
+                  accessState={accessState}
                   trialEndsAt={profile?.trial_ends_at || null}
                 />
-              </div>
 
-              {!access.hasAccess && (
-                <div className="rounded-[28px] border border-red-200 bg-red-50 p-6 text-center shadow-sm">
-                  <h2 className="text-2xl font-bold text-red-700">
-                    Acceso limitado
-                  </h2>
-                  <p className="mt-2 text-sm text-red-600">
-                    Activa tu plan desde billing para usar el dashboard completo.
-                  </p>
-                  <a
-                    href="/billing"
-                    className="mt-4 inline-block rounded-2xl bg-blue-600 px-6 py-2 font-semibold text-white shadow-sm transition hover:bg-blue-700"
-                  >
-                    Ir a billing
-                  </a>
-                </div>
-              )}
-
-              {access.hasAccess && clientes.length === 0 && <EmptyStateHero />}
-
-              {access.hasAccess && clientes.length > 0 && (
-                <div className="space-y-5">
-                  <NextActionCard
-                    cliente={nextActionCliente}
-                    type={nextActionType}
+                {!hasAccess ? (
+                  <EmptyState
+                    icon="⛔"
+                    title="Acceso limitado"
+                    description="Activa tu plan desde la sección de billing."
+                    actionHref="/dashboard/billing"
+                    actionLabel="Ir a billing"
                   />
+                ) : null}
 
-                  <QuickSummary
-                    clientes={clientes}
-                    atrasados={atrasados}
-                    hoyClientes={hoyClientes}
-                    mananaClientes={mananaClientes}
-                    pagados={pagados}
-                    totalRevenue={totalRevenue}
+                {hasAccess && clientes.length === 0 ? (
+                  <EmptyState
+                    icon="🚀"
+                    title="Bienvenido a ClienteYA"
+                    description="Carga tu primer cliente para empezar a construir tu seguimiento comercial."
+                    actionHref="/dashboard/nuevo"
+                    actionLabel="+ Crear primer cliente"
                   />
+                ) : null}
 
-                  <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-                    <ActivityStatsCard
-                      ai={stats.ai}
-                      contacted={stats.contacted}
-                      followup={stats.followup}
-                      whatsapp={stats.whatsapp}
+                {hasAccess && clientes.length > 0 ? (
+                  <>
+                    <FounderTodaySection
+                      priorities={priorities}
+                      sectorLabel={dashboardIntro.sectorLabel}
                     />
 
-                    <UpgradeTriggerCard
-                      planType={profile?.plan_type}
-                      subscriptionStatus={profile?.subscription_status}
-                      stats={stats}
-                    />
-                  </div>
+                    <CompactFounderActions
+  intelligence={sectorKpiIntelligence}
+/>
 
-                  <TopReminders
-                    clientes={clientes}
-                    onQuickAction={aplicarSugerencia}
-                  />
 
-                  <div className="grid gap-5 xl:grid-cols-[1.4fr_0.8fr]">
-                    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h2 className="text-xl font-semibold text-slate-900">
-                            Clientes recientes
-                          </h2>
-                          <p className="mt-1 text-sm text-slate-500">
-                            Vista compacta de tu base actual.
-                          </p>
-                        </div>
 
-                        <a
-                          href="/dashboard/clientes"
-                          className="rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
+                     <SectionCard
+                      badge="Less is more"
+                      title="La inteligencia está bajo la superficie"
+                      description="El dashboard muestra solo lo importante. Para análisis profundo, forecast, timeline y señales completas, abre el AI Cockpit."
+                    >
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Link href="/dashboard/clientes" className={primaryActionButtonClass}>
+                          Ver todos los clientes
+                        </Link>
+
+                        <Link href="/dashboard/nuevo" className={secondaryActionButtonClass}>
+                          + Nuevo cliente
+                        </Link>
+
+                        <Link
+                          href="/dashboard/cockpit"
+                          className={hasCockpitAccess ? secondaryActionButtonClass : primaryActionButtonClass}
                         >
-                          Ver todos
-                        </a>
+                          Abrir AI Cockpit
+                        </Link>
                       </div>
+                    </SectionCard>
 
-                      <div className="space-y-3">
-                        {compactClients.map((cliente) => (
-                          <ClientCompactCard
-                            key={cliente.id}
-                            cliente={cliente}
-                            today={today}
-                            tomorrow={tomorrow}
-                            onMarkPaid={marcarPagado}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-5">
-                      <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 shadow-sm">
-                        <div className="mb-4 flex items-center justify-between">
-                          <h2 className="text-lg font-semibold text-slate-900">
-                            Atrasados
-                          </h2>
-                          <span className="rounded-full border border-red-200 bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-                            {atrasados.length}
-                          </span>
-                        </div>
-
-                        {atrasados.length === 0 ? (
-                          <p className="text-sm text-slate-500">
-                            No tienes seguimientos atrasados.
-                          </p>
-                        ) : (
-                          <div className="space-y-3">
-                            {atrasados.slice(0, 4).map((c) => (
-                              <div
-                                key={c.id}
-                                className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm"
-                              >
-                                <p className="font-semibold text-slate-900">
-                                  {c.nombre}
-                                </p>
-                                <p className="mt-1 text-xs text-red-700">
-                                  {formatDate(c.proximo_contacto)}
-                                </p>
-                                <a
-                                  href={`/dashboard/whatsapp?id=${c.id}`}
-                                  className="mt-3 inline-block rounded-2xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-                                >
-                                  WhatsApp AI
-                                </a>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="rounded-[28px] border border-sky-200 bg-sky-50 p-5 shadow-sm">
-                        <div className="mb-4 flex items-center justify-between">
-                          <h2 className="text-lg font-semibold text-slate-900">
-                            Próximos
-                          </h2>
-                          <span className="rounded-full border border-sky-200 bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
-                            {mananaClientes.length}
-                          </span>
-                        </div>
-
-                        {mananaClientes.length === 0 ? (
-                          <p className="text-sm text-slate-500">
-                            No tienes contactos para mañana.
-                          </p>
-                        ) : (
-                          <div className="space-y-3">
-                            {mananaClientes.slice(0, 4).map((c) => (
-                              <div
-                                key={c.id}
-                                className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm"
-                              >
-                                <p className="font-semibold text-slate-900">
-                                  {c.nombre}
-                                </p>
-                                <p className="mt-1 text-xs text-sky-700">
-                                  {formatDate(c.proximo_contacto)}
-                                </p>
-                                <a
-                                  href={`/dashboard/whatsapp?id=${c.id}`}
-                                  className="mt-3 inline-block rounded-2xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-                                >
-                                  Preparar WhatsApp
-                                </a>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                        <h2 className="mb-4 text-lg font-semibold text-slate-900">
-                          Estado del negocio
-                        </h2>
-
-                        <div className="space-y-3 text-sm">
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-600">Clientes</span>
-                            <span className="font-semibold text-slate-900">
-                              {clientes.length}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-600">Pagados</span>
-                            <span className="font-semibold text-slate-900">
-                              {pagados.length}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between border-t border-slate-200 pt-3">
-                            <span className="text-slate-600">Ingresos</span>
-                            <span className="font-semibold text-slate-900">
-                              {formatGs(totalRevenue)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+                    {!hasCockpitAccess ? (
+                      <UpgradeTriggerCard
+                        title="Desbloquea ClienteYA AI Cockpit"
+                        description="El dashboard queda limpio. El análisis profundo vive en el cockpit: forecast, señales, timeline y prioridades avanzadas."
+                        features={[
+                          "AI Cockpit",
+                          "Founder insights",
+                          "Revenue forecast",
+                          "Smart automation",
+                        ]}
+                      />
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
       </main>
+
+      <MobileDashboardNav />
     </div>
   );
 }

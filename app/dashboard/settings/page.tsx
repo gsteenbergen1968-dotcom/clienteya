@@ -1,22 +1,98 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+
 import { AppHeader } from "../../components/AppHeader";
 import SidebarNav from "../SidebarNav";
+import MobileDashboardNav from "../MobileDashboardNav";
+
 import { createAuthServerClient } from "../../../lib/supabase/auth-server";
-import { createAdminClient } from "../../../lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-type AssistantSettings = {
+type BusinessSettings = {
   user_id: string;
+  company_name: string | null;
   business_type: string | null;
   business_tone: string | null;
-  ai_prompt: string | null;
-  brand_name: string | null;
+  business_email: string | null;
+  business_phone: string | null;
+  whatsapp_number: string | null;
   country_label: string | null;
-  company_name: string | null;
-  support_email: string | null;
+  city: string | null;
+  ai_prompt: string | null;
 };
+
+const defaultPrompt =
+  "Escribe mensajes claros, útiles y breves. Mantén un tono humano y orientado a convertir sin sonar agresivo.";
+
+const businessTypeOptions = [
+  {
+    value: "general",
+    label: "General",
+    description: "Para ventas y seguimiento comercial general.",
+    example: "Seguimiento pendiente",
+  },
+  {
+    value: "restaurant",
+    label: "Restaurante / Gastronomía",
+    description: "Clientes, pedidos, reservas, visitas y recompra.",
+    example: "Cliente ausente",
+  },
+  {
+    value: "consulting",
+    label: "Consultoría",
+    description: "Propuestas, seguimiento, reuniones y próximos pasos.",
+    example: "Siguiente paso comercial",
+  },
+  {
+    value: "real_estate",
+    label: "Inmobiliaria",
+    description: "Propiedades, visitas, interesados y cierre de operación.",
+    example: "Cliente esperando seguimiento",
+  },
+  {
+    value: "fitness",
+    label: "Fitness / Gimnasio",
+    description: "Miembros, entrenamiento, renovación y reactivación.",
+    example: "Cliente dejó de entrenar",
+  },
+  {
+    value: "beauty",
+    label: "Belleza / Peluquería / Spa",
+    description: "Citas, reservas, recompra y clientes recurrentes.",
+    example: "Cliente listo para nueva cita",
+  },
+  {
+    value: "retail",
+    label: "Retail / Tienda",
+    description: "Ventas, recompra, productos y clientes frecuentes.",
+    example: "Cliente sin retorno",
+  },
+  {
+    value: "automotive",
+    label: "Automotriz",
+    description: "Interesados, cotizaciones, prueba y postventa.",
+    example: "Interés enfriándose",
+  },
+  {
+    value: "medical",
+    label: "Salud / Clínica",
+    description: "Pacientes, consultas, controles y continuidad.",
+    example: "Seguimiento pendiente",
+  },
+  {
+    value: "education",
+    label: "Educación / Cursos",
+    description: "Alumnos, inscripciones, clases y continuidad.",
+    example: "Alumno potencial pendiente",
+  },
+  {
+    value: "services",
+    label: "Servicios",
+    description: "Seguimiento, trabajos, presupuestos y clientes activos.",
+    example: "Cliente en seguimiento",
+  },
+];
 
 function ParaguayBadge() {
   return (
@@ -31,6 +107,32 @@ function ParaguayBadge() {
   );
 }
 
+function getBusinessTypeLabel(value: string | null | undefined) {
+  return (
+    businessTypeOptions.find((option) => option.value === value)?.label ||
+    "General"
+  );
+}
+
+function getBusinessTypeDescription(value: string | null | undefined) {
+  return (
+    businessTypeOptions.find((option) => option.value === value)?.description ||
+    "Para ventas y seguimiento comercial general."
+  );
+}
+
+function getBusinessTypeExample(value: string | null | undefined) {
+  return (
+    businessTypeOptions.find((option) => option.value === value)?.example ||
+    "Seguimiento pendiente"
+  );
+}
+
+function getSafeErrorMessage(message: string | undefined) {
+  if (!message) return "Error desconocido";
+  return message.slice(0, 260);
+}
+
 export default async function SettingsPage({
   searchParams,
 }: {
@@ -39,6 +141,7 @@ export default async function SettingsPage({
   const { ok, error } = await searchParams;
 
   const supabase = await createAuthServerClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -47,10 +150,11 @@ export default async function SettingsPage({
     redirect("/login");
   }
 
-  async function saveSettings(formData: FormData) {
+  async function saveBusinessSettings(formData: FormData) {
     "use server";
 
     const supabase = await createAuthServerClient();
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -59,34 +163,47 @@ export default async function SettingsPage({
       redirect("/login");
     }
 
-    const businessType = String(formData.get("business_type") || "").trim();
-    const businessTone = String(formData.get("business_tone") || "").trim();
-    const aiPrompt = String(formData.get("ai_prompt") || "").trim();
-    const brandName = String(formData.get("brand_name") || "").trim();
-    const countryLabel = String(formData.get("country_label") || "").trim();
     const companyName = String(formData.get("company_name") || "").trim();
-    const supportEmail = String(formData.get("support_email") || "").trim();
+    const businessEmail = String(formData.get("business_email") || "").trim();
+    const businessPhone = String(formData.get("business_phone") || "").trim();
+    const whatsappNumber = String(formData.get("whatsapp_number") || "").trim();
+    const countryLabel = String(
+      formData.get("country_label") || "Paraguay"
+    ).trim();
+    const city = String(formData.get("city") || "").trim();
 
-    const admin = createAdminClient();
+    const businessType = String(
+      formData.get("business_type") || "general"
+    ).trim();
 
-    const { error } = await admin.from("user_settings").upsert(
+    const businessTone = String(
+      formData.get("business_tone") || "cercano"
+    ).trim();
+
+    const aiPrompt = String(formData.get("ai_prompt") || "").trim();
+
+    const { error } = await supabase.from("business_settings").upsert(
       {
         user_id: user.id,
-        business_type: businessType || "ventas_generales",
+        company_name: companyName,
+        business_type: businessType || "general",
         business_tone: businessTone || "cercano",
-        ai_prompt:
-          aiPrompt ||
-          "Escribe mensajes claros, útiles y breves. Mantén un tono humano y orientado a convertir sin sonar agresivo.",
-        brand_name: brandName || "ClienteYA",
+        business_email: businessEmail,
+        business_phone: businessPhone,
+        whatsapp_number: whatsappNumber,
         country_label: countryLabel || "Paraguay",
-        company_name: companyName || "ClienteYA Paraguay",
-        support_email: supportEmail || "soporte@clienteya.com",
+        city,
+        ai_prompt: aiPrompt || defaultPrompt,
       },
       { onConflict: "user_id" }
     );
 
     if (error) {
-      redirect("/dashboard/settings?error=1");
+      redirect(
+        `/dashboard/settings?error=${encodeURIComponent(
+          getSafeErrorMessage(error.message)
+        )}`
+      );
     }
 
     revalidatePath("/dashboard");
@@ -97,25 +214,25 @@ export default async function SettingsPage({
     redirect("/dashboard/settings?ok=1");
   }
 
-  const admin = createAdminClient();
-
-  const { data } = await admin
-    .from("user_settings")
-    .select("*")
+  const { data: settingsData } = await supabase
+    .from("business_settings")
+    .select(
+      "user_id,company_name,business_type,business_tone,business_email,business_phone,whatsapp_number,country_label,city,ai_prompt"
+    )
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const settings = (data || null) as AssistantSettings | null;
+  const settings = (settingsData || null) as BusinessSettings | null;
 
-  const businessType = settings?.business_type || "ventas_generales";
+  const companyName = settings?.company_name || "";
+  const businessType = settings?.business_type || "general";
   const businessTone = settings?.business_tone || "cercano";
-  const aiPrompt =
-    settings?.ai_prompt ||
-    "Escribe mensajes claros, útiles y breves. Mantén un tono humano y orientado a convertir sin sonar agresivo.";
-  const brandName = settings?.brand_name || "ClienteYA";
+  const businessEmail = settings?.business_email || "";
+  const businessPhone = settings?.business_phone || "";
+  const whatsappNumber = settings?.whatsapp_number || "";
   const countryLabel = settings?.country_label || "Paraguay";
-  const companyName = settings?.company_name || "ClienteYA Paraguay";
-  const supportEmail = settings?.support_email || "soporte@clienteya.com";
+  const city = settings?.city || "";
+  const aiPrompt = settings?.ai_prompt || defaultPrompt;
 
   return (
     <div className="dashboard-shell">
@@ -127,7 +244,7 @@ export default async function SettingsPage({
             <SidebarNav />
           </aside>
 
-          <div className="flex-1 px-6 py-10">
+          <div className="flex-1 px-4 pb-36 pt-6 sm:px-6 lg:px-10 lg:pb-10">
             <div className="mx-auto max-w-6xl">
               <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -138,291 +255,329 @@ export default async function SettingsPage({
                     </span>
                   </div>
 
-                  <h1 className="text-5xl font-bold tracking-tight text-slate-950">
-                    Settings
+                  <h1 className="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
+                    Configuración
                   </h1>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                    Ajusta marca, tono y prompt del asistente para que ClienteYA
-                    escriba mensajes más claros y más alineados con tu negocio.
+
+                  <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+                    Define empresa, sector, WhatsApp, tono y prompt. ClienteYA
+                    usará esta configuración para adaptar decisiones, mensajes y
+                    lenguaje comercial a la realidad de tu negocio.
                   </p>
                 </div>
               </div>
 
-              {ok === "1" && (
-                <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
+              {ok === "1" ? (
+                <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-sm">
                   ✅ Configuración guardada correctamente.
                 </div>
-              )}
+              ) : null}
 
-              {error === "1" && (
-                <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm">
-                  ⚠️ No pudimos guardar la configuración.
+              {error ? (
+                <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800 shadow-sm">
+                  ⚠️ No pudimos guardar la configuración: {error}
                 </div>
-              )}
+              ) : null}
 
               <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-                <div className="space-y-6">
-                  <form
-                    action={saveSettings}
-                    className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm"
-                  >
-                    <div className="mb-5">
-                      <div className="mb-3 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                        Asistente WhatsApp
-                      </div>
-                      <h2 className="text-2xl font-semibold text-slate-900">
-                        Configuración principal
-                      </h2>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        Define el tipo de negocio, el tono y la instrucción base
-                        del asistente.
-                      </p>
+                <form
+                  action={saveBusinessSettings}
+                  className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm"
+                >
+                  <div className="mb-6">
+                    <div className="mb-3 inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+                      V20.3.3 Auth Business Settings
                     </div>
 
-                    <div className="grid gap-5 md:grid-cols-2">
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Tipo de negocio
-                        </label>
-                        <select
-                          name="business_type"
-                          defaultValue={businessType}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
-                        >
-                          <option value="ventas_generales">
-                            Ventas generales
-                          </option>
-                          <option value="inmobiliaria">Inmobiliaria</option>
-                          <option value="automotor">Automotor</option>
-                          <option value="servicios">Servicios</option>
-                          <option value="salud_belleza">Salud y belleza</option>
-                          <option value="educacion">Educación</option>
-                          <option value="gastronomia">Gastronomía</option>
-                        </select>
-                      </div>
+                    <h2 className="text-2xl font-black text-slate-950">
+                      Perfil inteligente del negocio
+                    </h2>
 
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Tono del mensaje
-                        </label>
-                        <select
-                          name="business_tone"
-                          defaultValue={businessTone}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
-                        >
-                          <option value="cercano">Cercano</option>
-                          <option value="formal">Formal</option>
-                          <option value="vendedor">Vendedor</option>
-                          <option value="directo">Directo</option>
-                          <option value="amable">Amable</option>
-                        </select>
-                      </div>
-                    </div>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+                      Esta información define cómo ClienteYA interpreta clientes,
+                      acciones, WhatsApp y mensajes. Es la base de la Sector
+                      Intelligence Layer.
+                    </p>
+                  </div>
 
-                    <div className="mt-5">
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Prompt personalizado
+                  <div className="grid gap-5">
+                    <div>
+                      <label className="mb-2 block text-sm font-black text-slate-700">
+                        Nombre de la empresa
                       </label>
-                      <textarea
-                        name="ai_prompt"
-                        rows={6}
-                        defaultValue={aiPrompt}
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-500"
+
+                      <input
+                        type="text"
+                        name="company_name"
+                        defaultValue={companyName}
+                        placeholder="Ej. Morphy"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500"
                       />
-                      <p className="mt-2 text-xs text-slate-500">
-                        Puedes indicar cosas como: “más breve”, “sin emojis”,
-                        “más vendedor”, “más humano” o “más directo”.
-                      </p>
-                    </div>
 
-                    <div className="mt-6 flex flex-wrap gap-3">
-                      <button
-                        type="submit"
-                        className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-                      >
-                        Guardar asistente
-                      </button>
-                    </div>
-                  </form>
-
-                  <form
-                    action={saveSettings}
-                    className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm"
-                  >
-                    <div className="mb-5">
-                      <div className="mb-3 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                        Marca
-                      </div>
-                      <h2 className="text-2xl font-semibold text-slate-900">
-                        Identidad y soporte
-                      </h2>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        Personaliza cómo se presenta tu marca dentro del sistema
-                        y en la ayuda al usuario.
+                      <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+                        ClienteYA usará este nombre para entender para qué
+                        negocio trabaja.
                       </p>
                     </div>
 
                     <div className="grid gap-5 md:grid-cols-2">
                       <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Nombre de la app
+                        <label className="mb-2 block text-sm font-black text-slate-700">
+                          Email del negocio
                         </label>
+
                         <input
-                          type="text"
-                          name="brand_name"
-                          defaultValue={brandName}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
+                          type="email"
+                          name="business_email"
+                          defaultValue={businessEmail}
+                          placeholder="empresa@email.com"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500"
                         />
                       </div>
 
                       <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          País principal
+                        <label className="mb-2 block text-sm font-black text-slate-700">
+                          Teléfono del negocio
                         </label>
+
+                        <input
+                          type="text"
+                          name="business_phone"
+                          defaultValue={businessPhone}
+                          placeholder="Ej. 0981 123 456"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-black text-slate-700">
+                        Número principal de WhatsApp
+                      </label>
+
+                      <input
+                        type="text"
+                        name="whatsapp_number"
+                        defaultValue={whatsappNumber}
+                        placeholder="Ej. 0981 123 456"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500"
+                      />
+
+                      <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+                        Este número será la base para futuras acciones,
+                        automatizaciones y mensajes inteligentes por WhatsApp.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-5 md:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block text-sm font-black text-slate-700">
+                          País
+                        </label>
+
                         <input
                           type="text"
                           name="country_label"
                           defaultValue={countryLabel}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
+                          placeholder="Paraguay"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500"
                         />
                       </div>
 
                       <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Empresa
+                        <label className="mb-2 block text-sm font-black text-slate-700">
+                          Ciudad
                         </label>
+
                         <input
                           type="text"
-                          name="company_name"
-                          defaultValue={companyName}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Email de soporte
-                        </label>
-                        <input
-                          type="email"
-                          name="support_email"
-                          defaultValue={supportEmail}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
+                          name="city"
+                          defaultValue={city}
+                          placeholder="Ej. Asunción"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500"
                         />
                       </div>
                     </div>
 
-                    <div className="mt-6 flex flex-wrap gap-3">
-                      <button
-                        type="submit"
-                        className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                    <div>
+                      <label className="mb-2 block text-sm font-black text-slate-700">
+                        Sector principal
+                      </label>
+
+                      <select
+                        name="business_type"
+                        defaultValue={businessType}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition focus:border-blue-500"
                       >
-                        Guardar marca
-                      </button>
+                        {businessTypeOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+                        Actual: {getBusinessTypeDescription(businessType)}
+                      </p>
                     </div>
-                  </form>
-                </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-black text-slate-700">
+                        Tono del mensaje
+                      </label>
+
+                      <select
+                        name="business_tone"
+                        defaultValue={businessTone}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500"
+                      >
+                        <option value="cercano">Cercano</option>
+                        <option value="formal">Formal</option>
+                        <option value="vendedor">Vendedor</option>
+                        <option value="directo">Directo</option>
+                        <option value="amable">Amable</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-black text-slate-700">
+                        Prompt AI personalizado
+                      </label>
+
+                      <textarea
+                        name="ai_prompt"
+                        rows={7}
+                        defaultValue={aiPrompt}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-500"
+                      />
+
+                      <p className="mt-2 text-xs font-semibold text-slate-500">
+                        Ejemplos: “más breve”, “sin emojis”, “más vendedor”,
+                        “más humano”, “más directo”, “usar tono premium”.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-blue-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800"
+                    >
+                      Guardar configuración
+                    </button>
+                  </div>
+                </form>
 
                 <div className="space-y-6">
-                  <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                      Vista actual del asistente
+                  <div className="rounded-[30px] border border-blue-200 bg-blue-50 p-6 shadow-sm">
+                    <div className="mb-4 inline-flex rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+                      Vista actual
                     </div>
 
-                    <div className="space-y-4">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                          Negocio
+                    <div className="rounded-[26px] border border-blue-200 bg-white p-5 shadow-sm">
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">
+                        Empresa
+                      </p>
+
+                      <h3 className="mt-2 text-2xl font-black text-slate-950">
+                        {companyName || "Sin empresa definida"}
+                      </h3>
+
+                      <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+                        {city || countryLabel
+                          ? `${city ? `${city}, ` : ""}${countryLabel}`
+                          : "Ubicación no definida"}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 grid gap-3">
+                      <div className="rounded-2xl border border-blue-200 bg-white px-4 py-4">
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                          Sector activo
                         </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">
-                          {businessType}
+
+                        <p className="mt-2 text-sm font-black text-slate-950">
+                          {getBusinessTypeLabel(businessType)}
+                        </p>
+
+                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                          {getBusinessTypeDescription(businessType)}
                         </p>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      <div className="rounded-2xl border border-blue-200 bg-white px-4 py-4">
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                          Ejemplo dashboard
+                        </p>
+
+                        <p className="mt-2 text-sm font-black text-slate-950">
+                          {getBusinessTypeExample(businessType)}
+                        </p>
+
+                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                          ClienteYA adapta las palabras al sector elegido.
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                          WhatsApp
+                        </p>
+
+                        <p className="mt-1 text-sm font-semibold text-slate-900">
+                          {whatsappNumber || "No definido"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                          Email
+                        </p>
+
+                        <p className="mt-1 text-sm font-semibold text-slate-900">
+                          {businessEmail || "No definido"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-400">
                           Tono
                         </p>
+
                         <p className="mt-1 text-sm font-semibold text-slate-900">
                           {businessTone}
                         </p>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-400">
                           Prompt activo
                         </p>
+
                         <p className="mt-1 text-sm leading-6 text-slate-700">
                           {aiPrompt}
                         </p>
                       </div>
-
-                      <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
-                        <p className="text-sm font-semibold text-sky-900">
-                          Asistente listo
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-sky-800">
-                          ClienteYA usará esta configuración para mensajes y sugerencias.
-                        </p>
-                      </div>
                     </div>
                   </div>
 
                   <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                      Marca actual
+                    <div className="mb-4 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-slate-700">
+                      North Star
                     </div>
 
-                    <div className="grid gap-4">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                          Nombre
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">
-                          {brandName}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                          País
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">
-                          {countryLabel}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                          Empresa
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">
-                          {companyName}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                          Soporte
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">
-                          {supportEmail}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                      Ideas de prompts
-                    </div>
-
-                    <div className="space-y-3 text-sm text-slate-600">
-                      <p>• Escribe breve y sin emojis.</p>
-                      <p>• Usa tono más vendedor y directo.</p>
-                      <p>• Habla como una asesora inmobiliaria profesional.</p>
-                      <p>• Mantén un estilo humano, amable y claro.</p>
-                      <p>• Evita sonar insistente.</p>
+                    <div className="space-y-3 text-sm font-semibold leading-6 text-slate-600">
+                      <p>
+                        ClienteYA debe sentirse construido para cada negocio.
+                      </p>
+                      <p>
+                        WhatsApp, sector y empresa son la base de las próximas
+                        acciones inteligentes.
+                      </p>
+                      <p>
+                        Sector + relación + memoria = lenguaje correcto para el
+                        founder.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -431,6 +586,8 @@ export default async function SettingsPage({
           </div>
         </div>
       </main>
+
+      <MobileDashboardNav />
     </div>
   );
 }

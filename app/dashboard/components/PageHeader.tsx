@@ -5,6 +5,7 @@ type PageHeaderProps = {
   description?: string;
   actionHref?: string;
   actionLabel?: string;
+  badge?: string;
 };
 
 export default function PageHeader({
@@ -12,10 +13,17 @@ export default function PageHeader({
   description,
   actionHref,
   actionLabel,
+  badge,
 }: PageHeaderProps) {
   return (
     <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
       <div>
+        {badge && (
+          <div className="mb-3 inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+            {badge}
+          </div>
+        )}
+
         <h1 className="text-4xl font-bold tracking-tight text-slate-950">
           {title}
         </h1>

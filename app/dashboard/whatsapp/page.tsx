@@ -1,20 +1,25 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
+
+import { ui } from "../../../lib/ui";
+
 import { AppHeader } from "../../components/AppHeader";
 import SidebarNav from "../SidebarNav";
+import PageHeader from "../components/PageHeader";
+import KpiCard from "../../components/KpiCard";
+import SectionCard from "../../components/SectionCard";
+
 import { createAuthServerClient } from "../../../lib/supabase/auth-server";
 import { createAdminClient } from "../../../lib/supabase/server";
-import { buildAssistantVariants } from "../../../lib/whatsapp-assistant";
-import { getPlanAccess } from "../../../lib/plan-access";
+
 import {
-  getDailyUsage,
-  consumeDailyUsage,
-  type UsageResult,
-} from "../../../lib/usage";
-import { logActivity } from "../../../lib/activity";
-import { scheduleAutoFollowup } from "../../../lib/followup-engine";
-import PreviewEditor from "./PreviewEditor";
-import { getWhatsAppLogsByCliente } from "../../../lib/whatsapp-logs";
+  buildClientMemory,
+  getClientMemoryClasses,
+  type ClientMemoryProfile,
+} from "../../../lib/client-memory";
+
+export const dynamic = "force-dynamic";
 
 type Cliente = {
   id: string;
@@ -25,22 +30,23 @@ type Cliente = {
   notas: string | null;
   recordatorio: string | null;
   proximo_contacto: string | null;
+  created_at?: string | null;
+  monto?: number | null;
+  pagado?: boolean | null;
+  fecha_pago?: string | null;
 };
 
-const BASIC_AI_DAILY_LIMIT = 3;
-const AI_FEATURE = "ai_whatsapp_preview";
+type MessageVariant = {
+  id: string;
+  label: string;
+  tone: string;
+  title: string;
+  message: string;
+  reason: string;
+};
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return "—";
-
-  const [year, month, day] = value.slice(0, 10).split("-");
-  if (!year || !month || !day) return value;
-
-  return `${day}/${month}/${year}`;
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("es-ES");
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function addDaysISO(days: number) {
@@ -54,173 +60,463 @@ function addDaysISO(days: number) {
   return `${year}-${month}-${day}`;
 }
 
-function buildLockedPreview(cliente: Cliente) {
-  return `Hola ${cliente.nombre} 👋
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—";
 
-Te escribo porque quería retomar nuestro seguimiento.
+  const [year, month, day] = value.slice(0, 10).split("-");
 
-${
-    cliente.recordatorio
-      ? `Recordatorio: ${cliente.recordatorio}.`
-      : "Si quieres, podemos avanzar con el siguiente paso."
-  }
+  if (!year || !month || !day) return value;
 
-Quedo atento 😊`;
+  return `${day}/${month}/${year}`;
 }
 
-function ParaguayBadge() {
+function cleanPhone(phone: string) {
+  return phone.replace(/[^\d]/g, "");
+}
+
+function buildWhatsAppUrl(phone: string, message: string) {
+  const clean = cleanPhone(phone);
+
+  return `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
+}
+
+function daysBetween(date: string | null | undefined, today: string) {
+  if (!date) return null;
+
+  const target = new Date(`${date.slice(0, 10)}T00:00:00`);
+  const current = new Date(`${today}T00:00:00`);
+
+  return Math.round(
+    (target.getTime() - current.getTime()) / (1000 * 60 * 60 * 24)
+  );
+}
+
+function getClientPhase(cliente: Cliente, today: string) {
+  const estado = cliente.estado.toLowerCase();
+  const delta = daysBetween(cliente.proximo_contacto, today);
+
+  if (cliente.pagado || estado.includes("pag")) {
+    return {
+      label: "Cliente pagado",
+      tone: "emerald",
+      description: "Ya convirtió. El mejor mensaje es de continuidad o recompra.",
+    };
+  }
+
+  if (delta !== null && delta < 0) {
+    return {
+      label: "Follow-up vencido",
+      tone: "red",
+      description: "Este cliente necesita una reactivación simple y directa.",
+    };
+  }
+
+  if (delta === 0) {
+    return {
+      label: "Seguimiento hoy",
+      tone: "amber",
+      description: "Buen momento para escribir con un mensaje corto.",
+    };
+  }
+
+  if (estado.includes("interes")) {
+    return {
+      label: "Oportunidad",
+      tone: "amber",
+      description: "El cliente mostró interés. Conviene empujar el siguiente paso.",
+    };
+  }
+
+  if (estado.includes("sin")) {
+    return {
+      label: "Sin respuesta",
+      tone: "orange",
+      description: "Necesita un mensaje suave para retomar conversación.",
+    };
+  }
+
+  if (estado.includes("contact")) {
+    return {
+      label: "Contactado",
+      tone: "sky",
+      description: "Ya existe contacto previo. Mantener el ritmo.",
+    };
+  }
+
+  return {
+    label: "Nuevo lead",
+    tone: "slate",
+    description: "Cliente nuevo o sin suficiente información todavía.",
+  };
+}
+
+function getPhaseClasses(tone: string) {
+  if (tone === "red") return "border-red-200 bg-red-50 text-red-800";
+  if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (tone === "orange") return "border-orange-200 bg-orange-50 text-orange-800";
+  if (tone === "sky") return "border-sky-200 bg-sky-50 text-sky-800";
+
+  if (tone === "emerald") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function buildMemoryMessage(cliente: Cliente, memory: ClientMemoryProfile) {
+  const name = cliente.nombre;
+
+  if (memory.recommendedTone === "post_sale") {
+    return `Hola ${name} 👋
+
+Quería agradecerte nuevamente y asegurarme de que todo esté bien.
+
+Si necesitas algo más o quieres avanzar con el siguiente paso, estoy atento.`;
+  }
+
+  if (memory.recommendedTone === "soft") {
+    return `Hola ${name} 👋
+
+Espero que estés muy bien.
+
+Solo quería retomar nuestra conversación con calma y ver si todavía tiene sentido avanzar.
+
+Quedo atento 😊`;
+  }
+
+  if (memory.recommendedTone === "direct") {
+    return `Hola ${name} 👋
+
+Te escribo para confirmar si avanzamos con el siguiente paso.
+
+Puedo ayudarte a dejarlo listo hoy si te parece bien.`;
+  }
+
+  return `Hola ${name} 👋
+
+Te escribo para dar seguimiento y ver si podemos avanzar de forma simple con el siguiente paso.
+
+¿Te parece bien que lo revisemos?`;
+}
+
+function buildVariants(
+  cliente: Cliente,
+  memory: ClientMemoryProfile
+): MessageVariant[] {
+  const best = buildMemoryMessage(cliente, memory);
+
+  return [
+    {
+      id: "best",
+      label: "Recomendado",
+      tone:
+        memory.recommendedTone === "soft"
+          ? "Suave"
+          : memory.recommendedTone === "direct"
+          ? "Directo"
+          : memory.recommendedTone === "post_sale"
+          ? "Post-venta"
+          : "Balanceado",
+      title: "Mejor siguiente mensaje",
+      message: best,
+      reason: memory.nextBestStep,
+    },
+    {
+      id: "soft",
+      label: "Suave",
+      tone: "Amable",
+      title: "Mensaje menos directo",
+      message: `Hola ${cliente.nombre} 👋
+
+Espero que estés muy bien.
+
+Solo quería retomar nuestra conversación con calma y ver si todavía tiene sentido avanzar.
+
+Quedo atento 😊`,
+      reason: "Útil cuando hay riesgo de ghosting o demasiados seguimientos.",
+    },
+    {
+      id: "direct",
+      label: "Directo",
+      tone: "Comercial",
+      title: "Mensaje más enfocado en acción",
+      message: `Hola ${cliente.nombre} 👋
+
+Te escribo para confirmar si avanzamos con el siguiente paso.
+
+Puedo ayudarte a dejarlo listo hoy si te parece bien.`,
+      reason: "Útil cuando el cliente está caliente y falta decisión.",
+    },
+  ];
+}
+
+function SuccessBanner({ ok }: { ok?: string }) {
+  if (!ok) return null;
+
+  const messages: Record<string, string> = {
+    contactado: "Cliente marcado como contactado.",
+    seguimiento: "Seguimiento programado correctamente.",
+    cerrado: "Cliente cerrado correctamente.",
+  };
+
   return (
-    <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-      <div className="absolute inset-x-0 top-0 h-1/3 bg-red-500" />
-      <div className="absolute inset-x-0 top-1/3 h-1/3 bg-white" />
-      <div className="absolute inset-x-0 bottom-0 h-1/3 bg-blue-600" />
-      <span className="relative z-10 text-[10px] font-bold text-slate-900">
-        PY
-      </span>
+    <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
+      ✅ {messages[ok] || "Acción guardada correctamente."}
     </div>
   );
 }
 
-function ContextPaywallCard({
+function VariantCard({
+  variant,
   cliente,
-  usage,
+  isPrimary = false,
 }: {
+  variant: MessageVariant;
   cliente: Cliente;
-  usage: UsageResult | null;
+  isPrimary?: boolean;
 }) {
-  const preview = buildLockedPreview(cliente);
+  const whatsappUrl = buildWhatsAppUrl(cliente.telefono, variant.message);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.9fr_1.3fr]">
-      <div className="space-y-6">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-xl font-semibold text-slate-900">
-            Cliente
+    <div
+      className={`min-w-0 rounded-[28px] border p-4 shadow-sm sm:p-5 ${
+        isPrimary
+          ? "border-emerald-200 bg-emerald-50"
+          : "border-slate-200 bg-white"
+      }`}
+    >
+      <div className="mb-4 flex flex-col gap-3">
+        <div className="min-w-0">
+          <div
+            className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
+              isPrimary
+                ? "border-emerald-200 bg-white text-emerald-700"
+                : "border-blue-200 bg-blue-50 text-blue-700"
+            }`}
+          >
+            {variant.label}
+          </div>
+
+          <h2 className="mt-3 break-words text-lg font-bold leading-tight text-slate-950 sm:text-xl">
+            {variant.title}
           </h2>
 
-          <div className="grid gap-3 text-sm md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Nombre
-              </p>
-              <p className="mt-1 font-semibold text-slate-900">
-                {cliente.nombre}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Teléfono
-              </p>
-              <p className="mt-1 font-semibold text-slate-900">
-                {cliente.telefono}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Estado
-              </p>
-              <p className="mt-1 font-semibold text-slate-900">
-                {cliente.estado}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Próximo
-              </p>
-              <p className="mt-1 font-semibold text-slate-900">
-                {formatDate(cliente.proximo_contacto)}
-              </p>
-            </div>
-          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            Tono: {variant.tone}
+          </p>
         </div>
 
-        <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-5 shadow-sm">
-          <div className="mb-3 inline-flex rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-semibold text-amber-700">
-            Límite diario
+        <a
+          href={whatsappUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+        >
+          Abrir WhatsApp
+        </a>
+      </div>
+
+      <div className="min-w-0 rounded-[22px] border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-800">
+        <p className="whitespace-pre-wrap break-words">{variant.message}</p>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-white/70 px-4 py-3 text-sm text-slate-600">
+        💡 {variant.reason}
+      </div>
+    </div>
+  );
+}
+
+function ClientMemoryPanel({ memory }: { memory: ClientMemoryProfile }) {
+  return (
+    <div
+      className={`rounded-[28px] border p-5 shadow-sm ${getClientMemoryClasses(
+        memory
+      )}`}
+    >
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="mb-2 inline-flex rounded-full border border-current bg-white/60 px-3 py-1 text-xs font-semibold">
+            AI Follow-up Memory
           </div>
 
-          <h2 className="text-xl font-semibold text-slate-900">
-            Llegaste al límite gratuito de hoy
+          <h2 className="text-2xl font-bold tracking-tight">
+            {memory.label}
           </h2>
 
-          <p className="mt-3 text-sm leading-6 text-amber-800">
-            Usaste {usage?.used || 0}/{usage?.limit || BASIC_AI_DAILY_LIMIT}{" "}
-            mensajes AI gratuitos hoy. El siguiente mensaje ya está casi listo;
-            activa Pro para desbloquearlo y enviarlo ahora.
+          <p className="mt-2 max-w-3xl text-sm leading-6">
+            {memory.summary}
           </p>
+        </div>
 
-          <a
-            href="/billing"
-            className="mt-5 inline-block rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-          >
-            Activar Pro
-          </a>
+        <div className="rounded-2xl border border-white/50 bg-white/60 px-4 py-3 text-sm font-semibold">
+          Memory score: {memory.score}/100
         </div>
       </div>
 
-      <div className="relative">
-        <div className="pointer-events-none select-none opacity-45 blur-[3px]">
-          <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-slate-900">
-              Mensaje listo para enviar
-            </h2>
-
-            <div className="mt-5 min-h-[360px] rounded-[24px] border border-slate-300 bg-white px-4 py-4 text-sm leading-7 text-slate-900">
-              <p className="whitespace-pre-wrap">{preview}</p>
-            </div>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <span className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
-                Copiar
-              </span>
-              <span className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
-                Regenerar
-              </span>
-              <span className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">
-                Abrir WhatsApp
-              </span>
-            </div>
-          </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-2xl border border-white/50 bg-white/60 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
+            Riesgo
+          </p>
+          <p className="mt-2 text-sm font-medium leading-6">
+            {memory.risk}
+          </p>
         </div>
 
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="mx-6 max-w-md rounded-[28px] border border-blue-200 bg-white p-6 text-center shadow-xl">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-xl">
-              🔒
-            </div>
+        <div className="rounded-2xl border border-white/50 bg-white/60 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
+            Tono recomendado
+          </p>
+          <p className="mt-2 text-sm font-medium leading-6">
+            {memory.recommendedTone}
+          </p>
+        </div>
 
-            <h2 className="text-2xl font-bold text-slate-950">
-              Este mensaje ya está listo
-            </h2>
-
-            <p className="mt-3 text-sm leading-6 text-slate-500">
-              Estabas a punto de enviar un mensaje inteligente a{" "}
-              <strong>{cliente.nombre}</strong>. Activa Pro para desbloquearlo,
-              usar variantes y continuar sin límites.
-            </p>
-
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <a
-                href="/billing"
-                className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-              >
-                Activar Pro ahora
-              </a>
-
-              <a
-                href="/dashboard/clientes"
-                className="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
-              >
-                Volver a clientes
-              </a>
-            </div>
-          </div>
+        <div className="rounded-2xl border border-white/50 bg-white/60 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
+            Próximo mejor paso
+          </p>
+          <p className="mt-2 text-sm font-medium leading-6">
+            {memory.nextBestStep}
+          </p>
         </div>
       </div>
     </div>
+  );
+}
+
+function ClienteContextCard({
+  cliente,
+  phase,
+  score,
+  memory,
+}: {
+  cliente: Cliente;
+  phase: ReturnType<typeof getClientPhase>;
+  score: number;
+  memory: ClientMemoryProfile;
+}) {
+  return (
+    <SectionCard
+      badge="Contexto"
+      title={cliente.nombre}
+      description={cliente.telefono || "Sin teléfono"}
+      actions={
+        <span
+          className={`rounded-full border px-3 py-1 text-xs font-semibold ${getPhaseClasses(
+            phase.tone
+          )}`}
+        >
+          {phase.label}
+        </span>
+      }
+    >
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Estado
+          </p>
+
+          <p className="mt-1 font-semibold text-slate-900">
+            {cliente.estado}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Próximo contacto
+          </p>
+
+          <p className="mt-1 font-semibold text-slate-900">
+            {formatDate(cliente.proximo_contacto)}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            AI score
+          </p>
+
+          <p className="mt-1 font-semibold text-slate-900">
+            {score}/100
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Memory
+          </p>
+
+          <p className="mt-1 line-clamp-2 font-semibold text-slate-900">
+            {memory.label}
+          </p>
+        </div>
+      </div>
+
+      <div
+        className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${getPhaseClasses(
+          phase.tone
+        )}`}
+      >
+        {phase.description}
+      </div>
+    </SectionCard>
+  );
+}
+
+function ActionPanel({
+  cliente,
+  onContacted,
+  onSchedule,
+  onClose,
+}: {
+  cliente: Cliente;
+  onContacted: (formData: FormData) => Promise<void>;
+  onSchedule: (formData: FormData) => Promise<void>;
+  onClose: (formData: FormData) => Promise<void>;
+}) {
+  return (
+    <SectionCard
+      badge="CRM"
+      title="Después de enviar"
+      description="Mantén el CRM limpio con una acción rápida."
+    >
+      <div className="grid gap-3">
+        <form action={onContacted}>
+          <input type="hidden" name="id" value={cliente.id} />
+
+          <button
+            type="submit"
+            className="w-full rounded-2xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+          >
+            Marcar contactado
+          </button>
+        </form>
+
+        <form action={onSchedule}>
+          <input type="hidden" name="id" value={cliente.id} />
+
+          <button
+            type="submit"
+            className="w-full rounded-2xl bg-amber-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600"
+          >
+            Seguimiento en 3 días
+          </button>
+        </form>
+
+        <form action={onClose}>
+          <input type="hidden" name="id" value={cliente.id} />
+
+          <button
+            type="submit"
+            className="w-full rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800"
+          >
+            Cerrar como pagado
+          </button>
+        </form>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -232,6 +528,7 @@ export default async function WhatsAppPreviewPage({
   const { id, ok } = await searchParams;
 
   const supabase = await createAuthServerClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -239,20 +536,19 @@ export default async function WhatsAppPreviewPage({
   if (!user) redirect("/login");
   if (!id) redirect("/dashboard/clientes");
 
-  async function marcarContactado(formData: FormData) {
+  async function actionContacted(formData: FormData) {
     "use server";
 
     const supabase = await createAuthServerClient();
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) redirect("/login");
 
-    const plan = await getPlanAccess(user.id);
-    if (!plan.isPro) redirect("/billing");
+    const clienteId = String(formData.get("id") || "");
 
-    const clienteId = String(formData.get("clienteId") || "");
     if (!clienteId) redirect("/dashboard/clientes");
 
     const admin = createAdminClient();
@@ -261,39 +557,32 @@ export default async function WhatsAppPreviewPage({
       .from("clientes")
       .update({
         estado: "Contactado",
-        recordatorio: "Cliente contactado desde WhatsApp AI",
+        recordatorio: "Contactado desde WhatsApp AI",
       })
       .eq("id", clienteId)
       .eq("user_id", user.id);
 
-    await logActivity({
-      userId: user.id,
-      type: "contacted",
-      clienteId,
-    });
-
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clientes");
     revalidatePath("/dashboard/automations");
-    revalidatePath(`/dashboard/whatsapp?id=${clienteId}`);
+    revalidatePath("/dashboard/whatsapp");
 
     redirect(`/dashboard/whatsapp?id=${clienteId}&ok=contactado`);
   }
 
-  async function marcarSinRespuesta(formData: FormData) {
+  async function actionSchedule(formData: FormData) {
     "use server";
 
     const supabase = await createAuthServerClient();
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) redirect("/login");
 
-    const plan = await getPlanAccess(user.id);
-    if (!plan.isPro) redirect("/billing");
+    const clienteId = String(formData.get("id") || "");
 
-    const clienteId = String(formData.get("clienteId") || "");
     if (!clienteId) redirect("/dashboard/clientes");
 
     const admin = createAdminClient();
@@ -308,40 +597,27 @@ export default async function WhatsAppPreviewPage({
       .eq("id", clienteId)
       .eq("user_id", user.id);
 
-    await scheduleAutoFollowup({
-      userId: user.id,
-      clienteId,
-      days: 3,
-    });
-
-    await logActivity({
-      userId: user.id,
-      type: "followup",
-      clienteId,
-    });
-
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clientes");
     revalidatePath("/dashboard/automations");
-    revalidatePath(`/dashboard/whatsapp?id=${clienteId}`);
+    revalidatePath("/dashboard/whatsapp");
 
-    redirect(`/dashboard/whatsapp?id=${clienteId}&ok=sin-respuesta`);
+    redirect(`/dashboard/whatsapp?id=${clienteId}&ok=seguimiento`);
   }
 
-  async function cerrarOportunidad(formData: FormData) {
+  async function actionClose(formData: FormData) {
     "use server";
 
     const supabase = await createAuthServerClient();
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) redirect("/login");
 
-    const plan = await getPlanAccess(user.id);
-    if (!plan.isPro) redirect("/billing");
+    const clienteId = String(formData.get("id") || "");
 
-    const clienteId = String(formData.get("clienteId") || "");
     if (!clienteId) redirect("/dashboard/clientes");
 
     const admin = createAdminClient();
@@ -349,9 +625,11 @@ export default async function WhatsAppPreviewPage({
     await admin
       .from("clientes")
       .update({
-        estado: "Cerrado",
-        recordatorio: "Oportunidad cerrada desde WhatsApp AI",
-        proximo_contacto: null,
+        estado: "Pagó",
+        pagado: true,
+        monto: 50000,
+        fecha_pago: new Date().toISOString(),
+        recordatorio: "Cerrado como pagado desde WhatsApp AI",
       })
       .eq("id", clienteId)
       .eq("user_id", user.id);
@@ -359,89 +637,30 @@ export default async function WhatsAppPreviewPage({
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clientes");
     revalidatePath("/dashboard/automations");
-    revalidatePath(`/dashboard/whatsapp?id=${clienteId}`);
+    revalidatePath("/dashboard/whatsapp");
 
     redirect(`/dashboard/whatsapp?id=${clienteId}&ok=cerrado`);
   }
 
   const admin = createAdminClient();
 
-  const { data } = await admin
+  const { data: clienteData } = await admin
     .from("clientes")
     .select("*")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const cliente = data as Cliente | null;
+  if (!clienteData) redirect("/dashboard/clientes");
 
-  if (!cliente) redirect("/dashboard/clientes");
-
-  const plan = await getPlanAccess(user.id);
-
-  const logs = await getWhatsAppLogsByCliente({
-    userId: user.id,
-    clienteId: cliente.id,
-  });
-
-  const okMessage =
-    ok === "contactado"
-      ? "Cliente marcado como contactado."
-      : ok === "sin-respuesta"
-      ? "Cliente marcado como sin respuesta. Se agendó seguimiento automático en 3 días."
-      : ok === "cerrado"
-      ? "Oportunidad cerrada correctamente."
-      : null;
-
-  const isBasicActive = plan.planType === "basic" && plan.isActive;
-  const isPro = plan.isPro;
-
-  let usage: UsageResult | null = null;
-  let variants: Awaited<ReturnType<typeof buildAssistantVariants>> = [];
-  let initialMessage = "";
-  let canGenerateAI = false;
-
-  if (isPro) {
-    canGenerateAI = true;
-  }
-
-  if (isBasicActive && !isPro) {
-    const currentUsage = await getDailyUsage({
-      userId: user.id,
-      feature: AI_FEATURE,
-      limit: BASIC_AI_DAILY_LIMIT,
-    });
-
-    if (currentUsage.allowed) {
-      usage = await consumeDailyUsage({
-        userId: user.id,
-        feature: AI_FEATURE,
-        limit: BASIC_AI_DAILY_LIMIT,
-      });
-
-      canGenerateAI = usage.allowed;
-    } else {
-      usage = currentUsage;
-      canGenerateAI = false;
-    }
-  }
-
-  if (canGenerateAI) {
-    variants = await buildAssistantVariants({
-      userId: user.id,
-      cliente,
-    });
-
-    initialMessage = variants?.[0]?.message || `Hola ${cliente.nombre}`;
-
-    if (!isPro) {
-      await logActivity({
-        userId: user.id,
-        type: "ai_message",
-        clienteId: cliente.id,
-      });
-    }
-  }
+const cliente = clienteData as Cliente;
+const today = todayISO();
+const phase = getClientPhase(cliente, today);
+const memory = buildClientMemory(cliente);
+const score = memory.score;
+const variants = buildVariants(cliente, memory);
+const primary = variants[0];
+const otherVariants = variants.slice(1);
 
   return (
     <div className="dashboard-shell">
@@ -453,194 +672,79 @@ export default async function WhatsAppPreviewPage({
             <SidebarNav />
           </aside>
 
-          <div className="flex-1 px-6 py-10">
-            <div className="mx-auto max-w-6xl">
-              <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="mb-3">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
-                      <ParaguayBadge />
-                      Paraguay
-                    </span>
+          <div className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+            <div className="mx-auto max-w-[1500px]">
+              <SuccessBanner ok={ok} />
+
+              <PageHeader
+                title="WhatsApp AI"
+                description="Elige el mejor mensaje, abre WhatsApp y actualiza el CRM en un clic."
+                badge="Message Intelligence"
+                actionHref="/dashboard/clientes"
+                actionLabel="Volver a clientes"
+              />
+
+              <div className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <KpiCard label="AI score" value={`${score}/100`} tone="sky" />
+                  <KpiCard label="Memory" value={memory.label} tone="amber" />
+                  <KpiCard
+                    label="Próximo"
+                    value={formatDate(cliente.proximo_contacto)}
+                  />
+                  <KpiCard label="Estado" value={cliente.estado} tone="emerald" />
+                </div>
+
+                <ClientMemoryPanel memory={memory} />
+
+                <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+                  <div className="space-y-6">
+                    <ClienteContextCard
+                      cliente={cliente}
+                      phase={phase}
+                      score={score}
+                      memory={memory}
+                    />
+
+                    <ActionPanel
+                      cliente={cliente}
+                      onContacted={actionContacted}
+                      onSchedule={actionSchedule}
+                      onClose={actionClose}
+                    />
                   </div>
 
-                  <h1 className="text-5xl font-bold tracking-tight text-slate-950">
-                    Asistente WhatsApp
-                  </h1>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                    Edita, envía y actualiza el estado del cliente desde un mismo lugar.
-                  </p>
-                </div>
+                  <div className="min-w-0 space-y-6">
+                    <SectionCard
+                      badge="Recomendado"
+                      title="Mensaje principal"
+                      description="ClienteYA recomienda este mensaje usando memoria comercial y contexto del cliente."
+                    >
+                      <VariantCard
+                        variant={primary}
+                        cliente={cliente}
+                        isPrimary
+                      />
+                    </SectionCard>
 
-                <a
-                  href="/dashboard/clientes"
-                  className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-100"
-                >
-                  Volver a clientes
-                </a>
-              </div>
-
-              {okMessage && (
-                <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
-                  ✅ {okMessage}
-                </div>
-              )}
-
-              {!canGenerateAI ? (
-                <ContextPaywallCard cliente={cliente} usage={usage} />
-              ) : (
-                <div className="grid gap-6 xl:grid-cols-[0.9fr_1.3fr]">
-                  <div className="space-y-6">
-                    {!isPro && usage && (
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
-                        ⚡ Te quedan <strong>{usage.remaining}</strong>{" "}
-                        mensajes AI gratis hoy.
-                      </div>
-                    )}
-
-                    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                      <h2 className="mb-4 text-xl font-semibold text-slate-900">
-                        Cliente
-                      </h2>
-
-                      <div className="grid gap-3 text-sm md:grid-cols-2">
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                            Nombre
-                          </p>
-                          <p className="mt-1 font-semibold text-slate-900">
-                            {cliente.nombre}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                            Teléfono
-                          </p>
-                          <p className="mt-1 font-semibold text-slate-900">
-                            {cliente.telefono}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                            Estado
-                          </p>
-                          <p className="mt-1 font-semibold text-slate-900">
-                            {cliente.estado}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                            Próximo
-                          </p>
-                          <p className="mt-1 font-semibold text-slate-900">
-                            {formatDate(cliente.proximo_contacto)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {isPro && (
-                      <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                        <h2 className="mb-4 text-xl font-semibold text-slate-900">
-                          Acciones CRM
-                        </h2>
-
-                        <div className="space-y-3">
-                          <form action={marcarContactado}>
-                            <input
-                              type="hidden"
-                              name="clienteId"
-                              value={cliente.id}
-                            />
-                            <button
-                              type="submit"
-                              className="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-                            >
-                              ✅ Marcar contactado
-                            </button>
-                          </form>
-
-                          <form action={marcarSinRespuesta}>
-                            <input
-                              type="hidden"
-                              name="clienteId"
-                              value={cliente.id}
-                            />
-                            <button
-                              type="submit"
-                              className="w-full rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600"
-                            >
-                              🟠 Sin respuesta — reintentar en 3 días
-                            </button>
-                          </form>
-
-                          <form action={cerrarOportunidad}>
-                            <input
-                              type="hidden"
-                              name="clienteId"
-                              value={cliente.id}
-                            />
-                            <button
-                              type="submit"
-                              className="w-full rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
-                            >
-                              🔴 Cerrar oportunidad
-                            </button>
-                          </form>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                      <h2 className="mb-4 text-xl font-semibold text-slate-900">
-                        Historial de mensajes
-                      </h2>
-
-                      {logs.length === 0 && (
-                        <p className="text-sm text-slate-500">
-                          Aún no hay mensajes registrados.
-                        </p>
-                      )}
-
-                      <div className="space-y-3">
-                        {logs.map((log) => (
-                          <div
-                            key={log.id}
-                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm shadow-sm"
-                          >
-                            <div className="mb-2 text-xs text-slate-400">
-                              {formatDateTime(log.created_at)}
-                            </div>
-
-                            <div className="whitespace-pre-wrap leading-6 text-slate-700">
-                              {log.message}
-                            </div>
-
-                            <div className="mt-2 text-xs text-slate-400">
-                              {log.source}
-                            </div>
-                          </div>
+                    <SectionCard
+                      badge="Alternativas"
+                      title="Otros tonos"
+                      description="Elige un mensaje más suave o más directo según el contexto."
+                    >
+                      <div className="grid min-w-0 gap-5">
+                        {otherVariants.map((variant) => (
+                          <VariantCard
+                            key={variant.id}
+                            variant={variant}
+                            cliente={cliente}
+                          />
                         ))}
                       </div>
-                    </div>
+                    </SectionCard>
                   </div>
-
-                  <PreviewEditor
-                    cliente={{
-                      id: cliente.id,
-                      nombre: cliente.nombre,
-                      telefono: cliente.telefono,
-                    }}
-                    initialMessage={initialMessage}
-                    variants={variants}
-                    isPro={isPro}
-                    usage={usage}
-                  />
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>

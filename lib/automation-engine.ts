@@ -3,7 +3,7 @@ import { createAdminClient } from "./supabase/server";
 export type ClienteForAutomation = {
   id: string;
   nombre: string;
-  telefono: string;
+  telefono?: string | null;
   estado?: string | null;
   notas?: string | null;
   recordatorio?: string | null;
@@ -12,6 +12,9 @@ export type ClienteForAutomation = {
 
 export type AutomationReminder = {
   cliente: ClienteForAutomation;
+  clienteId: string;
+  nombre: string;
+  type: "overdue" | "today" | "tomorrow" | "interested" | "no_response" | "general";
   score: number;
   priority: "urgent" | "high" | "medium" | "low";
   title: string;
@@ -42,51 +45,101 @@ function tomorrowISO() {
   return addDaysISO(1);
 }
 
+function normalizeDate(value?: string | null) {
+  if (!value) return "";
+
+  return value.slice(0, 10);
+}
+
 function daysBetweenISO(from: string, to: string) {
+  const fromDate = new Date(`${normalizeDate(from)}T00:00:00`);
+  const toDate = new Date(`${normalizeDate(to)}T00:00:00`);
+
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return 0;
+  }
+
   return Math.floor(
-    (new Date(to).getTime() - new Date(from).getTime()) /
-      (1000 * 60 * 60 * 24)
+    (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)
   );
 }
 
 function normalize(value?: string | null) {
-  return value?.toLowerCase().trim() || "";
+  return (value || "").toLowerCase().trim();
+}
+
+function getSafeCliente(cliente: ClienteForAutomation): ClienteForAutomation {
+  return {
+    id: cliente.id || "",
+    nombre: cliente.nombre || "Cliente sin nombre",
+    telefono: cliente.telefono || "",
+    estado: cliente.estado || "Nuevo",
+    notas: cliente.notas || null,
+    recordatorio: cliente.recordatorio || null,
+    proximo_contacto: normalizeDate(cliente.proximo_contacto) || null,
+  };
 }
 
 function isPaid(cliente: ClienteForAutomation) {
-  return normalize(cliente.estado).includes("pagado");
+  const estado = normalize(cliente.estado);
+
+  return estado.includes("pag") || estado.includes("pagó");
 }
 
 function isInterested(cliente: ClienteForAutomation) {
-  return normalize(cliente.estado).includes("interes");
+  const estado = normalize(cliente.estado);
+
+  return estado.includes("interes") || estado.includes("interés");
 }
 
 function isNoResponse(cliente: ClienteForAutomation) {
-  return normalize(cliente.estado).includes("sin respuesta");
+  const estado = normalize(cliente.estado);
+
+  return estado.includes("sin");
 }
 
 function isClosed(cliente: ClienteForAutomation) {
-  return normalize(cliente.estado).includes("cerrado");
+  const estado = normalize(cliente.estado);
+
+  return estado.includes("cerr");
+}
+
+function buildReminder(
+  cliente: ClienteForAutomation,
+  data: Omit<AutomationReminder, "cliente" | "clienteId" | "nombre">
+): AutomationReminder {
+  const safeCliente = getSafeCliente(cliente);
+
+  return {
+    cliente: safeCliente,
+    clienteId: safeCliente.id,
+    nombre: safeCliente.nombre,
+    ...data,
+  };
 }
 
 export function applyAutomationRules<T extends ClienteForAutomation>(
   clientes: T[]
 ): T[] {
-  return clientes.map((cliente) => {
-    if (isPaid(cliente) || isClosed(cliente)) {
+  const safeClientes = Array.isArray(clientes) ? clientes : [];
+
+  return safeClientes.map((cliente) => {
+    const safeCliente = getSafeCliente(cliente);
+
+    if (isPaid(safeCliente) || isClosed(safeCliente)) {
       return cliente;
     }
 
-    if (!cliente.proximo_contacto) {
+    if (!safeCliente.proximo_contacto) {
       let nextDate = addDaysISO(3);
       let reminder = "Seguimiento automático en 3 días";
 
-      if (isInterested(cliente)) {
+      if (isInterested(safeCliente)) {
         nextDate = addDaysISO(1);
         reminder = "Cliente interesado: responder rápido";
       }
 
-      if (isNoResponse(cliente)) {
+      if (isNoResponse(safeCliente)) {
         nextDate = addDaysISO(3);
         reminder = "Reintentar contacto en 3 días";
       }
@@ -105,20 +158,26 @@ export function applyAutomationRules<T extends ClienteForAutomation>(
 export function buildAutomationReminders(
   clientes: ClienteForAutomation[]
 ): AutomationReminder[] {
+  const safeClientes = Array.isArray(clientes) ? clientes : [];
   const today = todayISO();
   const tomorrow = tomorrowISO();
 
-  return clientes
+  return safeClientes
     .map((cliente) => {
-      if (isPaid(cliente) || isClosed(cliente)) {
+      const safeCliente = getSafeCliente(cliente);
+      const proximoContacto = normalizeDate(safeCliente.proximo_contacto);
+
+      if (!safeCliente.id) return null;
+
+      if (isPaid(safeCliente) || isClosed(safeCliente)) {
         return null;
       }
 
-      if (cliente.proximo_contacto && cliente.proximo_contacto < today) {
-        const overdueDays = daysBetweenISO(cliente.proximo_contacto, today);
+      if (proximoContacto && proximoContacto < today) {
+        const overdueDays = daysBetweenISO(proximoContacto, today);
 
-        return {
-          cliente,
+        return buildReminder(safeCliente, {
+          type: "overdue",
           score: 100 + overdueDays,
           priority: overdueDays >= 7 ? "urgent" : "high",
           title:
@@ -134,13 +193,13 @@ export function buildAutomationReminders(
               ? "Llamar directamente al cliente"
               : "Enviar mensaje hoy",
           actionLabel: "Contactar ahora",
-          actionType: "contactado" as const,
-        };
+          actionType: "contactado",
+        });
       }
 
-      if (cliente.proximo_contacto === today) {
-        return {
-          cliente,
+      if (proximoContacto === today) {
+        return buildReminder(safeCliente, {
+          type: "today",
           score: 90,
           priority: "high",
           title: "📅 Seguimiento para hoy",
@@ -148,13 +207,13 @@ export function buildAutomationReminders(
             "Este cliente está programado para hoy. Conviene cerrar el contacto.",
           nextBestAction: "Abrir WhatsApp y hacer seguimiento",
           actionLabel: "Marcar listo",
-          actionType: "listo" as const,
-        };
+          actionType: "listo",
+        });
       }
 
-      if (cliente.proximo_contacto === tomorrow) {
-        return {
-          cliente,
+      if (proximoContacto === tomorrow) {
+        return buildReminder(safeCliente, {
+          type: "tomorrow",
           score: 75,
           priority: "medium",
           title: "🕒 Seguimiento mañana",
@@ -162,13 +221,13 @@ export function buildAutomationReminders(
             "Puedes dejar listo el mensaje o preparar el siguiente paso.",
           nextBestAction: "Preparar mensaje automático",
           actionLabel: "Agendar siguiente",
-          actionType: "schedule" as const,
-        };
+          actionType: "schedule",
+        });
       }
 
-      if (isInterested(cliente)) {
-        return {
-          cliente,
+      if (isInterested(safeCliente)) {
+        return buildReminder(safeCliente, {
+          type: "interested",
           score: 85,
           priority: "high",
           title: "🔥 Cliente interesado",
@@ -176,72 +235,71 @@ export function buildAutomationReminders(
             "Este cliente mostró interés y necesita seguimiento rápido.",
           nextBestAction: "Enviar propuesta o cerrar venta",
           actionLabel: "Responder ahora",
-          actionType: "contactado" as const,
-        };
+          actionType: "contactado",
+        });
       }
 
-      if (isNoResponse(cliente)) {
-        return {
-          cliente,
+      if (isNoResponse(safeCliente)) {
+        return buildReminder(safeCliente, {
+          type: "no_response",
           score: 60,
           priority: "medium",
           title: "📨 Cliente sin respuesta",
-          description:
-            "Este cliente no respondió el último contacto.",
+          description: "Este cliente no respondió el último contacto.",
           nextBestAction: "Reintentar contacto en horario distinto",
           actionLabel: "Reintentar",
-          actionType: "schedule" as const,
-        };
+          actionType: "schedule",
+        });
       }
 
-      return {
-        cliente,
+      return buildReminder(safeCliente, {
+        type: "general",
         score: 40,
         priority: "low",
         title: "Seguimiento general",
-        description:
-          "Cliente activo sin prioridad urgente.",
+        description: "Cliente activo sin prioridad urgente.",
         nextBestAction: "Mantener contacto semanal",
         actionLabel: "Abrir cliente",
-        actionType: "schedule" as const,
-      };
+        actionType: "schedule",
+      });
     })
-    .filter(Boolean)
+    .filter((reminder): reminder is AutomationReminder => Boolean(reminder))
     .sort((a, b) => b.score - a.score)
-    .slice(0, 6) as AutomationReminder[];
+    .slice(0, 6);
 }
 
 export function buildDashboardAlerts(
   clientes: ClienteForAutomation[]
 ): DashboardAlert[] {
+  const safeClientes = Array.isArray(clientes) ? clientes : [];
   const today = todayISO();
   const tomorrow = tomorrowISO();
 
-  const activeClientes = clientes.filter(
-    (c) => !isPaid(c) && !isClosed(c)
-  );
+  const activeClientes = safeClientes
+    .map(getSafeCliente)
+    .filter((c) => c.id && !isPaid(c) && !isClosed(c));
 
-  const atrasados = activeClientes.filter(
-    (c) => c.proximo_contacto && c.proximo_contacto < today
-  );
+  const atrasados = activeClientes.filter((c) => {
+    const date = normalizeDate(c.proximo_contacto);
 
-  const muyAtrasados = atrasados.filter(
-    (c) =>
-      c.proximo_contacto &&
-      daysBetweenISO(c.proximo_contacto, today) >= 7
-  );
+    return date && date < today;
+  });
+
+  const muyAtrasados = atrasados.filter((c) => {
+    const date = normalizeDate(c.proximo_contacto);
+
+    return date && daysBetweenISO(date, today) >= 7;
+  });
 
   const hoy = activeClientes.filter(
-    (c) => c.proximo_contacto === today
+    (c) => normalizeDate(c.proximo_contacto) === today
   );
 
   const manana = activeClientes.filter(
-    (c) => c.proximo_contacto === tomorrow
+    (c) => normalizeDate(c.proximo_contacto) === tomorrow
   );
 
-  const interesados = activeClientes.filter((c) =>
-    isInterested(c)
-  );
+  const interesados = activeClientes.filter((c) => isInterested(c));
 
   const alerts: DashboardAlert[] = [];
 
@@ -250,8 +308,7 @@ export function buildDashboardAlerts(
       id: "very-overdue",
       tone: "red",
       title: `🚨 ${muyAtrasados.length} cliente(s) críticos`,
-      description:
-        "Estos clientes llevan más de 7 días sin seguimiento.",
+      description: "Estos clientes llevan más de 7 días sin seguimiento.",
     });
   }
 
@@ -260,8 +317,7 @@ export function buildDashboardAlerts(
       id: "overdue",
       tone: "red",
       title: `🔥 ${atrasados.length} seguimiento(s) atrasado(s)`,
-      description:
-        "Hay clientes que requieren atención inmediata.",
+      description: "Hay clientes que requieren atención inmediata.",
     });
   }
 
@@ -270,8 +326,7 @@ export function buildDashboardAlerts(
       id: "today",
       tone: "amber",
       title: `📅 ${hoy.length} seguimiento(s) para hoy`,
-      description:
-        "Clientes programados para contactar hoy.",
+      description: "Clientes programados para contactar hoy.",
     });
   }
 
@@ -280,8 +335,7 @@ export function buildDashboardAlerts(
       id: "tomorrow",
       tone: "sky",
       title: `🕒 ${manana.length} seguimiento(s) mañana`,
-      description:
-        "Puedes preparar mensajes hoy.",
+      description: "Puedes preparar mensajes hoy.",
     });
   }
 
@@ -290,15 +344,14 @@ export function buildDashboardAlerts(
       id: "interested",
       tone: "emerald",
       title: `💡 ${interesados.length} cliente(s) interesados`,
-      description:
-        "Clientes con potencial alto de conversión.",
+      description: "Clientes con potencial alto de conversión.",
     });
   }
 
   return alerts.slice(0, 4);
 }
 
-export function getAlertClasses(tone: DashboardAlert["tone"]) {
+export function getAlertClasses(tone: DashboardAlert["tone"] | null | undefined) {
   if (tone === "red") {
     return "border-red-200 bg-red-50 text-red-800";
   }
@@ -315,6 +368,12 @@ export function getAlertClasses(tone: DashboardAlert["tone"]) {
 }
 
 export async function runDueAutomations(userId: string) {
+  if (!userId) {
+    return {
+      processed: 0,
+    };
+  }
+
   const admin = createAdminClient();
   const today = todayISO();
 
@@ -325,9 +384,11 @@ export async function runDueAutomations(userId: string) {
     .eq("status", "scheduled")
     .lte("due_date", today);
 
-  const due = dueFollowups || [];
+  const due = Array.isArray(dueFollowups) ? dueFollowups : [];
 
   for (const followup of due) {
+    if (!followup.id || !followup.cliente_id) continue;
+
     await admin
       .from("scheduled_followups")
       .update({ status: "due" })
