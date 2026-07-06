@@ -39,23 +39,18 @@ export type CommercialOperatingClient = {
 
 export type CommercialOperatingResult = {
   client: CommercialOperatingClient;
-
   urgency: CommercialOperatingUrgency;
   priority: CommercialOperatingPriority;
-
   reason: string;
   nextAction: CommercialOperatingNextAction;
   nextActionLabel: string;
   nextDate: string | null;
-
   memoryScore: number;
   relationshipScore: number;
   commercialScore: number;
-
   daysUntilNextContact: number | null;
   daysSinceCreated: number | null;
   daysSinceUpdated: number | null;
-
   shouldAppearToday: boolean;
   shouldAppearInCalendar: boolean;
   shouldAppearInAutomations: boolean;
@@ -67,9 +62,7 @@ function todayISO() {
 }
 
 function normalizeText(value?: string | null) {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase();
+  return String(value ?? "").trim().toLowerCase();
 }
 
 function clamp(value: number, min = 0, max = 100) {
@@ -81,9 +74,7 @@ function parseDate(value?: string | null) {
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
+  if (Number.isNaN(date.getTime())) return null;
 
   return date;
 }
@@ -99,8 +90,7 @@ function daysBetween(from: Date, to: Date) {
   const toDay = startOfDay(to);
 
   return Math.round(
-    (toDay.getTime() - fromDay.getTime()) /
-      (1000 * 60 * 60 * 24),
+    (toDay.getTime() - fromDay.getTime()) / (1000 * 60 * 60 * 24),
   );
 }
 
@@ -166,25 +156,19 @@ function calculateMemoryScore(client: CommercialOperatingClient) {
 
   if (notas.length > 20) score += 25;
   if (notas.length > 80) score += 15;
-
   if (memory.length > 20) score += 30;
   if (memory.length > 80) score += 15;
-
   if (recordatorio.length > 10) score += 15;
 
   return clamp(score);
 }
 
-function calculateRelationshipScore(
-  client: CommercialOperatingClient,
-) {
+function calculateRelationshipScore(client: CommercialOperatingClient) {
   let score = 50;
 
   const status = normalizeText(client.estado);
   const daysSinceUpdated = getDaysSince(client.updated_at);
-  const daysUntilNextContact = getDaysUntil(
-    client.proximo_contacto,
-  );
+  const daysUntilNextContact = getDaysUntil(client.proximo_contacto);
 
   if (isActiveStatus(status)) score += 20;
   if (isClosedStatus(status)) score -= 30;
@@ -217,15 +201,12 @@ function calculateCommercialScore(
 
   if (hasCommercialValue(client)) score += 20;
   if (isPaid(client)) score -= 20;
-
   if (isClosedStatus(client.estado)) score -= 35;
 
   return clamp(Math.round(score));
 }
 
-function getNextActionLabel(
-  nextAction: CommercialOperatingNextAction,
-) {
+function getNextActionLabel(nextAction: CommercialOperatingNextAction) {
   switch (nextAction) {
     case "contact_today":
       return "Contactar hoy";
@@ -249,16 +230,12 @@ function getNextActionLabel(
 function buildOperatingResult(
   client: CommercialOperatingClient,
 ): CommercialOperatingResult {
-  const daysUntilNextContact = getDaysUntil(
-    client.proximo_contacto,
-  );
-
+  const daysUntilNextContact = getDaysUntil(client.proximo_contacto);
   const daysSinceCreated = getDaysSince(client.created_at);
   const daysSinceUpdated = getDaysSince(client.updated_at);
 
   const memoryScore = calculateMemoryScore(client);
-  const relationshipScore =
-    calculateRelationshipScore(client);
+  const relationshipScore = calculateRelationshipScore(client);
 
   const commercialScore = calculateCommercialScore(
     client,
@@ -291,8 +268,7 @@ function buildOperatingResult(
       urgency = "high";
       priority = "today";
       nextAction = "contact_today";
-      reason =
-        "El cliente tiene seguimiento programado para hoy.";
+      reason = "El cliente tiene seguimiento programado para hoy.";
     } else if (daysUntilNextContact === 1) {
       urgency = "medium";
       priority = "tomorrow";
@@ -303,14 +279,12 @@ function buildOperatingResult(
       urgency = "low";
       priority = "upcoming";
       nextAction = "prepare_followup";
-      reason =
-        "El cliente tiene una acción próxima en calendario.";
+      reason = "El cliente tiene una acción próxima en calendario.";
     } else {
       urgency = "none";
       priority = "watch";
       nextAction = "monitor";
-      reason =
-        "El próximo contacto está planificado más adelante.";
+      reason = "El próximo contacto está planificado más adelante.";
     }
   } else if (daysSinceUpdated !== null && daysSinceUpdated >= 14) {
     urgency = "high";
@@ -324,21 +298,12 @@ function buildOperatingResult(
     nextAction = "maintain_momentum";
     reason =
       "Cliente con alto potencial comercial. Conviene mantener el momentum.";
-  } else {
-    urgency = "low";
-    priority = "watch";
-    nextAction = "monitor";
-    reason =
-      "Cliente sin urgencia inmediata. Mantener en la cola inteligente.";
   }
 
-  const shouldAppearToday =
-    priority === "today" && !closed;
+  const shouldAppearToday = priority === "today" && !closed;
 
   const shouldAppearInCalendar =
-    !closed &&
-    daysUntilNextContact !== null &&
-    daysUntilNextContact >= 0;
+    !closed && daysUntilNextContact !== null;
 
   const shouldAppearInAutomations = !closed;
 
@@ -346,23 +311,18 @@ function buildOperatingResult(
 
   return {
     client,
-
     urgency,
     priority,
-
     reason,
     nextAction,
     nextActionLabel: getNextActionLabel(nextAction),
     nextDate: client.proximo_contacto ?? null,
-
     memoryScore,
     relationshipScore,
     commercialScore,
-
     daysUntilNextContact,
     daysSinceCreated,
     daysSinceUpdated,
-
     shouldAppearToday,
     shouldAppearInCalendar,
     shouldAppearInAutomations,
@@ -374,10 +334,7 @@ function sortOperatingResults(
   a: CommercialOperatingResult,
   b: CommercialOperatingResult,
 ) {
-  const priorityWeight: Record<
-    CommercialOperatingPriority,
-    number
-  > = {
+  const priorityWeight: Record<CommercialOperatingPriority, number> = {
     today: 5,
     tomorrow: 4,
     upcoming: 3,
@@ -385,10 +342,7 @@ function sortOperatingResults(
     closed: 1,
   };
 
-  const urgencyWeight: Record<
-    CommercialOperatingUrgency,
-    number
-  > = {
+  const urgencyWeight: Record<CommercialOperatingUrgency, number> = {
     critical: 5,
     high: 4,
     medium: 3,
@@ -399,16 +353,12 @@ function sortOperatingResults(
   const priorityDifference =
     priorityWeight[b.priority] - priorityWeight[a.priority];
 
-  if (priorityDifference !== 0) {
-    return priorityDifference;
-  }
+  if (priorityDifference !== 0) return priorityDifference;
 
   const urgencyDifference =
     urgencyWeight[b.urgency] - urgencyWeight[a.urgency];
 
-  if (urgencyDifference !== 0) {
-    return urgencyDifference;
-  }
+  if (urgencyDifference !== 0) return urgencyDifference;
 
   return b.commercialScore - a.commercialScore;
 }

@@ -20,12 +20,20 @@ export type CalendarCommercialClient = {
   fecha_pago?: string | null;
 };
 
-export type CalendarCommercialTone = "red" | "amber" | "sky";
+export type CalendarCommercialTone =
+  | "red"
+  | "amber"
+  | "emerald"
+  | "violet"
+  | "sky"
+  | "slate";
 
 export type CalendarCommercialBucketKey =
   | "atrasados"
   | "hoy"
-  | "proximos"
+  | "manana"
+  | "pasadoManana"
+  | "proximos14"
   | "sinFecha";
 
 export type CalendarCommercialItem = {
@@ -56,28 +64,21 @@ export type CalendarCommercialItem = {
 export type CalendarCommercialOverview = {
   atrasados: CalendarCommercialItem[];
   hoy: CalendarCommercialItem[];
-  proximos: CalendarCommercialItem[];
+  manana: CalendarCommercialItem[];
+  pasadoManana: CalendarCommercialItem[];
+  proximos14: CalendarCommercialItem[];
   sinFecha: CalendarCommercialItem[];
   all: CalendarCommercialItem[];
   counts: {
     atrasados: number;
     hoy: number;
-    proximos: number;
+    manana: number;
+    pasadoManana: number;
+    proximos14: number;
     sinFecha: number;
     total: number;
   };
 };
-
-function todayISO() {
-  return new Date().toISOString().split("T")[0];
-}
-
-function addDaysISO(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-
-  return date.toISOString().split("T")[0];
-}
 
 function normalizeDate(value?: string | null) {
   if (!value) return null;
@@ -126,6 +127,14 @@ function getCalendarTone(
     return "amber";
   }
 
+  if (action.daysUntilNextContact === 1) {
+    return "emerald";
+  }
+
+  if (action.daysUntilNextContact === 2) {
+    return "violet";
+  }
+
   return "sky";
 }
 
@@ -146,9 +155,7 @@ function getActionType(
   return "schedule";
 }
 
-function getActionLabel(
-  action: CommercialCalendarAction,
-) {
+function getActionLabel(action: CommercialCalendarAction) {
   if (
     action.daysUntilNextContact !== null &&
     action.daysUntilNextContact < 0
@@ -208,13 +215,22 @@ function sortCalendarItems(
   return b.score - a.score;
 }
 
+function sortUpcomingItems(
+  a: CalendarCommercialItem,
+  b: CalendarCommercialItem,
+) {
+  const scoreDifference = b.score - a.score;
+
+  if (scoreDifference !== 0) {
+    return scoreDifference;
+  }
+
+  return sortCalendarItems(a, b);
+}
+
 export function buildCalendarCommercialOverview(
   clients: CalendarCommercialClient[],
 ): CalendarCommercialOverview {
-  const today = todayISO();
-  const tomorrow = addDaysISO(1);
-  const nextSevenDays = addDaysISO(7);
-
   const normalizedClients = clients
     .map(normalizeCliente)
     .filter((cliente) => cliente.id);
@@ -248,7 +264,7 @@ export function buildCalendarCommercialOverview(
       monto: cliente.monto ?? null,
       pagado: Boolean(cliente.pagado),
       fecha_pago: cliente.fecha_pago ?? null,
-      tone: "sky" as CalendarCommercialTone,
+      tone: "slate" as CalendarCommercialTone,
       actionType: "schedule" as const,
       actionLabel: "Agendar seguimiento",
       reason: "Cliente sin próximo contacto planificado.",
@@ -264,38 +280,54 @@ export function buildCalendarCommercialOverview(
 
   const atrasados = allCalendarItems.filter(
     (item) =>
-      item.proximo_contacto &&
-      item.proximo_contacto < today,
+      item.daysUntilNextContact !== null &&
+      item.daysUntilNextContact < 0,
   );
 
   const hoy = allCalendarItems.filter(
-    (item) => item.proximo_contacto === today,
+    (item) => item.daysUntilNextContact === 0,
   );
 
-  const proximos = allCalendarItems.filter(
-    (item) =>
-      item.proximo_contacto &&
-      item.proximo_contacto >= tomorrow &&
-      item.proximo_contacto <= nextSevenDays,
+  const manana = allCalendarItems.filter(
+    (item) => item.daysUntilNextContact === 1,
   );
+
+  const pasadoManana = allCalendarItems.filter(
+    (item) => item.daysUntilNextContact === 2,
+  );
+
+  const proximos14 = allCalendarItems
+    .filter(
+      (item) =>
+        item.daysUntilNextContact !== null &&
+        item.daysUntilNextContact >= 3 &&
+        item.daysUntilNextContact <= 14,
+    )
+    .sort(sortUpcomingItems);
 
   const all = [
     ...atrasados,
     ...hoy,
-    ...proximos,
+    ...manana,
+    ...pasadoManana,
+    ...proximos14,
     ...sinFecha,
   ];
 
   return {
     atrasados,
     hoy,
-    proximos,
+    manana,
+    pasadoManana,
+    proximos14,
     sinFecha,
     all,
     counts: {
       atrasados: atrasados.length,
       hoy: hoy.length,
-      proximos: proximos.length,
+      manana: manana.length,
+      pasadoManana: pasadoManana.length,
+      proximos14: proximos14.length,
       sinFecha: sinFecha.length,
       total: all.length,
     },
@@ -345,10 +377,24 @@ export function getCalendarCommercialEmptyText(
     };
   }
 
-  if (bucket === "proximos") {
+  if (bucket === "manana") {
+    return {
+      title: "Mañana está libre",
+      text: "No tienes seguimientos programados para mañana.",
+    };
+  }
+
+  if (bucket === "pasadoManana") {
+    return {
+      title: "Sin presión inmediata",
+      text: "No tienes seguimientos para pasado mañana.",
+    };
+  }
+
+  if (bucket === "proximos14") {
     return {
       title: "Sin próximos contactos",
-      text: "No tienes seguimientos programados para los próximos 7 días.",
+      text: "No tienes seguimientos programados para los próximos 14 días.",
     };
   }
 
