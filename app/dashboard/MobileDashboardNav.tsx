@@ -28,9 +28,9 @@ const mobileItems = [
     icon: "📅",
   },
   {
-    href: "/dashboard/ai-cockpit",
+    href: "/dashboard/cockpit",
     label: ui.nav.cockpit,
-    shortLabel: "AI",
+    shortLabel: "Cockpit",
     icon: "✨",
   },
 ];
@@ -48,6 +48,7 @@ export default function MobileDashboardNav() {
             className={`${ui.mobile.touch} flex min-w-0 flex-col items-center justify-center rounded-2xl px-1.5 py-2 text-[10px] font-black text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 active:scale-[0.98]`}
           >
             <span className="text-base leading-none">{item.icon}</span>
+
             <span className="mt-1 w-full truncate text-center leading-none">
               {item.shortLabel}
             </span>

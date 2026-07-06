@@ -19,16 +19,19 @@ import {
 } from "../../lib/access-control";
 
 import {
-  buildSectorDecisionCopy,
   getBusinessTypeLabel,
   normalizeBusinessType,
 } from "../../lib/sector-intelligence";
-import { buildWhatsAppSectorMessage } from "../../lib/whatsapp-sector-intelligence";
+
 import {
   buildSectorKpiIntelligence,
   type SectorKpiIntelligenceResult,
 } from "../../lib/sector-kpi-intelligence";
-import DashboardMemoryIntegration from "./components/DashboardMemoryIntegration";
+
+import {
+  buildDashboardCommercialPriorities,
+  type DashboardTodayPriority,
+} from "../../lib/dashboard-commercial-adapter";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +42,7 @@ type Cliente = {
   telefono: string;
   estado: string;
   notas: string | null;
+  memory?: string | null;
   recordatorio: string | null;
   proximo_contacto: string | null;
   created_at: string;
@@ -55,6 +59,7 @@ type ClienteRaw = {
   telefono?: string | null;
   estado?: string | null;
   notas?: string | null;
+  memory?: string | null;
   recordatorio?: string | null;
   proximo_contacto?: string | null;
   created_at?: string | null;
@@ -96,24 +101,6 @@ type BusinessSettings = {
 
 type PriorityTone = "red" | "amber" | "emerald" | "sky" | "slate";
 
-type TodayPriority = {
-  id: string;
-  nombre: string;
-  telefono: string;
-  estado: string;
-  monto: number;
-  score: number;
-  label: string;
-  reason: string;
-  sectorHeadline: string;
-  sectorActionPhrase: string;
-  sectorReason: string;
-  sectorPrimaryVerb: string;
-  actionLabel: string;
-  actionHref: string;
-  tone: PriorityTone;
-};
-
 const primaryActionButtonClass =
   "inline-flex items-center justify-center rounded-2xl bg-blue-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800";
 
@@ -132,6 +119,7 @@ function normalizeCliente(cliente: ClienteRaw): Cliente {
     telefono: cliente.telefono || "",
     estado: cliente.estado || "Nuevo",
     notas: cliente.notas || null,
+    memory: cliente.memory || null,
     recordatorio: cliente.recordatorio || null,
     proximo_contacto: cliente.proximo_contacto || null,
     created_at: cliente.created_at || new Date().toISOString(),
@@ -160,47 +148,12 @@ function formatGs(value: number | null | undefined) {
   return `Gs.\u00A0${Number(value || 0).toLocaleString("es-PY")}`;
 }
 
-function daysBetween(date: string | null | undefined, today: string) {
-  if (!date) return null;
-
-  const target = new Date(`${date.slice(0, 10)}T00:00:00`);
-  const current = new Date(`${today}T00:00:00`);
-
-  if (Number.isNaN(target.getTime()) || Number.isNaN(current.getTime())) {
-    return null;
-  }
-
-  return Math.round(
-    (target.getTime() - current.getTime()) / (1000 * 60 * 60 * 24)
-  );
-}
-
-function getWhatsappHref(
-  telefono: string | null | undefined,
-  message?: string | null
-) {
-  const raw = String(telefono || "").replace(/\D/g, "");
-
-  if (!raw) return "";
-
-  let number = raw;
-
-  if (number.startsWith("00")) number = number.slice(2);
-  if (number.startsWith("0")) number = number.slice(1);
-  if (!number.startsWith("595")) number = `595${number}`;
-
-  const baseHref = `https://wa.me/${number}`;
-  const cleanMessage = message?.trim();
-
-  if (!cleanMessage) return baseHref;
-
-  return `${baseHref}?text=${encodeURIComponent(cleanMessage)}`;
-}
-
 function getBadgeClasses(tone: PriorityTone) {
   if (tone === "red") return "border-red-200 bg-red-50 text-red-800";
   if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-800";
-  if (tone === "emerald") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (tone === "emerald") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
   if (tone === "sky") return "border-sky-200 bg-sky-50 text-sky-800";
 
   return "border-slate-200 bg-slate-50 text-slate-700";
@@ -209,11 +162,25 @@ function getBadgeClasses(tone: PriorityTone) {
 function getStatusClasses(estado: string | null | undefined) {
   const value = normalizeText(estado);
 
-  if (value.includes("pag")) return "border-emerald-200 bg-emerald-100 text-emerald-700";
-  if (value.includes("interes")) return "border-amber-200 bg-amber-100 text-amber-700";
-  if (value.includes("sin")) return "border-orange-200 bg-orange-100 text-orange-700";
-  if (value.includes("contact")) return "border-blue-200 bg-blue-100 text-blue-700";
-  if (value.includes("cerr")) return "border-red-200 bg-red-100 text-red-700";
+  if (value.includes("pag")) {
+    return "border-emerald-200 bg-emerald-100 text-emerald-700";
+  }
+
+  if (value.includes("interes")) {
+    return "border-amber-200 bg-amber-100 text-amber-700";
+  }
+
+  if (value.includes("sin")) {
+    return "border-orange-200 bg-orange-100 text-orange-700";
+  }
+
+  if (value.includes("contact")) {
+    return "border-blue-200 bg-blue-100 text-blue-700";
+  }
+
+  if (value.includes("cerr")) {
+    return "border-red-200 bg-red-100 text-red-700";
+  }
 
   return "border-slate-200 bg-slate-100 text-slate-700";
 }
@@ -231,7 +198,7 @@ function getGreetingName(profile: Profile | null, email?: string | null) {
 function getCompanyName(
   businessSettings: BusinessSettings | null,
   profile: Profile | null,
-  email?: string | null
+  email?: string | null,
 ) {
   const companyName = businessSettings?.company_name?.trim();
   const businessName = businessSettings?.business_name?.trim();
@@ -336,176 +303,6 @@ function getDashboardIntro(businessType: string) {
   };
 }
 
-function getDecisionActionLabel(
-  label: string,
-  hasWhatsapp: boolean,
-  whatsappActionLabel?: string | null
-) {
-  const value = normalizeText(label);
-
-  if (value.includes("preparar") || value.includes("monitorear")) {
-    return "Ver cliente";
-  }
-
-  return hasWhatsapp ? whatsappActionLabel || "Enviar WhatsApp" : "Ver cliente";
-}
-
-function getDecisionActionHref(
-  cliente: Cliente,
-  label: string,
-  hasWhatsapp: boolean,
-  whatsappMessage?: string | null
-) {
-  const value = normalizeText(label);
-
-  if (!hasWhatsapp) return `/dashboard/clientes/${cliente.id}`;
-
-  if (value.includes("preparar") || value.includes("monitorear")) {
-    return `/dashboard/clientes/${cliente.id}`;
-  }
-
-  return getWhatsappHref(cliente.telefono, whatsappMessage);
-}
-
-function buildTodayPriorities(
-  clientes: Cliente[],
-  today: string,
-  businessType?: string | null,
-  businessSettings?: BusinessSettings | null,
-  companyName?: string | null
-): TodayPriority[] {
-  return clientes
-    .map((cliente) => {
-      const estado = normalizeText(cliente.estado);
-      const days = daysBetween(cliente.proximo_contacto, today);
-      const value = Number(cliente.monto || 0);
-      const hasWhatsapp = Boolean(getWhatsappHref(cliente.telefono));
-      const isPaid = Boolean(cliente.pagado || estado.includes("pag"));
-
-      let score = 35;
-      let label = "Monitorear";
-      let reason = "Cliente sin urgencia inmediata.";
-      let tone: PriorityTone = "slate";
-
-      if (estado.includes("interes")) {
-        score += 24;
-        label = "Cerrar esta semana";
-        reason = "Muestra interés y puede avanzar con seguimiento concreto.";
-        tone = "amber";
-      }
-
-      if (estado.includes("contact")) {
-        score += 14;
-        label = "Mantener momentum";
-        reason = "Ya existe contacto previo. Conviene mantener el ritmo.";
-        tone = "sky";
-      }
-
-      if (estado.includes("sin")) {
-        score += 16;
-        label = "Reactivar cliente";
-        reason = "Necesita una reactivación corta y humana.";
-        tone = "amber";
-      }
-
-      if (value > 0 && !isPaid) {
-        score += 15;
-        label = "Proteger ingreso";
-        reason = `${formatGs(value)} de oportunidad comercial abierta.`;
-        tone = "amber";
-      }
-
-      if (typeof days === "number") {
-        if (days < 0) {
-          score += 30;
-          label = "Actuar hoy";
-          reason = `Seguimiento vencido hace ${Math.abs(days)} día(s).`;
-          tone = "red";
-        } else if (days === 0) {
-          score += 25;
-          label = "Actuar hoy";
-          reason = "Seguimiento programado para hoy.";
-          tone = "red";
-        } else if (days === 1) {
-          score += 12;
-          label = "Preparar seguimiento";
-          reason = "Seguimiento programado para mañana.";
-          tone = "sky";
-        }
-      }
-
-      if (isPaid) {
-        score = Math.max(45, score - 18);
-        label = "Mantener cliente";
-        reason = "Cliente convertido. Cuidar relación, recompra o recomendación.";
-        tone = "emerald";
-      }
-
-      if (hasWhatsapp) score += 5;
-
-      score = Math.max(0, Math.min(100, Math.round(score)));
-
-      const sectorDecision = buildSectorDecisionCopy({
-        businessType: businessType || "general",
-        decisionLabel: label,
-        reason,
-        estado: cliente.estado,
-        daysOverdue:
-          typeof days === "number" && days < 0 ? Math.abs(days) : null,
-        hasWhatsapp,
-        isPaid,
-        hasValue: value > 0,
-      });
-
-      const daysOverdue =
-        typeof days === "number" && days < 0 ? Math.abs(days) : null;
-
-      const whatsappSectorMessage = buildWhatsAppSectorMessage({
-        cliente,
-        business: {
-          company_name: companyName || businessSettings?.company_name || null,
-          business_type: businessType || businessSettings?.business_type || null,
-          business_tone:
-            businessSettings?.business_tone || businessSettings?.tone || null,
-          ai_prompt: businessSettings?.ai_prompt || null,
-          whatsapp_number: businessSettings?.whatsapp_number || null,
-        },
-        decisionLabel: label,
-        reason,
-        daysOverdue,
-      });
-
-      return {
-        id: cliente.id,
-        nombre: cliente.nombre,
-        telefono: cliente.telefono,
-        estado: cliente.estado,
-        monto: value,
-        score,
-        label,
-        reason,
-        sectorHeadline: sectorDecision.headline,
-        sectorActionPhrase: sectorDecision.actionPhrase,
-        sectorReason: sectorDecision.humanReason,
-        sectorPrimaryVerb: sectorDecision.primaryVerb,
-        actionLabel: getDecisionActionLabel(
-          label,
-          hasWhatsapp,
-          whatsappSectorMessage.actionLabel
-        ),
-        actionHref: getDecisionActionHref(
-          cliente,
-          label,
-          hasWhatsapp,
-          whatsappSectorMessage.message
-        ),
-        tone,
-      };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
-}
-
 function AccessNotice({
   accessState,
   trialEndsAt,
@@ -558,7 +355,7 @@ function FounderTodayHero({
           <div>
             <div className="mb-4 flex flex-wrap gap-2">
               <span className="inline-flex rounded-full border border-blue-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-blue-700 shadow-sm">
-                V20.5.2 Inteligencia comercial
+                V21.2 Commercial Operating System
               </span>
 
               <span className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-700 shadow-sm">
@@ -600,7 +397,7 @@ function FounderPriorityCard({
   priority,
   index,
 }: {
-  priority: TodayPriority;
+  priority: DashboardTodayPriority;
   index: number;
 }) {
   const isExternal = priority.actionHref.startsWith("https://");
@@ -617,7 +414,7 @@ function FounderPriorityCard({
 
               <span
                 className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${getBadgeClasses(
-                  priority.tone
+                  priority.tone,
                 )}`}
               >
                 {priority.sectorHeadline}
@@ -625,10 +422,14 @@ function FounderPriorityCard({
 
               <span
                 className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${getStatusClasses(
-                  priority.estado
+                  priority.estado,
                 )}`}
               >
                 {priority.estado}
+              </span>
+
+              <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-violet-700">
+                COS {priority.commercialScore}/100
               </span>
             </div>
 
@@ -678,14 +479,14 @@ function FounderTodaySection({
   priorities,
   sectorLabel,
 }: {
-  priorities: TodayPriority[];
+  priorities: DashboardTodayPriority[];
   sectorLabel: string;
 }) {
   return (
     <SectionCard
-      badge="V20.5.2"
+      badge="Una sola verdad"
       title={`Prioridades de hoy · ${sectorLabel}`}
-      description="ClienteYA adapta la decisión al sector configurado en tu negocio. Misma inteligencia, lenguaje más preciso."
+      description="El dashboard muestra únicamente acciones para hoy, calculadas desde el Commercial Operating System Core."
     >
       {priorities.length === 0 ? (
         <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-sm font-semibold leading-6 text-emerald-800">
@@ -723,7 +524,7 @@ function CompactFounderActions({
             key={metric.key}
             label={metric.label}
             value={metric.formattedValue}
-            tone={metric.tone}
+            tone={metric.tone === "slate" ? "sky" : metric.tone}
           />
         ))}
       </div>
@@ -740,22 +541,25 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  const [{ data: profileData }, { data: businessSettingsData }, { data: clientesData }] =
-    await Promise.all([
-      authSupabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+  const [
+    { data: profileData },
+    { data: businessSettingsData },
+    { data: clientesData },
+  ] = await Promise.all([
+    authSupabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
 
-      authSupabase
-        .from("business_settings")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle(),
+    authSupabase
+      .from("business_settings")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle(),
 
-      authSupabase
-        .from("clientes")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false }),
-    ]);
+    authSupabase
+      .from("clientes")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false }),
+  ]);
 
   const profile = (profileData || null) as Profile | null;
   const businessSettings = (businessSettingsData || null) as BusinessSettings | null;
@@ -792,39 +596,27 @@ export default async function DashboardPage() {
   const greetingName = getCompanyName(
     businessSettings,
     profile,
-    user.email || null
+    user.email || null,
   );
 
   const configuredSectorValue = getConfiguredSectorValue(businessSettings);
   const normalizedBusinessType = normalizeBusinessType(configuredSectorValue);
   const businessType = normalizedBusinessType;
   const dashboardIntro = getDashboardIntro(businessType);
+
   const sectorKpiIntelligence = buildSectorKpiIntelligence({
     clientes,
     businessType,
     today,
   });
 
-  const atrasados = clientes.filter(
-    (cliente) => cliente.proximo_contacto && cliente.proximo_contacto < today
-  );
-
-  const hoyClientes = clientes.filter(
-    (cliente) => cliente.proximo_contacto === today
-  );
-
-  const priorities = buildTodayPriorities(
+  const priorities = buildDashboardCommercialPriorities({
     clientes,
-    today,
     businessType,
     businessSettings,
-    greetingName
-  );
-
-  const revenuePotential = priorities.reduce(
-    (sum, priority) => sum + Number(priority.monto || 0),
-    0
-  );
+    companyName: greetingName,
+    limit: 3,
+  });
 
   return (
     <div className="dashboard-shell">
@@ -881,29 +673,35 @@ export default async function DashboardPage() {
                       sectorLabel={dashboardIntro.sectorLabel}
                     />
 
-                    <CompactFounderActions
-  intelligence={sectorKpiIntelligence}
-/>
+                    <CompactFounderActions intelligence={sectorKpiIntelligence} />
 
-
-
-                     <SectionCard
+                    <SectionCard
                       badge="Less is more"
                       title="La inteligencia está bajo la superficie"
                       description="El dashboard muestra solo lo importante. Para análisis profundo, forecast, timeline y señales completas, abre el AI Cockpit."
                     >
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        <Link href="/dashboard/clientes" className={primaryActionButtonClass}>
+                        <Link
+                          href="/dashboard/clientes"
+                          className={primaryActionButtonClass}
+                        >
                           Ver todos los clientes
                         </Link>
 
-                        <Link href="/dashboard/nuevo" className={secondaryActionButtonClass}>
+                        <Link
+                          href="/dashboard/nuevo"
+                          className={secondaryActionButtonClass}
+                        >
                           + Nuevo cliente
                         </Link>
 
                         <Link
                           href="/dashboard/cockpit"
-                          className={hasCockpitAccess ? secondaryActionButtonClass : primaryActionButtonClass}
+                          className={
+                            hasCockpitAccess
+                              ? secondaryActionButtonClass
+                              : primaryActionButtonClass
+                          }
                         >
                           Abrir AI Cockpit
                         </Link>

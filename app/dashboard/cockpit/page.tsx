@@ -58,6 +58,25 @@ import {
 import FounderMemoryBriefingPanel from "./FounderMemoryBriefingPanel";
 import FounderKpiIntelligencePanel from "./FounderKpiIntelligencePanel";
 import FounderStrategicSignalsPanel from "./FounderStrategicSignalsPanel";
+import FounderCommercialMemoryCenterPanel from "./FounderCommercialMemoryCenterPanel";
+import CockpitUnifiedSignalsPanel from "./CockpitUnifiedSignalsPanel";
+import FounderOpportunityEnginePanel from "./FounderOpportunityEnginePanel";
+import FounderRevenueLeversPanel from "./FounderRevenueLeversPanel";
+import FounderRiskForecastPanel from "./FounderRiskForecastPanel";
+import FounderGrowthEnginePanel from "./FounderGrowthEnginePanel";
+import FounderAIExecutiveAdvisorPanel from "./FounderAIExecutiveAdvisorPanel";
+
+import {
+  buildCockpitIntelligenceDeduplication,
+  type CockpitSignalSource,
+  type CockpitUnifiedSignalCategory,
+  type CockpitUnifiedSignalPriority,
+} from "../../../lib/cockpit-intelligence-deduplication";
+
+import { buildCommercialMemoryOSList } from "../../../lib/commercial-memory-os";
+import {
+  buildFounderCommercialMemoryCenter,
+} from "../../../lib/founder-commercial-memory-center";
 
 export const dynamic = "force-dynamic";
 
@@ -153,6 +172,46 @@ function getTypeIcon(type: string) {
   if (type === "growth") return "📈";
 
   return "🧠";
+}
+
+function getUnifiedSignalCategory(
+  type: AICockpitInsight["type"],
+): CockpitUnifiedSignalCategory {
+  if (type === "risk") return "risk";
+  if (type === "opportunity") return "opportunity";
+  if (type === "followup") return "followup";
+  if (type === "payment") return "payment";
+  if (type === "growth") return "opportunity";
+
+  return "memory";
+}
+
+function getUnifiedSignalPriority(
+  priority: AICockpitInsight["priority"],
+): CockpitUnifiedSignalPriority {
+  if (priority === "urgent") return "critical";
+  if (priority === "high") return "high";
+  if (priority === "medium") return "medium";
+
+  return "low";
+}
+
+function getUnifiedSignalScore(priority: AICockpitInsight["priority"]) {
+  if (priority === "urgent") return 94;
+  if (priority === "high") return 78;
+  if (priority === "medium") return 58;
+
+  return 38;
+}
+
+function getFounderActionUnifiedPriority(
+  priority: FounderAction["priority"],
+): CockpitUnifiedSignalPriority {
+  if (priority === "critical") return "critical";
+  if (priority === "high") return "high";
+  if (priority === "medium") return "medium";
+
+  return "low";
 }
 
 function getRecommendationIcon(category: string) {
@@ -3141,6 +3200,9 @@ export default async function AICockpitPage() {
   const revenueForecast = buildRevenueForecast(clientes);
   const revenueHealth = getRevenueForecastHealth(revenueForecast);
   const founderActions = buildFounderActions(clientes, revenueForecast);
+  const commercialMemoryResults = buildCommercialMemoryOSList(clientes);
+  const founderCommercialMemoryCenter =
+    buildFounderCommercialMemoryCenter(commercialMemoryResults);
 
   const risks = briefing.insights.filter((item) => item.type === "risk");
   const opportunities = briefing.insights.filter(
@@ -3148,6 +3210,84 @@ export default async function AICockpitPage() {
   );
   const followups = briefing.insights.filter((item) => item.type === "followup");
   const payments = briefing.insights.filter((item) => item.type === "payment");
+
+  const cockpitUnifiedSignalSources = [
+    ...briefing.insights.map((insight) => {
+      const cliente = insight.clienteId
+        ? clientes.find((item) => item.id === insight.clienteId)
+        : null;
+
+      return {
+        id: `insight-${insight.id}`,
+        clientId: insight.clienteId ?? null,
+        clientName: cliente?.nombre ?? insight.title,
+        title: insight.title,
+        description: insight.description,
+        category: getUnifiedSignalCategory(insight.type),
+        priority: getUnifiedSignalPriority(insight.priority),
+        score: getUnifiedSignalScore(insight.priority),
+        amount:
+          insight.type === "opportunity" ||
+          insight.type === "payment" ||
+          insight.type === "growth"
+            ? Number(cliente?.monto || 0)
+            : 0,
+        actionLabel: insight.actionLabel || "Abrir cliente",
+        actionHref: insight.clienteId
+          ? `/dashboard/clientes/${insight.clienteId}`
+          : insight.actionHref || "/dashboard/clientes",
+      };
+    }),
+
+    ...founderActions.map((action) => ({
+      id: `founder-action-${action.id}`,
+      clientId: action.actionHref?.includes("/dashboard/clientes/")
+        ? action.actionHref.split("/dashboard/clientes/")[1] || null
+        : null,
+      clientName: action.title,
+      title: action.title,
+      description: action.description,
+      category:
+        action.priority === "critical" || action.priority === "high"
+          ? "risk"
+          : "followup",
+      priority: getFounderActionUnifiedPriority(action.priority),
+      score:
+        action.priority === "critical"
+          ? 95
+          : action.priority === "high"
+            ? 80
+            : action.priority === "medium"
+              ? 60
+              : 40,
+      amount: Number(action.impact || 0),
+      actionLabel: action.actionLabel || "Abrir acción",
+      actionHref: action.actionHref || "/dashboard/clientes",
+    })),
+
+    ...revenueForecast.topOpportunities.slice(0, 5).map((item) => ({
+      id: `revenue-opportunity-${item.id}`,
+      clientId: item.id,
+      clientName: item.nombre,
+      title: `${item.nombre}: oportunidad comercial`,
+      description: item.reason,
+      category: "revenue",
+      priority:
+        item.riskLevel === "high"
+          ? "high"
+          : item.probability >= 70
+            ? "high"
+            : "medium",
+      score: item.probability,
+      amount: Number(item.expectedRevenue || item.monto || 0),
+      actionLabel: "Abrir cliente",
+      actionHref: `/dashboard/clientes/${item.id}`,
+    })),
+ ] as CockpitSignalSource[];
+
+  const cockpitUnifiedSignals = buildCockpitIntelligenceDeduplication(
+    cockpitUnifiedSignalSources,
+  );
 
   return (
     <div className="dashboard-shell">
@@ -3161,16 +3301,6 @@ export default async function AICockpitPage() {
 
           <div className="min-w-0 flex-1 px-4 pb-36 pt-5 sm:px-6 lg:px-10 lg:pb-10 lg:pt-8 2xl:px-12">
             <div className="mx-auto w-full max-w-[1800px]">
-              {clientes.length > 0 ? (
-                <LiveCommandWall
-                  metrics={enterpriseMetrics}
-                  risks={risks}
-                  followups={followups}
-                  opportunities={opportunities}
-                  payments={payments}
-                />
-              ) : null}
-
               <div className="mb-6 overflow-hidden rounded-[36px] border border-slate-100 bg-white/95 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
                 <div className="bg-gradient-to-br from-blue-50 via-white to-slate-50 p-6 text-slate-950 sm:p-8 xl:p-10">
                   <div className="mb-6 flex flex-wrap items-center gap-2">
@@ -3203,11 +3333,11 @@ export default async function AICockpitPage() {
 
                       <div className="mt-8 rounded-[28px] border border-slate-200 bg-slate-50 p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)] backdrop-blur">
                         <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">
-                          Prioridad del fundador
+                          Lectura estratégica
                         </p>
 
                         <p className="mt-3 text-base font-bold leading-relaxed text-slate-950">
-                          {briefing.focus}
+                          {briefing.summary}
                         </p>
                       </div>
                     </div>
@@ -3235,86 +3365,57 @@ export default async function AICockpitPage() {
 
               {clientes.length > 0 && (
                 <div className="space-y-6">
-                  <DailyNavigationPanel
-                    decisions={briefing.founderDecisions}
-                    metrics={enterpriseMetrics}
-                    focus={briefing.focus}
-                    followups={followups}
-                    opportunities={opportunities}
-                    risks={risks}
-                    payments={payments}
-                    clientes={clientes}
-                    leadTemperatureMap={leadTemperatureMap}
+                  <FounderAIExecutiveAdvisorPanel
+                    clients={clientes}
                   />
 
-                  <FounderActionCenter
-  actions={founderActions}
-  forecast={revenueForecast}
-/>
+                  <CockpitUnifiedSignalsPanel result={cockpitUnifiedSignals} />
 
-<FounderMemoryBriefingPanel clients={clientes} />
-
-<FounderKpiIntelligencePanel
-  input={{
-    sector: "general",
-    totalClients: clientes.length,
-    activeClients: enterpriseMetrics.recentClients,
-    clientsToContactToday: enterpriseMetrics.dueSoonFollowups,
-    overdueClients: enterpriseMetrics.overdueFollowups,
-    paidClients: enterpriseMetrics.paidClients,
-    unpaidClients: enterpriseMetrics.unpaidClients,
-    totalRevenue: enterpriseMetrics.confirmedRevenue,
-  }}
-/>
-
-
-<FounderStrategicSignalsPanel
-  responseRate={Math.min(
-    100,
-    Math.round(
-      (enterpriseMetrics.recentClients /
-        Math.max(clientes.length, 1)) *
-        100,
-    ),
-  )}
-  conversionRate={Math.min(
-    100,
-    Math.round(
-      (enterpriseMetrics.paidClients /
-        Math.max(clientes.length, 1)) *
-        100,
-    ),
-  )}
-  followupRate={Math.min(
-    100,
-    Math.round(
-      ((clientes.length -
-        enterpriseMetrics.overdueFollowups) /
-        Math.max(clientes.length, 1)) *
-        100,
-    ),
-  )}
-  activeClients={enterpriseMetrics.recentClients}
-  opportunities={
-    enterpriseMetrics.dueSoonFollowups +
-    enterpriseMetrics.overdueFollowups
-  }
-  revenue={enterpriseMetrics.confirmedRevenue}
-/>
-
-
-<UnifiedClientIntelligence
-                    clientes={clientes}
-                    followups={followups}
-                    opportunities={opportunities}
-                    risks={risks}
-                    payments={payments}
-                    leadTemperatureMap={leadTemperatureMap}
+                  <FounderStrategicSignalsPanel
+                    responseRate={Math.min(
+                      100,
+                      Math.round(
+                        (enterpriseMetrics.recentClients /
+                          Math.max(clientes.length, 1)) *
+                          100,
+                      ),
+                    )}
+                    conversionRate={Math.min(
+                      100,
+                      Math.round(
+                        (enterpriseMetrics.paidClients /
+                          Math.max(clientes.length, 1)) *
+                          100,
+                      ),
+                    )}
+                    followupRate={Math.min(
+                      100,
+                      Math.round(
+                        ((clientes.length -
+                          enterpriseMetrics.overdueFollowups) /
+                          Math.max(clientes.length, 1)) *
+                          100,
+                      ),
+                    )}
+                    activeClients={enterpriseMetrics.recentClients}
+                    opportunities={
+                      enterpriseMetrics.dueSoonFollowups +
+                      enterpriseMetrics.overdueFollowups
+                    }
+                    revenue={enterpriseMetrics.confirmedRevenue}
                   />
 
-                  <AIExecutiveRail
-                    decisions={briefing.founderDecisions}
-                    founderScore={enterpriseMetrics.founderScore}
+                  <FounderKpiIntelligencePanel
+                    input={{
+                      sector: "general",
+                      totalClients: clientes.length,
+                      activeClients: enterpriseMetrics.recentClients,
+                      clientsToContactToday: enterpriseMetrics.dueSoonFollowups,
+                      overdueClients: enterpriseMetrics.overdueFollowups,
+                      paidClients: enterpriseMetrics.paidClients,
+                      unpaidClients: enterpriseMetrics.unpaidClients,
+                      totalRevenue: enterpriseMetrics.confirmedRevenue,
+                    }}
                   />
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
@@ -3328,7 +3429,7 @@ export default async function AICockpitPage() {
                     <CockpitMetricCard
                       label="Seguimientos"
                       value={briefing.followupCount}
-                      description="Acciones vencidas, próximas o prioritarias para hoy."
+                      description="Acciones vencidas, próximas o prioritarias detectadas."
                       tone="amber"
                     />
 
@@ -3347,10 +3448,32 @@ export default async function AICockpitPage() {
                     />
                   </div>
 
+                  <FounderOpportunityEnginePanel
+                    clients={clientes}
+                  />
+
+                  <FounderRiskForecastPanel
+                    clients={clientes}
+                  />
+
                   <RevenueIntelligenceSection
                     forecast={revenueForecast}
                     healthLabel={revenueHealth.label}
                   />
+
+                  <FounderRevenueLeversPanel
+                    clients={clientes}
+                  />
+
+                  <FounderGrowthEnginePanel
+                    clients={clientes}
+                  />
+
+                  <FounderCommercialMemoryCenterPanel
+                    center={founderCommercialMemoryCenter}
+                  />
+
+                  <FounderMemoryBriefingPanel clients={clientes} />
 
                   <FounderIntelligenceVisuals metrics={enterpriseMetrics} />
 
@@ -3369,11 +3492,11 @@ export default async function AICockpitPage() {
                     <div className="grid gap-4 xl:grid-cols-[1fr_0.75fr]">
                       <div className="rounded-[26px] border border-slate-200 bg-slate-50 px-4 py-3">
                         <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                          Acción principal recomendada
+                          Lectura principal
                         </p>
 
                         <p className="mt-3 text-base font-bold leading-relaxed text-slate-900">
-                          {briefing.focus}
+                          {briefing.summary}
                         </p>
                       </div>
 
@@ -3416,146 +3539,7 @@ export default async function AICockpitPage() {
                     </div>
                   </SectionCard>
 
-                  <div className="grid gap-10 2xl:grid-cols-2">
-                    <SectionCard
-                      badge="Riesgo"
-                      title="Clientes en riesgo"
-                      description="Señales que pueden afectar conversión, retención o respuesta."
-                    >
-                      <div className="space-y-4">
-                        {risks.length === 0 && (
-                          <EmptySignal>
-                            ✅ Cartera estable: no hay riesgos críticos
-                            detectados en este momento.
-                          </EmptySignal>
-                        )}
 
-                        {risks.map((insight) => (
-                          <InsightCard
-                            key={insight.id}
-                            insight={insight}
-                            temperature={
-                              insight.clienteId
-                                ? leadTemperatureMap.get(insight.clienteId)
-                                : null
-                            }
-                          />
-                        ))}
-                      </div>
-                    </SectionCard>
-
-                    <SectionCard
-                      badge="Oportunidades"
-                      title="Oportunidades comerciales"
-                      description="Clientes con señales de avance, interés o potencial de venta."
-                    >
-                      <div className="space-y-4">
-                        {opportunities.length === 0 && (
-                          <EmptySignal tone="slate">
-                            No hay oportunidades destacadas todavía. Actualiza
-                            estados, notas o próximos contactos para activar más
-                            señales.
-                          </EmptySignal>
-                        )}
-
-                        {opportunities.map((insight) => (
-                          <InsightCard
-                            key={insight.id}
-                            insight={insight}
-                            temperature={
-                              insight.clienteId
-                                ? leadTemperatureMap.get(insight.clienteId)
-                                : null
-                            }
-                          />
-                        ))}
-                      </div>
-                    </SectionCard>
-                  </div>
-
-                  <div className="grid gap-10 2xl:grid-cols-2">
-                    <SectionCard
-                      badge="Seguimientos"
-                      title="Seguimientos críticos"
-                      description="Acciones que necesitan atención ahora o muy pronto."
-                    >
-                      <div className="space-y-4">
-                        {followups.length === 0 && (
-                          <EmptySignal>
-                            ✅ No hay seguimientos vencidos o urgentes. La
-                            operación comercial está bajo control.
-                          </EmptySignal>
-                        )}
-
-                        {followups.map((insight) => (
-                          <InsightCard
-                            key={insight.id}
-                            insight={insight}
-                            temperature={
-                              insight.clienteId
-                                ? leadTemperatureMap.get(insight.clienteId)
-                                : null
-                            }
-                          />
-                        ))}
-                      </div>
-                    </SectionCard>
-
-                    <SectionCard
-                      badge="Pagos"
-                      title="Pagos pendientes"
-                      description="Clientes con monto pendiente o cobro por revisar."
-                    >
-                      <div className="space-y-4">
-                        {payments.length === 0 && (
-                          <EmptySignal>
-                            ✅ No hay pagos pendientes detectados en este
-                            momento.
-                          </EmptySignal>
-                        )}
-
-                        {payments.map((insight) => (
-                          <InsightCard
-                            key={insight.id}
-                            insight={insight}
-                            temperature={
-                              insight.clienteId
-                                ? leadTemperatureMap.get(insight.clienteId)
-                                : null
-                            }
-                          />
-                        ))}
-                      </div>
-                    </SectionCard>
-                  </div>
-
-                  <SectionCard
-                    badge="Señales completas"
-                    title="Panel de señales inteligentes"
-                    description="Vista completa de todas las señales generadas por el AI Cockpit."
-                  >
-                    <div className="grid gap-4 2xl:grid-cols-2">
-                      {briefing.insights.length === 0 && (
-                        <EmptySignal tone="slate">
-                          Todavía no hay señales suficientes. A medida que
-                          agregues clientes, fechas, montos y estados, este
-                          panel se convertirá en tu centro de control ejecutivo.
-                        </EmptySignal>
-                      )}
-
-                      {briefing.insights.map((insight) => (
-                        <InsightCard
-                          key={insight.id}
-                          insight={insight}
-                          temperature={
-                            insight.clienteId
-                              ? leadTemperatureMap.get(insight.clienteId)
-                              : null
-                          }
-                        />
-                      ))}
-                    </div>
-                  </SectionCard>
                 </div>
               )}
             </div>

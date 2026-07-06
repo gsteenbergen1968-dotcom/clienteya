@@ -15,6 +15,11 @@ import { createAuthServerClient } from "../../../lib/supabase/auth-server";
 import { createAdminClient } from "../../../lib/supabase/server";
 
 import {
+  canAccessPro,
+  type ProfileAccess,
+} from "../../../lib/access-control";
+
+import {
   buildAIClientSummary,
   getAIClientSummaryClasses,
 } from "../../../lib/ai-client-summary";
@@ -23,6 +28,7 @@ export const dynamic = "force-dynamic";
 
 type Cliente = {
   id: string;
+  user_id?: string | null;
   nombre: string;
   telefono: string;
   estado?: string | null;
@@ -39,6 +45,12 @@ type ActivityLog = {
   id: string;
   type: string;
   created_at: string;
+};
+
+type Profile = ProfileAccess & {
+  id: string;
+  email?: string | null;
+  full_name?: string | null;
 };
 
 function todayISO() {
@@ -75,7 +87,7 @@ function daysBetween(date: string | null | undefined, today: string) {
   const current = new Date(`${today}T00:00:00`);
 
   return Math.round(
-    (target.getTime() - current.getTime()) / (1000 * 60 * 60 * 24)
+    (target.getTime() - current.getTime()) / (1000 * 60 * 60 * 24),
   );
 }
 
@@ -85,7 +97,7 @@ function cleanPhone(phone: string) {
 
 function buildWhatsAppUrl(phone: string, message: string) {
   return `https://wa.me/${cleanPhone(phone)}?text=${encodeURIComponent(
-    message
+    message,
   )}`;
 }
 
@@ -327,7 +339,7 @@ function AISummaryPanel({ cliente }: { cliente: Cliente }) {
   return (
     <div
       className={`rounded-[28px] border p-5 shadow-sm ${getAIClientSummaryClasses(
-        summary.tone
+        summary.tone,
       )}`}
     >
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -381,6 +393,31 @@ function AISummaryPanel({ cliente }: { cliente: Cliente }) {
   );
 }
 
+async function getFounderModeForUser(userId: string, userEmail?: string | null) {
+  const admin = createAdminClient();
+
+  const { data: profileData } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const profile = (profileData || null) as Profile | null;
+
+  const profileAccess = {
+    ...(profile || {}),
+    email: profile?.email || userEmail || null,
+  } as ProfileAccess;
+
+  const access = canAccessPro(profileAccess);
+
+  return {
+    admin,
+    founderModeActive: access.reason === "founder_mode",
+    hasAccess: access.allowed,
+  };
+}
+
 export default async function EditarClientePage({
   searchParams,
 }: {
@@ -399,23 +436,37 @@ export default async function EditarClientePage({
 
   if (!user) redirect("/login");
 
-  const admin = createAdminClient();
+  const { admin, founderModeActive, hasAccess } = await getFounderModeForUser(
+    user.id,
+    user.email,
+  );
 
-  const { data: cliente, error } = await admin
+  if (!hasAccess) redirect("/dashboard");
+
+  let clienteQuery = admin
     .from("clientes")
     .select("*")
-    .eq("id", clienteId)
-    .eq("user_id", user.id)
-    .single();
+    .eq("id", clienteId);
+
+  if (!founderModeActive) {
+    clienteQuery = clienteQuery.eq("user_id", user.id);
+  }
+
+  const { data: cliente, error } = await clienteQuery.maybeSingle();
 
   if (error || !cliente) redirect("/dashboard/clientes");
 
-  const { data: logs } = await admin
+  let logsQuery = admin
     .from("activity_logs")
     .select("id,type,created_at")
     .eq("cliente_id", clienteId)
-    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
+
+  if (!founderModeActive) {
+    logsQuery = logsQuery.eq("user_id", user.id);
+  }
+
+  const { data: logs } = await logsQuery;
 
   async function updateCliente(formData: FormData) {
     "use server";
@@ -428,11 +479,16 @@ export default async function EditarClientePage({
 
     if (!user) redirect("/login");
 
-    const admin = createAdminClient();
+    const { admin, founderModeActive, hasAccess } =
+      await getFounderModeForUser(user.id, user.email);
+
+    if (!hasAccess) redirect("/dashboard");
 
     const id = String(formData.get("id") || "");
 
-    await admin
+    if (!id) redirect("/dashboard/clientes");
+
+    let updateQuery = admin
       .from("clientes")
       .update({
         nombre: String(formData.get("nombre") || ""),
@@ -440,10 +496,16 @@ export default async function EditarClientePage({
         estado: String(formData.get("estado") || ""),
         notas: String(formData.get("notas") || ""),
         recordatorio: String(formData.get("recordatorio") || ""),
-        proximo_contacto: String(formData.get("proximo_contacto") || "") || null,
+        proximo_contacto:
+          String(formData.get("proximo_contacto") || "") || null,
       })
-      .eq("id", id)
-      .eq("user_id", user.id);
+      .eq("id", id);
+
+    if (!founderModeActive) {
+      updateQuery = updateQuery.eq("user_id", user.id);
+    }
+
+    await updateQuery;
 
     await admin.from("activity_logs").insert({
       user_id: user.id,
@@ -454,6 +516,7 @@ export default async function EditarClientePage({
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clientes");
     revalidatePath("/dashboard/automations");
+    revalidatePath(`/dashboard/clientes/${id}`);
     revalidatePath(`/dashboard/editar?id=${id}`);
 
     redirect(`/dashboard/editar?id=${id}`);
@@ -482,7 +545,11 @@ export default async function EditarClientePage({
               <PageHeader
                 title={typedCliente.nombre}
                 description="Editar cliente, revisar memoria comercial y preparar la próxima acción."
-                badge="Cliente Intelligence"
+                badge={
+                  founderModeActive
+                    ? "Cliente Intelligence · Founder Mode"
+                    : "Cliente Intelligence"
+                }
                 actionHref="/dashboard/clientes"
                 actionLabel="Volver a clientes"
               />
@@ -506,7 +573,7 @@ export default async function EditarClientePage({
 
                 <div
                   className={`rounded-[28px] border p-5 shadow-sm ${getPhaseClasses(
-                    phase.tone
+                    phase.tone,
                   )}`}
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -533,16 +600,23 @@ export default async function EditarClientePage({
                         href={whatsappUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className={ui.button.success}
+                        className={ui.buttons.success}
                       >
                         Enviar WhatsApp
                       </a>
 
                       <Link
                         href={`/dashboard/whatsapp?id=${typedCliente.id}`}
-                        className={ui.button.secondary}
+                        className={ui.buttons.secondary}
                       >
                         WhatsApp AI
+                      </Link>
+
+                      <Link
+                        href={`/dashboard/clientes/${typedCliente.id}`}
+                        className={ui.buttons.secondary}
+                      >
+                        Ver detalle
                       </Link>
                     </div>
                   </div>
@@ -617,13 +691,20 @@ export default async function EditarClientePage({
                       </FormField>
 
                       <div className="flex flex-wrap gap-3">
-                        <button type="submit" className={ui.button.primary}>
+                        <button type="submit" className={ui.buttons.primary}>
                           Guardar cambios
                         </button>
 
                         <Link
+                          href={`/dashboard/clientes/${typedCliente.id}`}
+                          className={ui.buttons.secondary}
+                        >
+                          Volver al detalle
+                        </Link>
+
+                        <Link
                           href="/dashboard/clientes"
-                          className={ui.button.secondary}
+                          className={ui.buttons.secondary}
                         >
                           Cancelar
                         </Link>

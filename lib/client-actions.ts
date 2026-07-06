@@ -11,21 +11,74 @@ type ClientActionResult = {
   message: string;
 };
 
+type ClienteActionRow = {
+  id: string;
+  user_id?: string | null;
+  estado?: string | null;
+  proximo_contacto?: string | null;
+  recordatorio?: string | null;
+};
+
+function logAction(label: string, payload: unknown) {
+  console.log(`[CLIENT ACTION] ${label}:`, payload);
+}
+
+async function insertActivityLog({
+  actorUserId,
+  cliente,
+  type,
+}: {
+  actorUserId: string;
+  cliente: ClienteActionRow;
+  type: string;
+}) {
+  const admin = createAdminClient();
+
+  const { error } = await admin.from("activity_logs").insert({
+    user_id: cliente.user_id || actorUserId,
+    cliente_id: cliente.id,
+    type,
+  });
+
+  if (error) {
+    logAction("activity_log_error", error.message);
+  }
+}
+
+function emptyUpdateResult(action: string): ClientActionResult {
+  return {
+    ok: false,
+    message: `${action}: no se actualizó ningún cliente.`,
+  };
+}
+
 export async function markClientContacted(
   userId: string,
-  clienteId: string
+  clienteId: string,
 ): Promise<ClientActionResult> {
   const admin = createAdminClient();
 
-  const { error } = await admin
+  logAction("contactado_input", {
+    userId,
+    clienteId,
+    nextDate: addDaysISO(3),
+  });
+
+  const { data, error } = await admin
     .from("clientes")
     .update({
-      estado: "contactado",
+      estado: "Contactado",
       proximo_contacto: addDaysISO(3),
       recordatorio: "Revisar respuesta en 3 días",
     })
     .eq("id", clienteId)
-    .eq("user_id", userId);
+    .select("id,user_id,estado,proximo_contacto,recordatorio")
+    .maybeSingle();
+
+  logAction("contactado_result", {
+    data,
+    error: error?.message || null,
+  });
 
   if (error) {
     return {
@@ -34,33 +87,54 @@ export async function markClientContacted(
     };
   }
 
-  await admin.from("activity_logs").insert({
-    user_id: userId,
-    cliente_id: clienteId,
+  const cliente = data as ClienteActionRow | null;
+
+  if (!cliente) {
+    return emptyUpdateResult("Contactado");
+  }
+
+  await insertActivityLog({
+    actorUserId: userId,
+    cliente,
     type: "contactado",
   });
 
   return {
     ok: true,
-    message: "Cliente marcado como contactado.",
+    message: `Cliente marcado como Contactado. Próximo contacto: ${
+      cliente.proximo_contacto || "—"
+    }`,
   };
 }
 
 export async function scheduleNextFollowup(
   userId: string,
   clienteId: string,
-  days = 3
+  days = 3,
 ): Promise<ClientActionResult> {
   const admin = createAdminClient();
 
-  const { error } = await admin
+  logAction("schedule_input", {
+    userId,
+    clienteId,
+    days,
+    nextDate: addDaysISO(days),
+  });
+
+  const { data, error } = await admin
     .from("clientes")
     .update({
       proximo_contacto: addDaysISO(days),
       recordatorio: `Seguimiento automático en ${days} días`,
     })
     .eq("id", clienteId)
-    .eq("user_id", userId);
+    .select("id,user_id,estado,proximo_contacto,recordatorio")
+    .maybeSingle();
+
+  logAction("schedule_result", {
+    data,
+    error: error?.message || null,
+  });
 
   if (error) {
     return {
@@ -69,33 +143,52 @@ export async function scheduleNextFollowup(
     };
   }
 
-  await admin.from("activity_logs").insert({
-    user_id: userId,
-    cliente_id: clienteId,
+  const cliente = data as ClienteActionRow | null;
+
+  if (!cliente) {
+    return emptyUpdateResult(`+${days} días`);
+  }
+
+  await insertActivityLog({
+    actorUserId: userId,
+    cliente,
     type: "followup_scheduled",
   });
 
   return {
     ok: true,
-    message: `Seguimiento agendado en ${days} días.`,
+    message: `Seguimiento agendado en ${days} días. Próximo contacto: ${
+      cliente.proximo_contacto || "—"
+    }`,
   };
 }
 
 export async function closeOpportunity(
   userId: string,
-  clienteId: string
+  clienteId: string,
 ): Promise<ClientActionResult> {
   const admin = createAdminClient();
 
-  const { error } = await admin
+  logAction("close_input", {
+    userId,
+    clienteId,
+  });
+
+  const { data, error } = await admin
     .from("clientes")
     .update({
-      estado: "cerrado",
+      estado: "Cerrado",
       proximo_contacto: null,
       recordatorio: "Oportunidad cerrada",
     })
     .eq("id", clienteId)
-    .eq("user_id", userId);
+    .select("id,user_id,estado,proximo_contacto,recordatorio")
+    .maybeSingle();
+
+  logAction("close_result", {
+    data,
+    error: error?.message || null,
+  });
 
   if (error) {
     return {
@@ -104,9 +197,15 @@ export async function closeOpportunity(
     };
   }
 
-  await admin.from("activity_logs").insert({
-    user_id: userId,
-    cliente_id: clienteId,
+  const cliente = data as ClienteActionRow | null;
+
+  if (!cliente) {
+    return emptyUpdateResult("Cerrado");
+  }
+
+  await insertActivityLog({
+    actorUserId: userId,
+    cliente,
     type: "closed",
   });
 
@@ -118,19 +217,31 @@ export async function closeOpportunity(
 
 export async function markNoResponse(
   userId: string,
-  clienteId: string
+  clienteId: string,
 ): Promise<ClientActionResult> {
   const admin = createAdminClient();
 
-  const { error } = await admin
+  logAction("no_response_input", {
+    userId,
+    clienteId,
+    nextDate: addDaysISO(3),
+  });
+
+  const { data, error } = await admin
     .from("clientes")
     .update({
-      estado: "sin respuesta",
+      estado: "Sin respuesta",
       proximo_contacto: addDaysISO(3),
       recordatorio: "Reintentar contacto en 3 días",
     })
     .eq("id", clienteId)
-    .eq("user_id", userId);
+    .select("id,user_id,estado,proximo_contacto,recordatorio")
+    .maybeSingle();
+
+  logAction("no_response_result", {
+    data,
+    error: error?.message || null,
+  });
 
   if (error) {
     return {
@@ -139,14 +250,22 @@ export async function markNoResponse(
     };
   }
 
-  await admin.from("activity_logs").insert({
-    user_id: userId,
-    cliente_id: clienteId,
+  const cliente = data as ClienteActionRow | null;
+
+  if (!cliente) {
+    return emptyUpdateResult("Sin respuesta");
+  }
+
+  await insertActivityLog({
+    actorUserId: userId,
+    cliente,
     type: "no_response",
   });
 
   return {
     ok: true,
-    message: "Cliente marcado como sin respuesta.",
+    message: `Cliente marcado como Sin respuesta. Próximo contacto: ${
+      cliente.proximo_contacto || "—"
+    }`,
   };
 }

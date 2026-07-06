@@ -8,6 +8,12 @@
 
 **Language:** English (Master Version)
 
+Last Updated:
+June 2026
+
+Founder:
+Gerard Henri Steenbergen
+
 ---
 
 # Our Motto

@@ -17,6 +17,10 @@ type Cliente = {
   updated_at?: string | null;
 };
 
+type SmartQueueCliente = Cliente & {
+  telefono: string;
+};
+
 export type BusinessHealth = {
   score: number;
   label: string;
@@ -27,10 +31,17 @@ export type BusinessHealth = {
   recommendations: string[];
 };
 
+function normalizeForSmartQueue(cliente: Cliente): SmartQueueCliente {
+  return {
+    ...cliente,
+    telefono: cliente.telefono || "",
+  };
+}
+
 export function buildBusinessHealth(clientes: Cliente[]): BusinessHealth {
   const revenue = buildRevenueAnalytics(clientes);
   const pipeline = buildPipelineAnalytics(clientes);
-  const smartQueue = buildSmartQueue(clientes);
+  const smartQueue = buildSmartQueue(clientes.map(normalizeForSmartQueue));
 
   let score = 70;
 
@@ -89,8 +100,8 @@ export function buildBusinessHealth(clientes: Cliente[]): BusinessHealth {
     score >= 80
       ? "Salud comercial fuerte"
       : score >= 55
-      ? "Salud comercial estable"
-      : "Salud comercial en riesgo";
+        ? "Salud comercial estable"
+        : "Salud comercial en riesgo";
 
   const tone = score >= 80 ? "green" : score >= 55 ? "amber" : "red";
 
@@ -98,8 +109,8 @@ export function buildBusinessHealth(clientes: Cliente[]): BusinessHealth {
     score >= 80
       ? "El pipeline muestra buenas señales comerciales."
       : score >= 55
-      ? "El pipeline está funcionando, pero necesita seguimiento constante."
-      : "El pipeline necesita atención para evitar pérdida de oportunidades.";
+        ? "El pipeline está funcionando, pero necesita seguimiento constante."
+        : "El pipeline necesita atención para evitar pérdida de oportunidades.";
 
   return {
     score,

@@ -10,10 +10,19 @@ import {
   type KPIImpactSignal,
 } from "../../../lib/kpi-impact-layer";
 
-import type { SectorKpiInput } from "../../../lib/sector-kpi-explanations";
+type FounderKpiPanelInput = {
+  sector: string;
+  totalClients: number;
+  activeClients: number;
+  clientsToContactToday: number;
+  overdueClients: number;
+  paidClients: number;
+  unpaidClients: number;
+  totalRevenue: number;
+};
 
 type FounderKpiIntelligencePanelProps = {
-  input: SectorKpiInput;
+  input: FounderKpiPanelInput;
 };
 
 function getPriorityClasses(priority: FounderKpiInsight["priority"]) {

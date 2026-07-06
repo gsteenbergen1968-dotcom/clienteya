@@ -52,7 +52,7 @@ export function buildWhatsAppPriorityItem(
   return {
     clienteId: cliente.id,
     nombre: normalizeName(cliente.nombre),
-    telefono: cliente.telefono,
+    telefono: "",
     priority,
     score,
     title: action?.title || "Actualizar contexto",

@@ -1,7 +1,10 @@
 import {
   buildMemoryPatternClusters,
-  type CommercialMemoryClient,
 } from "./memory-pattern-clusters";
+
+import type {
+  CommercialMemoryClient,
+} from "./commercial-memory-signals";
 
 export type FounderMemoryBriefing = {
   memoryScore: number;

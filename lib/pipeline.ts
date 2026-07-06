@@ -1,10 +1,9 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createAuthServerClient } from "@/lib/supabase/auth-server";
 
 export async function updateClientStatus(id: string, estado: string) {
-  const supabase = createClient();
-
+  const supabase = await createAuthServerClient();
   await supabase
     .from("clientes")
     .update({ estado })

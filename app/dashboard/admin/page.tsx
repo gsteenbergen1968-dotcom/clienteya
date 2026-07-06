@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+
 import { AppHeader } from "../../components/AppHeader";
 import SidebarNav from "../SidebarNav";
+import MobileDashboardNav from "../MobileDashboardNav";
+
 import { createAuthServerClient } from "../../../lib/supabase/auth-server";
 import { createAdminClient } from "../../../lib/supabase/server";
 
@@ -21,36 +24,60 @@ type Profile = {
 
 function formatGs(value: number | null) {
   if (!value) return "—";
-  return `Gs. ${Number(value).toLocaleString("es-ES")}`;
+
+  return `Gs. ${Number(value).toLocaleString("es-PY")}`;
 }
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("es-ES");
+
+  return new Intl.DateTimeFormat("es-PY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
 function statusBadge(status: string | null) {
   if (status === "active") {
-    return "bg-emerald-100 text-emerald-700 border border-emerald-200";
+    return "border border-emerald-200 bg-emerald-100 text-emerald-700";
   }
+
   if (status === "pending_review") {
-    return "bg-amber-100 text-amber-700 border border-amber-200";
+    return "border border-amber-200 bg-amber-100 text-amber-700";
   }
+
   if (status === "canceled" || status === "expired") {
-    return "bg-red-100 text-red-700 border border-red-200";
+    return "border border-red-200 bg-red-100 text-red-700";
   }
-  return "bg-slate-100 text-slate-700 border border-slate-200";
+
+  return "border border-slate-200 bg-slate-100 text-slate-700";
 }
 
 function planBadge(plan: string | null) {
   if (plan === "pro") {
-    return "bg-blue-100 text-blue-700 border border-blue-200";
+    return "border border-blue-200 bg-blue-100 text-blue-700";
   }
-  return "bg-slate-100 text-slate-700 border border-slate-200";
+
+  if (plan === "enterprise") {
+    return "border border-violet-200 bg-violet-100 text-violet-700";
+  }
+
+  return "border border-slate-200 bg-slate-100 text-slate-700";
+}
+
+function isAdminEmail(email?: string | null) {
+  if (!email) return false;
+
+  return (
+    email.toLowerCase().trim() ===
+    (process.env.ADMIN_EMAIL || "").toLowerCase().trim()
+  );
 }
 
 export default async function AdminPage() {
   const supabase = await createAuthServerClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -59,26 +86,29 @@ export default async function AdminPage() {
     redirect("/login");
   }
 
-  const admin = createAdminClient();
-
-  const { data: currentProfile } = await admin
-    .from("profiles")
-    .select("id, email")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  // 🔒 ADMIN CHECK — zet hier jouw email
-  const isAdmin =
-    currentProfile?.email === "jouw@email.com" ||
-    user.email === "jouw@email.com";
-
-  if (!isAdmin) {
+  if (!isAdminEmail(user.email)) {
     redirect("/dashboard");
   }
 
   async function activatePro(formData: FormData) {
     "use server";
-    const id = String(formData.get("profileId"));
+
+    const supabase = await createAuthServerClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user || !isAdminEmail(user.email)) {
+      redirect("/dashboard");
+    }
+
+    const id = String(formData.get("profileId") || "");
+
+    if (!id) {
+      redirect("/dashboard/admin");
+    }
+
     const admin = createAdminClient();
 
     await admin
@@ -94,7 +124,23 @@ export default async function AdminPage() {
 
   async function activateBasic(formData: FormData) {
     "use server";
-    const id = String(formData.get("profileId"));
+
+    const supabase = await createAuthServerClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user || !isAdminEmail(user.email)) {
+      redirect("/dashboard");
+    }
+
+    const id = String(formData.get("profileId") || "");
+
+    if (!id) {
+      redirect("/dashboard/admin");
+    }
+
     const admin = createAdminClient();
 
     await admin
@@ -110,7 +156,23 @@ export default async function AdminPage() {
 
   async function pauseUser(formData: FormData) {
     "use server";
-    const id = String(formData.get("profileId"));
+
+    const supabase = await createAuthServerClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user || !isAdminEmail(user.email)) {
+      redirect("/dashboard");
+    }
+
+    const id = String(formData.get("profileId") || "");
+
+    if (!id) {
+      redirect("/dashboard/admin");
+    }
+
     const admin = createAdminClient();
 
     await admin
@@ -123,10 +185,12 @@ export default async function AdminPage() {
     revalidatePath("/dashboard/admin");
   }
 
+  const admin = createAdminClient();
+
   const { data } = await admin
     .from("profiles")
     .select(
-      "id, email, full_name, subscription_status, plan_type, payment_amount, payment_method, payment_notes, created_at"
+      "id, email, full_name, subscription_status, plan_type, payment_amount, payment_method, payment_notes, created_at",
     )
     .order("created_at", { ascending: false });
 
@@ -142,28 +206,40 @@ export default async function AdminPage() {
             <SidebarNav />
           </aside>
 
-          <div className="flex-1 px-6 py-10">
-            <div className="mx-auto max-w-6xl">
-              <h1 className="mb-8 text-4xl font-bold text-slate-900">
-                Admin panel
-              </h1>
+          <div className="flex-1 px-4 pb-36 pt-6 sm:px-6 lg:px-10 lg:pb-10 lg:pt-10">
+            <div className="mx-auto max-w-7xl">
+              <div className="mb-8">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
+                  ClienteYA Admin
+                </p>
+
+                <h1 className="mt-3 text-4xl font-bold tracking-tight text-slate-900">
+                  Admin panel
+                </h1>
+
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+                  Gestión interna de usuarios, planes y estado de suscripción.
+                  Esta página solo está disponible para cuentas autorizadas de
+                  ClienteYA.
+                </p>
+              </div>
 
               <div className="space-y-5">
                 {profiles.map((profile) => (
                   <div
                     key={profile.id}
-                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                    className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
                   >
-                    <div className="flex flex-col gap-4 xl:flex-row xl:justify-between">
-                      <div className="flex-1">
+                    <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-lg font-semibold">
-                            {profile.full_name || profile.email}
+                          <p className="text-lg font-semibold text-slate-950">
+                            {profile.full_name || profile.email || "Usuario"}
                           </p>
 
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-semibold ${planBadge(
-                              profile.plan_type
+                              profile.plan_type,
                             )}`}
                           >
                             {profile.plan_type || "basic"}
@@ -171,45 +247,60 @@ export default async function AdminPage() {
 
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-semibold ${statusBadge(
-                              profile.subscription_status
+                              profile.subscription_status,
                             )}`}
                           >
                             {profile.subscription_status || "trial"}
                           </span>
                         </div>
 
-                        <p className="text-sm text-slate-500">
-                          {profile.email}
+                        <p className="mt-1 text-sm text-slate-500">
+                          {profile.email || "Sin email"}
                         </p>
 
-                        {/* 🔥 FIXED GRID */}
-                        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                          <div className="card-mini">
-                            <p className="label">Monto</p>
-                            <p>{formatGs(profile.payment_amount)}</p>
+                        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Monto
+                            </p>
+
+                            <p className="mt-2 text-sm font-semibold text-slate-950">
+                              {formatGs(profile.payment_amount)}
+                            </p>
                           </div>
 
-                          <div className="card-mini">
-                            <p className="label">Método</p>
-                            <p>{profile.payment_method || "—"}</p>
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Método
+                            </p>
+
+                            <p className="mt-2 text-sm font-semibold text-slate-950">
+                              {profile.payment_method || "—"}
+                            </p>
                           </div>
 
-                          <div className="card-mini">
-                            <p className="label">Creado</p>
-                            <p>{formatDate(profile.created_at)}</p>
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Creado
+                            </p>
+
+                            <p className="mt-2 text-sm font-semibold text-slate-950">
+                              {formatDate(profile.created_at)}
+                            </p>
                           </div>
 
-                          {/* 🔥 FIX NOTE */}
-                          <div className="card-mini md:col-span-2 xl:col-span-1">
-                            <p className="label">Nota</p>
-                            <p className="break-words">
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2 xl:col-span-1">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Nota
+                            </p>
+
+                            <p className="mt-2 break-words text-sm font-semibold text-slate-950">
                               {profile.payment_notes || "—"}
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      {/* 🔥 BUTTONS */}
                       <div className="flex flex-wrap gap-2">
                         <form action={activatePro}>
                           <input
@@ -217,7 +308,8 @@ export default async function AdminPage() {
                             name="profileId"
                             value={profile.id}
                           />
-                          <button className="btn-primary">
+
+                          <button className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
                             Activar Pro
                           </button>
                         </form>
@@ -228,7 +320,8 @@ export default async function AdminPage() {
                             name="profileId"
                             value={profile.id}
                           />
-                          <button className="btn-secondary">
+
+                          <button className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
                             Básico
                           </button>
                         </form>
@@ -239,7 +332,8 @@ export default async function AdminPage() {
                             name="profileId"
                             value={profile.id}
                           />
-                          <button className="btn-danger">
+
+                          <button className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
                             Pausar
                           </button>
                         </form>
@@ -247,11 +341,25 @@ export default async function AdminPage() {
                     </div>
                   </div>
                 ))}
+
+                {profiles.length === 0 ? (
+                  <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center">
+                    <p className="font-semibold text-slate-900">
+                      No hay perfiles todavía
+                    </p>
+
+                    <p className="mt-2 text-sm text-slate-500">
+                      Cuando existan usuarios registrados, aparecerán aquí.
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
         </div>
       </main>
+
+      <MobileDashboardNav />
     </div>
   );
 }

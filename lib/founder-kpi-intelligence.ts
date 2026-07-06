@@ -1,7 +1,15 @@
-import {
-  buildSectorKpiExplanations,
-  type SectorKpiInput,
-} from "./sector-kpi-explanations";
+import { buildSectorKpiExplanations } from "./sector-kpi-explanations";
+
+export type FounderKpiInput = {
+  sector: string;
+  totalClients: number;
+  activeClients: number;
+  clientsToContactToday: number;
+  overdueClients: number;
+  paidClients: number;
+  unpaidClients: number;
+  totalRevenue: number;
+};
 
 export type FounderKpiInsight = {
   id: string;
@@ -20,22 +28,17 @@ export type FounderKpiIntelligence = {
 };
 
 export function buildFounderKpiIntelligence(
-  input: SectorKpiInput,
+  input: FounderKpiInput,
 ): FounderKpiIntelligence {
   const result = buildSectorKpiExplanations(input);
 
   const insights: FounderKpiInsight[] = result.explanations.map(
     (item, index) => ({
-      id: `${item.kpi}-${index}`,
+      id: `${item.title}-${index}`,
       title: item.title,
       explanation: item.explanation,
-      recommendation: item.recommendation,
-      priority:
-        index === 0
-          ? "high"
-          : index <= 2
-            ? "medium"
-            : "low",
+      recommendation: item.actionHint,
+      priority: index === 0 ? "high" : index <= 2 ? "medium" : "low",
     }),
   );
 

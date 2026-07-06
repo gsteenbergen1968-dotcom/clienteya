@@ -77,7 +77,7 @@ export function buildFounderActions(
         title: `Avanzar negociación con ${cliente.nombre}`,
         description:
           "Cliente con señales de interés que necesita seguimiento.",
-        impact: formatImpact(cliente.monto),
+        impact: formatImpact(Number(cliente.monto || 0)),
         actionLabel: "Abrir cliente",
         actionHref: `/dashboard/clientes/${cliente.id}`,
         priority: "high",

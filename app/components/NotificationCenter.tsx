@@ -14,7 +14,9 @@ type NotificationCenterProps = {
   description?: string;
 };
 
-function getPriorityIcon(priority: AINotification["priority"] | null | undefined) {
+function getPriorityIcon(
+  priority: AINotification["priority"] | null | undefined,
+) {
   if (priority === "urgent") return "🚨";
   if (priority === "high") return "🔥";
   if (priority === "medium") return "⚡";
@@ -23,7 +25,7 @@ function getPriorityIcon(priority: AINotification["priority"] | null | undefined
 }
 
 function getSafePriority(
-  priority: AINotification["priority"] | null | undefined
+  priority: AINotification["priority"] | null | undefined,
 ): AINotification["priority"] {
   if (
     priority === "urgent" ||
@@ -38,18 +40,9 @@ function getSafePriority(
 }
 
 function getSafeTone(
-  tone: AINotification["tone"] | null | undefined
-): AINotification["tone"] {
-  if (
-    tone === "danger" ||
-    tone === "warning" ||
-    tone === "success" ||
-    tone === "info"
-  ) {
-    return tone;
-  }
-
-  return "info";
+  priority: AINotification["priority"] | null | undefined,
+): AINotification["priority"] {
+  return getSafePriority(priority);
 }
 
 export default function NotificationCenter({
@@ -93,7 +86,7 @@ export default function NotificationCenter({
         <div className="space-y-3">
           {safeNotifications.map((notification, index) => {
             const priority = getSafePriority(notification.priority);
-            const tone = getSafeTone(notification.tone);
+            const tone = getSafeTone(notification.priority);
 
             const id = notification.id || `notification-${index}`;
             const category = notification.category || "AI";
@@ -107,7 +100,7 @@ export default function NotificationCenter({
               <div
                 key={id}
                 className={`rounded-2xl border px-4 py-3 ${getAINotificationClasses(
-                  tone
+                  tone,
                 )}`}
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

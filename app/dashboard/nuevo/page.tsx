@@ -35,11 +35,11 @@ export default async function NuevoClientePage() {
     const estado = String(formData.get("estado") || "Nuevo").trim();
 
     const proximoContacto = String(
-      formData.get("proximo_contacto") || ""
+      formData.get("proximo_contacto") || "",
     ).trim();
 
     const recordatorio = String(
-      formData.get("recordatorio") || ""
+      formData.get("recordatorio") || "",
     ).trim();
 
     const notas = String(formData.get("notas") || "").trim();
@@ -85,13 +85,6 @@ export default async function NuevoClientePage() {
             <div className="mx-auto max-w-7xl">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="mb-3">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-                      <span className="text-sm">🇵🇾</span>
-                      Paraguay
-                    </span>
-                  </div>
-
                   <h1 className="text-4xl font-bold tracking-tight text-slate-900">
                     Nuevo cliente
                   </h1>

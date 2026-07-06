@@ -7,12 +7,12 @@ import {
   getPlanDescription,
   type BancardPlanType,
 } from "../../../../lib/bancard";
+import { createAuthServerClient } from "../../../../lib/supabase/auth-server";
 import { createSupabaseAdminClient } from "../../../../lib/supabase/admin";
-import { createClient } from "../../../../lib/supabase/server";
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient();
+    const supabase = await createAuthServerClient();
 
     const {
       data: { user },
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
         },
         {
           status: 401,
-        }
+        },
       );
     }
 
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
         },
         {
           status: 500,
-        }
+        },
       );
     }
 
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
         },
         {
           status: 500,
-        }
+        },
       );
     }
 
@@ -137,7 +137,7 @@ export async function POST(req: Request) {
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }

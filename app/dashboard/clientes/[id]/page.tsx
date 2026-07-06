@@ -30,6 +30,8 @@ import {
 } from "../../../../lib/founder-decision-engine";
 import { buildWhatsAppSectorMessage } from "../../../../lib/whatsapp-sector-intelligence";
 import CustomerMemorySignalsPanel from "./CustomerMemorySignalsPanel";
+import CommercialMemoryOSPanel from "./CommercialMemoryOSPanel";
+import { buildCommercialMemoryOS } from "../../../../lib/commercial-memory-os";
 
 export const dynamic = "force-dynamic";
 
@@ -2250,6 +2252,7 @@ export default async function ClienteDetailPage({
   const relationship = buildRelationshipProfile(cliente);
   const memory = buildRelationshipMemoryProfile(cliente, relationship);
   const whatsappMemory = buildClienteMemoryProfile(cliente);
+  const commercialMemoryOS = buildCommercialMemoryOS(cliente);
   const detectedPatterns = detectWhatsAppPatterns(whatsappMemory.timeline);
   const v18FounderAction = buildFounderActionFromPatterns(detectedPatterns);
   const aiReasoning = buildAIReasoningProfile(
@@ -2345,7 +2348,7 @@ export default async function ClienteDetailPage({
           <div className="min-w-0 flex-1 px-4 pb-40 pt-5 sm:px-6 lg:px-10 lg:pb-10 lg:pt-8">
             <div className="mx-auto w-full max-w-[1360px]">
               <PageHeader
-                eyebrow="ClienteYA · V19.5 Founder Action First"
+                badge="ClienteYA · V19.5 Founder Action First"
                 title={nombre}
                 description="Decisión primero. Acción directa. Contexto sólo cuando el founder lo necesita."
               />
@@ -2421,6 +2424,10 @@ export default async function ClienteDetailPage({
                   decision={founderDecision}
                   actionHref={whatsappMessageHref}
                 />
+              </div>
+
+              <div className="mt-5">
+                <CommercialMemoryOSPanel result={commercialMemoryOS} />
               </div>
 
               <div className="mt-5">

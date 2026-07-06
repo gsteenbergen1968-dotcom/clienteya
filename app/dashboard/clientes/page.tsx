@@ -7,7 +7,6 @@ import { ui } from "../../../lib/ui";
 
 import { AppHeader } from "../../components/AppHeader";
 import SidebarNav from "../SidebarNav";
-import PageHeader from "../components/PageHeader";
 import EmptyState from "../../components/EmptyState";
 import SectionCard from "../../components/SectionCard";
 
@@ -336,103 +335,6 @@ function ExecutiveMetricCard({
         {value}
       </p>
     </div>
-  );
-}
-
-function AiClientesPanel({
-  total,
-  highPriority,
-  opportunityClients,
-  hotLeads,
-  ghostingRisk,
-  revenuePotential,
-  overdue,
-}: {
-  total: number;
-  highPriority: number;
-  opportunityClients: number;
-  hotLeads: number;
-  ghostingRisk: number;
-  revenuePotential: number;
-  overdue: number;
-}) {
-  const healthText =
-    ghostingRisk > 0
-      ? `${ghostingRisk} cliente(s) con riesgo de ghosting. Usar tono suave y seguimiento inteligente.`
-      : overdue > 0
-      ? `${overdue} cliente(s) con seguimiento atrasado. Trabajar primero esta lista.`
-      : hotLeads > 0
-      ? `${hotLeads} hot lead(s). Buen momento para convertir.`
-      : highPriority > 0
-      ? `${highPriority} cliente(s) con alta prioridad. Mantener ritmo comercial.`
-      : "Lista controlada. No hay presión crítica ahora.";
-
-  const healthTone =
-    ghostingRisk > 0 || overdue > 0
-      ? "red"
-      : hotLeads > 0 || highPriority > 0
-      ? "amber"
-      : "emerald";
-
-  return (
-    <SectionCard
-      badge="AI Client Memory"
-      title="Prioridad comercial por cliente"
-      description="ClienteYA combina fase, seguimiento, oportunidad, memoria comercial, timeline y riesgo para ordenar la lista de trabajo."
-      tone={healthTone}
-    >
-      <div className="mb-5">
-        <a
-          href="/dashboard/automations"
-          className={`${ui.buttons.secondary} inline-flex`}
-        >
-          Ver automatizaciones
-        </a>
-      </div>
-
-     <div className="grid grid-cols-2 gap-4 2xl:grid-cols-12">
-  <div className="2xl:col-span-2">
-    <ExecutiveMetricCard label="Clientes" value={total} />
-  </div>
-
-  <div className="2xl:col-span-2">
-    <ExecutiveMetricCard
-      label="Hot leads"
-      value={hotLeads}
-      tone="red"
-    />
-  </div>
-
-  <div className="2xl:col-span-2">
-    <ExecutiveMetricCard
-      label="Ghosting risk"
-      value={ghostingRisk}
-      tone="amber"
-    />
-  </div>
-
-  <div className="2xl:col-span-2">
-    <ExecutiveMetricCard
-      label="Oportunidades"
-      value={opportunityClients}
-      tone="sky"
-    />
-  </div>
-
-  <div className="col-span-2 2xl:col-span-4">
-    <ExecutiveMetricCard
-      label="Potencial"
-      value={formatGs(revenuePotential)}
-      tone="emerald"
-      wide
-    />
-  </div>
-</div>
-
-      <div className="mt-4 rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm font-semibold leading-relaxed text-slate-700">
-        {healthText}
-      </div>
-    </SectionCard>
   );
 }
 
@@ -917,15 +819,7 @@ const clientes: Cliente[] = data || [];
   const hoy = clientesWithAi.filter((c) => c.proximo_contacto === today);
   const manana = clientesWithAi.filter((c) => c.proximo_contacto === tomorrow);
 
-  const altaPrioridad = clientesWithAi.filter(
-    (c) => c.intelligence.priority === "Alta"
-  );
 
-  const oportunidades = clientesWithAi.filter(
-    (c) =>
-      c.intelligence.phase === "Oportunidad" ||
-      c.estado.toLowerCase().includes("interes")
-  );
 
   const hotLeads = clientesWithAi.filter(
     (c) => c.temperature.temperature === "hot"
@@ -935,14 +829,6 @@ const clientes: Cliente[] = data || [];
     (c) => c.memory.ghostingRisk === "high"
   );
 
-  const revenuePotential = clientesWithAi
-    .filter(
-      (c) =>
-        !c.pagado &&
-        !c.estado.toLowerCase().includes("pag") &&
-        c.memory.score >= 60
-    )
-    .reduce((sum, c) => sum + Number(c.monto || 50000), 0);
 
   const filteredByStatus = clientesWithAi.filter((c) => {
     if (filter === "atrasados") {
@@ -1024,25 +910,27 @@ const clientes: Cliente[] = data || [];
             <div className="mx-auto max-w-7xl">
               <FeedbackBanner ok={ok} />
 
-              <PageHeader
-                title="Clientes"
-                description="Busca, filtra y actualiza clientes con prioridad comercial AI."
-                actionHref="/dashboard/nuevo"
-                actionLabel="+ Nuevo cliente"
-                badge="CRM Intelligence"
-              />
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                    Clientes
+                  </h1>
+
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                    Relaciones, contexto y seguimiento comercial en una sola lista.
+                  </p>
+                </div>
+
+                <a
+                  href="/dashboard/nuevo"
+                  className={ui.buttons.primary}
+                >
+                  + Nuevo cliente
+                </a>
+              </div>
 
               <div className="space-y-6">
-                <AiClientesPanel
-                  total={total}
-                  highPriority={altaPrioridad.length}
-                  opportunityClients={oportunidades.length}
-                  hotLeads={hotLeads.length}
-                  ghostingRisk={ghostingRisk.length}
-                  revenuePotential={revenuePotential}
-                  overdue={atrasados.length}
-                />
-<div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
+                <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
                 
                   <ExecutiveMetricCard label="Total" value={total} />
                   <ExecutiveMetricCard

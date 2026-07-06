@@ -19,16 +19,13 @@ const items = [
   },
 
   {
-    href: "/dashboard/ai-cockpit",
-    label: "Centro estratégico",
+    href: "/dashboard/cockpit",
+    label: "Cockpit",
     badge: "PRO",
     premium: true,
   },
 
   { href: "/dashboard/billing", label: "Suscripción", badge: null },
-
-
-  { href: "/dashboard/admin", label: "Admin", badge: null },
 
   {
     href: "/dashboard/settings",
@@ -91,7 +88,10 @@ export default function SidebarNav() {
       <nav className="flex-1 overflow-y-auto px-3 py-3">
         <div className="space-y-1">
           {items.map((item) => {
-            const active = pathname === item.href;
+            const active =
+              pathname === item.href ||
+              (item.href !== "/dashboard" &&
+                pathname.startsWith(`${item.href}/`));
 
             return (
               <Link
@@ -133,7 +133,7 @@ export default function SidebarNav() {
                   {item.badge && (
                     <span
                       className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${badgeClasses(
-                        item.badge
+                        item.badge,
                       )}`}
                     >
                       {item.badge}
@@ -157,7 +157,7 @@ export default function SidebarNav() {
           </p>
 
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            CRM + automatización + inteligencia ejecutiva.
+            Relaciones, memoria e inteligencia comercial en una sola operación.
           </p>
         </div>
       </div>

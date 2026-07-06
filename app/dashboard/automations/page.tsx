@@ -17,9 +17,12 @@ import { createAdminClient } from "../../../lib/supabase/server";
 import { buildWhatsAppLink } from "../../../lib/whatsapp-link";
 
 import {
-  applyAutomationRules,
-  buildAutomationReminders,
-} from "../../../lib/automation-engine";
+  buildCommercialAutomationQueue,
+  getCommercialAdapterBadgeClasses,
+  getCommercialAdapterPriorityClasses,
+  getCommercialAdapterPriorityLabel,
+  type CommercialAutomationReminder,
+} from "../../../lib/commercial-operating-adapter";
 
 import { buildAIRecommendations } from "../../../lib/ai-recommendations";
 import { buildWhatsAppDraft } from "../../../lib/whatsapp-drafts";
@@ -73,12 +76,19 @@ type Cliente = {
   telefono: string;
   estado?: string | null;
   notas?: string | null;
+  memory?: string | null;
   recordatorio?: string | null;
   proximo_contacto?: string | null;
   monto?: number | null;
   pagado?: boolean | null;
   fecha_pago?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type RawCliente = Omit<Cliente, "telefono" | "nombre"> & {
+  nombre?: string | null;
+  telefono?: string | null;
 };
 
 type Profile = ProfileAccess & {
@@ -88,6 +98,24 @@ type Profile = ProfileAccess & {
 };
 
 type FilterType = "todos" | "urgente" | "alta" | "media" | "normal";
+
+function normalizeCliente(cliente: RawCliente): Cliente {
+  return {
+    id: cliente.id,
+    nombre: cliente.nombre || "Cliente sin nombre",
+    telefono: cliente.telefono || "",
+    estado: cliente.estado ?? null,
+    notas: cliente.notas ?? null,
+    memory: cliente.memory ?? null,
+    recordatorio: cliente.recordatorio ?? null,
+    proximo_contacto: cliente.proximo_contacto ?? null,
+    monto: cliente.monto ?? null,
+    pagado: cliente.pagado ?? false,
+    fecha_pago: cliente.fecha_pago ?? null,
+    created_at: cliente.created_at ?? null,
+    updated_at: cliente.updated_at ?? null,
+  };
+}
 
 function formatDate(date: string | null | undefined) {
   if (!date) return "—";
@@ -100,38 +128,6 @@ function formatDate(date: string | null | undefined) {
   const [y, m, d] = parts;
 
   return `${d}/${m}/${y}`;
-}
-
-function getPriorityClasses(priority: string) {
-  if (priority === "urgent") return "border-red-200 bg-red-50";
-  if (priority === "high") return "border-amber-200 bg-amber-50";
-  if (priority === "medium") return "border-sky-200 bg-sky-50";
-
-  return "border-slate-200 bg-white";
-}
-
-function getBadgeClasses(priority: string) {
-  if (priority === "urgent") {
-    return "border border-red-200 bg-red-100 text-red-700";
-  }
-
-  if (priority === "high") {
-    return "border border-amber-200 bg-amber-100 text-amber-700";
-  }
-
-  if (priority === "medium") {
-    return "border border-sky-200 bg-sky-100 text-sky-700";
-  }
-
-  return "border border-slate-200 bg-slate-100 text-slate-700";
-}
-
-function getPriorityLabel(priority: string) {
-  if (priority === "urgent") return "Urgente";
-  if (priority === "high") return "Alta";
-  if (priority === "medium") return "Media";
-
-  return "Normal";
 }
 
 function filterToPriority(filter: FilterType) {
@@ -147,6 +143,26 @@ function filterHref(filter: FilterType) {
   if (filter === "todos") return "/dashboard/automations";
 
   return `/dashboard/automations?filter=${filter}`;
+}
+
+function getActionSuccessMessage(ok?: string) {
+  if (ok === "contactado") return "Cliente marcado como contactado.";
+  if (ok === "seguimiento") return "Seguimiento programado en 3 días.";
+  if (ok === "cerrado") return "Oportunidad cerrada.";
+
+  return null;
+}
+
+function FeedbackBanner({ ok }: { ok?: string }) {
+  const message = getActionSuccessMessage(ok);
+
+  if (!message) return null;
+
+  return (
+    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-sm">
+      ✅ {message}
+    </div>
+  );
 }
 
 function FilterTab({
@@ -217,9 +233,9 @@ function AutomationCommandCenter({
 }) {
   return (
     <SectionCard
-      badge="AI Automation Command Center"
+      badge="Commercial Operating System"
       title="Orden de trabajo inteligente"
-      description="Automatizaciones, smart queue, client memory y business intelligence en una sola vista."
+      description="Cola comercial calculada desde una sola verdad: ClienteYA Commercial Operating System Core."
     >
       <div className="mb-5 flex justify-end">
         <Link href="/dashboard/nuevo" className={ui.buttons.primary}>
@@ -251,7 +267,7 @@ function AutomationCard({
   actionClose,
 }: {
   cliente: Cliente;
-  reminder: ReturnType<typeof buildAutomationReminders>[number];
+  reminder: CommercialAutomationReminder;
   actionContacted: (formData: FormData) => Promise<void>;
   actionSchedule3Days: (formData: FormData) => Promise<void>;
   actionClose: (formData: FormData) => Promise<void>;
@@ -269,40 +285,44 @@ function AutomationCard({
 
   return (
     <div
-      className={`rounded-[28px] border p-4 shadow-sm sm:p-5 ${getPriorityClasses(
-        reminder.priority
+      className={`rounded-[28px] border p-4 shadow-sm sm:p-5 ${getCommercialAdapterPriorityClasses(
+        reminder.priority,
       )}`}
     >
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0 flex-1">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${getBadgeClasses(
-                reminder.priority
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${getCommercialAdapterBadgeClasses(
+                reminder.priority,
               )}`}
             >
-              {getPriorityLabel(reminder.priority)}
+              {getCommercialAdapterPriorityLabel(reminder.priority)}
             </span>
 
             <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
               Score {reminder.score}
             </span>
 
+            <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+              COS {reminder.commercialScore}/100
+            </span>
+
             <span
               className={`rounded-full border px-3 py-1 text-xs font-semibold ${getClientMemoryClasses(
-                memory
+                memory,
               )}`}
             >
               {memory.label}
             </span>
 
             <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-              Memory {memory.score}/100
+              Memory {reminder.memoryScore}/100
             </span>
 
             <span
               className={`rounded-full border px-3 py-1 text-xs font-semibold ${getPhaseClasses(
-                phase.tone
+                phase.tone,
               )}`}
             >
               {phase.label}
@@ -310,7 +330,7 @@ function AutomationCard({
 
             <span
               className={`rounded-full border px-3 py-1 text-xs font-semibold ${getOpportunityClasses(
-                opportunity.risk
+                opportunity.risk,
               )}`}
             >
               {opportunity.label}
@@ -318,7 +338,7 @@ function AutomationCard({
 
             <span
               className={`rounded-full border px-3 py-1 text-xs font-semibold ${getTimelineClasses(
-                timeline.tone
+                timeline.tone,
               )}`}
             >
               {timeline.label}
@@ -336,22 +356,22 @@ function AutomationCard({
           <p className="mt-2 text-sm text-slate-500">
             Próximo contacto:{" "}
             <span className="font-semibold text-slate-700">
-              {formatDate(cliente.proximo_contacto)}
+              {formatDate(reminder.nextDate)}
             </span>
           </p>
 
           <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr]">
             <div className="rounded-2xl border border-white/60 bg-white/70 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Memoria comercial
+                Razón del sistema
               </p>
 
               <p className="mt-3 text-sm leading-6 text-slate-700">
-                {memory.summary}
+                {reminder.reason}
               </p>
 
               <p className="mt-3 text-sm font-semibold text-slate-800">
-                Próximo paso: {memory.nextBestStep}
+                Próxima acción: {reminder.nextActionLabel}
               </p>
             </div>
 
@@ -385,7 +405,7 @@ function AutomationCard({
           </a>
 
           <Link
-            href={`/dashboard/editar?id=${cliente.id}`}
+            href={`/dashboard/clientes/${cliente.id}`}
             className={ui.buttons.secondary}
           >
             Abrir cliente
@@ -432,9 +452,9 @@ function AutomationCard({
 export default async function AutomationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; ok?: string }>;
 }) {
-  const { filter = "todos" } = await searchParams;
+  const { filter = "todos", ok } = await searchParams;
 
   const activeFilter: FilterType = [
     "todos",
@@ -467,15 +487,30 @@ export default async function AutomationsPage({
 
     const id = String(formData.get("id") || "");
 
+    console.log("[AUTOMATIONS ACTION] contactado_submit", {
+      userId: user.id,
+      id,
+    });
+
     if (!id) redirect("/dashboard/automations");
 
-    await markClientContacted(user.id, id);
+    const result = await markClientContacted(user.id, id);
+
+    console.log("[AUTOMATIONS ACTION] contactado_result", result);
+
+    if (!result.ok) {
+      console.error("CONTACTADO ERROR:", result.message);
+      throw new Error(result.message);
+    }
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clientes");
     revalidatePath("/dashboard/automations");
+    revalidatePath("/dashboard/calendario");
+    revalidatePath("/dashboard/cockpit");
+    revalidatePath(`/dashboard/clientes/${id}`);
 
-    redirect("/dashboard/automations");
+    redirect("/dashboard/automations?ok=contactado");
   }
 
   async function actionSchedule3Days(formData: FormData) {
@@ -491,15 +526,30 @@ export default async function AutomationsPage({
 
     const id = String(formData.get("id") || "");
 
+    console.log("[AUTOMATIONS ACTION] schedule_submit", {
+      userId: user.id,
+      id,
+    });
+
     if (!id) redirect("/dashboard/automations");
 
-    await scheduleNextFollowup(user.id, id, 3);
+    const result = await scheduleNextFollowup(user.id, id, 3);
+
+    console.log("[AUTOMATIONS ACTION] schedule_result", result);
+
+    if (!result.ok) {
+      console.error("SCHEDULE ERROR:", result.message);
+      throw new Error(result.message);
+    }
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clientes");
     revalidatePath("/dashboard/automations");
+    revalidatePath("/dashboard/calendario");
+    revalidatePath("/dashboard/cockpit");
+    revalidatePath(`/dashboard/clientes/${id}`);
 
-    redirect("/dashboard/automations");
+    redirect("/dashboard/automations?ok=seguimiento");
   }
 
   async function actionClose(formData: FormData) {
@@ -515,28 +565,39 @@ export default async function AutomationsPage({
 
     const id = String(formData.get("id") || "");
 
+    console.log("[AUTOMATIONS ACTION] close_submit", {
+      userId: user.id,
+      id,
+    });
+
     if (!id) redirect("/dashboard/automations");
 
-    await closeOpportunity(user.id, id);
+    const result = await closeOpportunity(user.id, id);
+
+    console.log("[AUTOMATIONS ACTION] close_result", result);
+
+    if (!result.ok) {
+      console.error("CLOSE ERROR:", result.message);
+      throw new Error(result.message);
+    }
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clientes");
     revalidatePath("/dashboard/automations");
+    revalidatePath("/dashboard/calendario");
+    revalidatePath("/dashboard/cockpit");
+    revalidatePath(`/dashboard/clientes/${id}`);
 
-    redirect("/dashboard/automations");
+    redirect("/dashboard/automations?ok=cerrado");
   }
 
   const admin = createAdminClient();
 
-  const [{ data: profileData }, { data: clientesData }] = await Promise.all([
-    admin.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-
-    admin
-      .from("clientes")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false }),
-  ]);
+  const { data: profileData } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle();
 
   const profile = (profileData || null) as Profile | null;
 
@@ -549,20 +610,38 @@ export default async function AutomationsPage({
   const hasAutomationsAccess = automationAccess.allowed;
   const founderModeActive = automationAccess.reason === "founder_mode";
 
-  const clientes = applyAutomationRules((clientesData ?? []) as Cliente[]);
-  const reminders = buildAutomationReminders(clientes);
+  const { data: clientesData } = await supabase
+    .from("clientes")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
 
-  const remindersWithMemory = reminders
-    .map((reminder) => ({
-      ...reminder,
-      memory: buildClientMemory(reminder.cliente),
-    }))
+  const clientes = ((clientesData ?? []) as RawCliente[]).map(
+    normalizeCliente,
+  );
+
+  const commercialQueue = buildCommercialAutomationQueue(clientes);
+
+  const remindersWithMemory = commercialQueue
+    .map((reminder) => {
+      const cliente = normalizeCliente(reminder.cliente as RawCliente);
+
+      return {
+        ...reminder,
+        cliente,
+        memory: buildClientMemory(cliente),
+      };
+    })
     .sort((a, b) => {
+      const scoreDiff = b.score - a.score;
+
+      if (scoreDiff !== 0) return scoreDiff;
+
       const memoryDiff = b.memory.score - a.memory.score;
 
       if (memoryDiff !== 0) return memoryDiff;
 
-      return b.score - a.score;
+      return b.commercialScore - a.commercialScore;
     });
 
   const revenue = buildRevenueAnalytics(clientes);
@@ -577,11 +656,11 @@ export default async function AutomationsPage({
   };
 
   const hotLeads = remindersWithMemory.filter(
-    (r) => r.memory.salesTemperature === "hot"
+    (r) => r.memory.salesTemperature === "hot",
   );
 
   const ghostingRisk = remindersWithMemory.filter(
-    (r) => r.memory.ghostingRisk === "high"
+    (r) => r.memory.ghostingRisk === "high",
   );
 
   const priorityFilter = filterToPriority(activeFilter);
@@ -609,13 +688,13 @@ export default async function AutomationsPage({
               <PageHeader
                 title="Automatizaciones"
                 description="Seguimientos, WhatsApp AI, oportunidades, revenue, client memory y salud comercial."
-                badge="AI Follow-up Engine"
+                badge="Commercial Operating System"
               />
 
               <div className="space-y-6">
-                <AutomationAccessNotice
-                  founderModeActive={founderModeActive}
-                />
+                <AutomationAccessNotice founderModeActive={founderModeActive} />
+
+                <FeedbackBanner ok={ok} />
 
                 {!hasAutomationsAccess ? (
                   <EmptyState
@@ -634,13 +713,13 @@ export default async function AutomationsPage({
                       hotLeads={hotLeads.length}
                       ghostingRisk={ghostingRisk.length}
                       expectedRevenue={formatGuarani(
-                        revenue.expectedRevenue || 0
+                        revenue.expectedRevenue || 0,
                       )}
                     />
 
                     <div
                       className={`rounded-[28px] border p-5 shadow-sm ${getBusinessHealthClasses(
-                        businessHealth.tone
+                        businessHealth.tone,
                       )}`}
                     >
                       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -725,7 +804,7 @@ export default async function AutomationsPage({
                       <SectionCard
                         badge="Smart Queue"
                         title="Cola inteligente de seguimiento"
-                        description={`${visibleReminders.length} seguimiento(s) detectado(s), ordenados por memory score, urgencia y oportunidad.`}
+                        description={`${visibleReminders.length} seguimiento(s) detectado(s), calculados desde una sola verdad comercial.`}
                       >
                         <div className="space-y-4">
                           {visibleReminders.map((reminder) => (

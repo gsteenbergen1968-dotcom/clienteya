@@ -1,9 +1,9 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createAuthServerClient } from "@/lib/supabase/auth-server";
 
 export async function markAsPaid(id: string, monto: number) {
-  const supabase = createClient();
+  const supabase = await createAuthServerClient();
 
   await supabase
     .from("clientes")

@@ -62,7 +62,6 @@ export function buildWhatsAppLearningEventsFromClientes(
         actionId: template.id,
         outcome,
         createdAt:
-          cliente.updated_at ||
           cliente.proximo_contacto ||
           cliente.created_at ||
           new Date().toISOString(),

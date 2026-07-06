@@ -1,22 +1,26 @@
-import { createAdminClient } from "../../../lib/supabase/server";
-import { createAuthServerClient } from "../../../lib/supabase/auth-server";
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
+import { createAuthServerClient } from "../../../lib/supabase/auth-server";
+
 import { AppHeader } from "../../components/AppHeader";
 import SidebarNav from "../SidebarNav";
+import MobileDashboardNav from "../MobileDashboardNav";
+
 import {
   createWhatsAppUrl,
   defaultTemplates,
 } from "../../../lib/whatsapp";
+
 import {
   getTemplate,
   renderTemplate,
 } from "../../../lib/get-whatsapp-template";
+
 import {
   applySuggestionAction,
   type SuggestionActionType,
 } from "../../../lib/action-engine";
-import PageHeader from "../components/PageHeader";
 
 type Cliente = {
   id: string;
@@ -33,26 +37,70 @@ type Cliente = {
   fecha_pago?: string | null;
 };
 
-function hoy() {
+function todayISO() {
   return new Date().toISOString().split("T")[0];
 }
 
-function manana() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().split("T")[0];
+function addDaysISO(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+
+  return date.toISOString().split("T")[0];
 }
 
-async function getClienteWhatsAppMessage(cliente: Cliente, userId: string) {
-  const today = hoy();
+function formatDate(value: string | null) {
+  if (!value) {
+    return "Sin fecha";
+  }
 
-  let key: "nuevo" | "hoy" | "pendiente" | "proximo" | "postventa" = "nuevo";
+  return new Intl.DateTimeFormat("es-PY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(`${value}T00:00:00`));
+}
 
-  if (cliente.proximo_contacto && cliente.proximo_contacto < today) {
+function normalizeCliente(cliente: Partial<Cliente>): Cliente {
+  return {
+    id: String(cliente.id || ""),
+    user_id: cliente.user_id ?? null,
+    nombre: cliente.nombre || "Cliente sin nombre",
+    telefono: cliente.telefono || "",
+    estado: cliente.estado || "Sin estado",
+    notas: cliente.notas ?? null,
+    recordatorio: cliente.recordatorio ?? null,
+    proximo_contacto: cliente.proximo_contacto ?? null,
+    created_at: cliente.created_at || new Date().toISOString(),
+    monto: cliente.monto ?? null,
+    pagado: cliente.pagado ?? false,
+    fecha_pago: cliente.fecha_pago ?? null,
+  };
+}
+
+async function getClienteWhatsAppMessage(
+  cliente: Cliente,
+  userId: string,
+) {
+  const today = todayISO();
+
+  let key:
+    | "nuevo"
+    | "hoy"
+    | "pendiente"
+    | "proximo"
+    | "postventa" = "nuevo";
+
+  if (
+    cliente.proximo_contacto &&
+    cliente.proximo_contacto < today
+  ) {
     key = "pendiente";
   } else if (cliente.proximo_contacto === today) {
     key = "hoy";
-  } else if (cliente.proximo_contacto && cliente.proximo_contacto > today) {
+  } else if (
+    cliente.proximo_contacto &&
+    cliente.proximo_contacto > today
+  ) {
     key = "proximo";
   } else if (
     cliente.estado === "Pagó" ||
@@ -68,23 +116,18 @@ async function getClienteWhatsAppMessage(cliente: Cliente, userId: string) {
   let fallback = "";
 
   if (key === "nuevo") {
-    fallback = defaultTemplates.nuevo(cliente.nombre);
+    fallback = defaultTemplates.nuevo();
   } else if (key === "hoy") {
-    fallback = defaultTemplates.hoy(cliente.nombre, cliente.recordatorio);
+    fallback = defaultTemplates.hoy();
   } else if (key === "pendiente") {
-    fallback = defaultTemplates.pendiente(cliente.nombre, cliente.recordatorio);
+    fallback = defaultTemplates.pendiente();
   } else if (key === "proximo") {
-    fallback = defaultTemplates.proximo(
-      cliente.nombre,
-      cliente.proximo_contacto
-    );
+    fallback = defaultTemplates.proximo();
   } else {
-    fallback = defaultTemplates.postventa(cliente.nombre);
+    fallback = defaultTemplates.postventa();
   }
 
-  const template = savedTemplate || fallback;
-
-  return renderTemplate(template, {
+  return renderTemplate(savedTemplate || fallback, {
     nombre: cliente.nombre,
     nota: cliente.recordatorio,
     fecha: cliente.proximo_contacto,
@@ -100,14 +143,119 @@ function EmptyColumn({
 }) {
   return (
     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
-      <p className="font-medium text-slate-900">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{text}</p>
+      <p className="font-semibold text-slate-900">{title}</p>
+
+      <p className="mt-2 text-sm leading-6 text-slate-500">
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function CalendarClientCard({
+  cliente,
+  tone,
+  whatsappMessage,
+  actionType,
+  actionLabel,
+  aplicarAccion,
+}: {
+  cliente: Cliente;
+  tone: "red" | "amber" | "sky";
+  whatsappMessage: string;
+  actionType: SuggestionActionType;
+  actionLabel: string;
+  aplicarAccion: (formData: FormData) => Promise<void>;
+}) {
+  const toneClasses = {
+    red: {
+      card: "border-red-100 bg-red-50",
+      date: "text-red-700",
+    },
+    amber: {
+      card: "border-amber-100 bg-amber-50",
+      date: "text-amber-700",
+    },
+    sky: {
+      card: "border-sky-100 bg-sky-50",
+      date: "text-sky-700",
+    },
+  }[tone];
+
+  return (
+    <div
+      className={`rounded-2xl border px-4 py-4 ${toneClasses.card}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold text-slate-900">
+            {cliente.nombre}
+          </p>
+
+          <p className={`mt-1 text-xs ${toneClasses.date}`}>
+            {formatDate(cliente.proximo_contacto)}
+          </p>
+        </div>
+
+        <span className="rounded-full border border-white bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600">
+          {cliente.estado}
+        </span>
+      </div>
+
+      <p className="mt-3 text-sm leading-6 text-slate-600">
+        {cliente.recordatorio ||
+          cliente.notas ||
+          "Sin recordatorio"}
+      </p>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <a
+          href={`/dashboard/clientes/${cliente.id}`}
+          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+        >
+          Ver cliente
+        </a>
+
+        <a
+          href={createWhatsAppUrl(
+            cliente.telefono,
+            whatsappMessage,
+          )}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
+        >
+          WhatsApp
+        </a>
+
+        <form action={aplicarAccion}>
+          <input
+            type="hidden"
+            name="id"
+            value={cliente.id}
+          />
+
+          <input
+            type="hidden"
+            name="actionType"
+            value={actionType}
+          />
+
+          <button
+            type="submit"
+            className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
+          >
+            {actionLabel}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
 
 export default async function CalendarioPage() {
   const authSupabase = await createAuthServerClient();
+
   const {
     data: { user },
   } = await authSupabase.auth.getUser();
@@ -120,6 +268,7 @@ export default async function CalendarioPage() {
     "use server";
 
     const authSupabase = await createAuthServerClient();
+
     const {
       data: { user },
     } = await authSupabase.auth.getUser();
@@ -129,7 +278,9 @@ export default async function CalendarioPage() {
     }
 
     const id = String(formData.get("id") || "");
-    const actionType = String(formData.get("actionType") || "") as SuggestionActionType;
+    const actionType = String(
+      formData.get("actionType") || "",
+    ) as SuggestionActionType;
 
     if (!id) {
       redirect("/dashboard/calendario");
@@ -144,40 +295,58 @@ export default async function CalendarioPage() {
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/calendario");
     revalidatePath("/dashboard/clientes");
+    revalidatePath(`/dashboard/clientes/${id}`);
+
     redirect("/dashboard/calendario");
   }
 
-  const admin = createAdminClient();
-
-  const { data: clientesData } = await admin
+  const { data: clientesData } = await authSupabase
     .from("clientes")
     .select("*")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+    .order("proximo_contacto", { ascending: true });
 
-  const clientes: Cliente[] = clientesData || [];
-  const hoyDate = hoy();
-  const mananaDate = manana();
+  const clientes: Cliente[] = (
+    (clientesData || []) as Partial<Cliente>[]
+  ).map(normalizeCliente);
+
+  const today = todayISO();
+  const tomorrow = addDaysISO(1);
+  const nextSevenDays = addDaysISO(7);
 
   const atrasados = clientes.filter(
-    (c) => c.proximo_contacto && c.proximo_contacto < hoyDate
+    (cliente) =>
+      cliente.proximo_contacto &&
+      cliente.proximo_contacto < today,
   );
 
-  const hoyClientes = clientes.filter((c) => c.proximo_contacto === hoyDate);
+  const hoyClientes = clientes.filter(
+    (cliente) => cliente.proximo_contacto === today,
+  );
 
   const proximosClientes = clientes.filter(
-    (c) => c.proximo_contacto === mananaDate
+    (cliente) =>
+      cliente.proximo_contacto &&
+      cliente.proximo_contacto >= tomorrow &&
+      cliente.proximo_contacto <= nextSevenDays,
+  );
+
+  const sinFecha = clientes.filter(
+    (cliente) => !cliente.proximo_contacto,
   );
 
   const whatsappMessages = await Promise.all(
     clientes.map(async (cliente) => ({
       id: cliente.id,
-      message: await getClienteWhatsAppMessage(cliente, user.id),
-    }))
+      message: await getClienteWhatsAppMessage(
+        cliente,
+        user.id,
+      ),
+    })),
   );
 
   const whatsappMap = new Map(
-    whatsappMessages.map((item) => [item.id, item.message])
+    whatsappMessages.map((item) => [item.id, item.message]),
   );
 
   return (
@@ -185,48 +354,87 @@ export default async function CalendarioPage() {
       <AppHeader />
 
       <main className="dashboard-main">
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen bg-slate-50/60">
           <aside className="hidden w-72 border-r border-slate-200 bg-white lg:flex lg:flex-col">
             <SidebarNav />
           </aside>
 
-          <div className="flex-1 px-6 py-10">
-  <div className="mx-auto max-w-7xl">
+          <div className="flex-1 px-4 pb-36 pt-6 sm:px-6 lg:px-10 lg:pb-10 lg:pt-10">
+            <div className="mx-auto max-w-7xl">
+              <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
+                    Agenda comercial
+                  </p>
 
-    <PageHeader
-      title="Calendario"
-      description="Revisa seguimientos atrasados, tareas para hoy y próximos contactos."
-    />
+                  <h1 className="mt-3 text-4xl font-bold tracking-tight text-slate-900">
+                    Calendario
+                  </h1>
 
-              <div className="mb-8 grid gap-4 md:grid-cols-3">
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+                    Seguimientos atrasados, contactos de hoy y próximos
+                    movimientos comerciales conectados directamente con cada
+                    relación.
+                  </p>
+                </div>
+
+                <a
+                  href="/dashboard/nuevo"
+                  className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                >
+                  + Nuevo cliente
+                </a>
+              </div>
+
+              <div className="mb-8 grid gap-4 md:grid-cols-4">
                 <div className="rounded-3xl border border-red-200 bg-red-50 p-5 shadow-sm">
-                  <p className="text-sm font-medium text-red-700">Atrasados</p>
+                  <p className="text-sm font-medium text-red-700">
+                    Atrasados
+                  </p>
+
                   <p className="mt-4 text-4xl font-bold tracking-tight text-red-900">
                     {atrasados.length}
                   </p>
                 </div>
 
                 <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
-                  <p className="text-sm font-medium text-amber-700">Hoy</p>
+                  <p className="text-sm font-medium text-amber-700">
+                    Hoy
+                  </p>
+
                   <p className="mt-4 text-4xl font-bold tracking-tight text-amber-900">
                     {hoyClientes.length}
                   </p>
                 </div>
 
                 <div className="rounded-3xl border border-sky-200 bg-sky-50 p-5 shadow-sm">
-                  <p className="text-sm font-medium text-sky-700">Mañana</p>
+                  <p className="text-sm font-medium text-sky-700">
+                    Próximos 7 días
+                  </p>
+
                   <p className="mt-4 text-4xl font-bold tracking-tight text-sky-900">
                     {proximosClientes.length}
                   </p>
                 </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm font-medium text-slate-600">
+                    Sin fecha
+                  </p>
+
+                  <p className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
+                    {sinFecha.length}
+                  </p>
+                </div>
               </div>
 
-              <div className="grid gap-6 md:grid-cols-3">
+              <div className="grid gap-6 xl:grid-cols-3">
                 <div className="rounded-3xl border border-red-200 bg-white p-6 shadow-sm">
                   <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-slate-900">
                       Atrasados
                     </h2>
+
                     <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
                       {atrasados.length}
                     </span>
@@ -239,48 +447,18 @@ export default async function CalendarioPage() {
                     />
                   ) : (
                     <div className="space-y-4">
-                      {atrasados.map((c) => (
-                        <div
-                          key={c.id}
-                          className="rounded-2xl border border-red-100 bg-red-50 px-4 py-4"
-                        >
-                          <p className="font-semibold text-slate-900">{c.nombre}</p>
-                          <p className="mt-1 text-xs text-red-700">
-                            {c.proximo_contacto || "—"}
-                          </p>
-                          <p className="mt-2 text-sm text-slate-600">
-                            {c.recordatorio || "Sin recordatorio"}
-                          </p>
-
-                          <div className="mt-3 flex gap-2">
-                            <a
-                              href={createWhatsAppUrl(
-                                c.telefono,
-                                whatsappMap.get(c.id) || ""
-                              )}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-emerald-700"
-                            >
-                              WhatsApp
-                            </a>
-
-                            <form action={aplicarAccion}>
-                              <input type="hidden" name="id" value={c.id} />
-                              <input
-                                type="hidden"
-                                name="actionType"
-                                value="contactado"
-                              />
-                              <button
-                                type="submit"
-                                className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-slate-800"
-                              >
-                                ✔ Contactado
-                              </button>
-                            </form>
-                          </div>
-                        </div>
+                      {atrasados.map((cliente) => (
+                        <CalendarClientCard
+                          key={cliente.id}
+                          cliente={cliente}
+                          tone="red"
+                          whatsappMessage={
+                            whatsappMap.get(cliente.id) || ""
+                          }
+                          actionType="contactado"
+                          actionLabel="✔ Contactado"
+                          aplicarAccion={aplicarAccion}
+                        />
                       ))}
                     </div>
                   )}
@@ -291,6 +469,7 @@ export default async function CalendarioPage() {
                     <h2 className="text-lg font-semibold text-slate-900">
                       Hoy
                     </h2>
+
                     <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
                       {hoyClientes.length}
                     </span>
@@ -303,41 +482,18 @@ export default async function CalendarioPage() {
                     />
                   ) : (
                     <div className="space-y-4">
-                      {hoyClientes.map((c) => (
-                        <div
-                          key={c.id}
-                          className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-4"
-                        >
-                          <p className="font-semibold text-slate-900">{c.nombre}</p>
-                          <p className="mt-2 text-sm text-slate-600">
-                            {c.recordatorio || "Sin nota"}
-                          </p>
-
-                          <div className="mt-3 flex gap-2">
-                            <a
-                              href={createWhatsAppUrl(
-                                c.telefono,
-                                whatsappMap.get(c.id) || ""
-                              )}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-emerald-700"
-                            >
-                              WhatsApp
-                            </a>
-
-                            <form action={aplicarAccion}>
-                              <input type="hidden" name="id" value={c.id} />
-                              <input type="hidden" name="actionType" value="listo" />
-                              <button
-                                type="submit"
-                                className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-slate-800"
-                              >
-                                ✔ Listo
-                              </button>
-                            </form>
-                          </div>
-                        </div>
+                      {hoyClientes.map((cliente) => (
+                        <CalendarClientCard
+                          key={cliente.id}
+                          cliente={cliente}
+                          tone="amber"
+                          whatsappMessage={
+                            whatsappMap.get(cliente.id) || ""
+                          }
+                          actionType="listo"
+                          actionLabel="✔ Listo"
+                          aplicarAccion={aplicarAccion}
+                        />
                       ))}
                     </div>
                   )}
@@ -346,8 +502,9 @@ export default async function CalendarioPage() {
                 <div className="rounded-3xl border border-sky-200 bg-white p-6 shadow-sm">
                   <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-slate-900">
-                      Mañana
+                      Próximos 7 días
                     </h2>
+
                     <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
                       {proximosClientes.length}
                     </span>
@@ -355,53 +512,23 @@ export default async function CalendarioPage() {
 
                   {proximosClientes.length === 0 ? (
                     <EmptyColumn
-                      title="Sin tareas mañana"
-                      text="No tienes próximos seguimientos para mañana."
+                      title="Sin próximos contactos"
+                      text="No tienes seguimientos programados para los próximos 7 días."
                     />
                   ) : (
                     <div className="space-y-4">
-                      {proximosClientes.map((c) => (
-                        <div
-                          key={c.id}
-                          className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-4"
-                        >
-                          <p className="font-semibold text-slate-900">{c.nombre}</p>
-                          <p className="mt-1 text-xs text-sky-700">
-                            {c.proximo_contacto || "—"}
-                          </p>
-                          <p className="mt-2 text-sm text-slate-600">
-                            {c.recordatorio || "Sin recordatorio"}
-                          </p>
-
-                          <div className="mt-3 flex gap-2">
-                            <a
-                              href={createWhatsAppUrl(
-                                c.telefono,
-                                whatsappMap.get(c.id) || ""
-                              )}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-emerald-700"
-                            >
-                              WhatsApp
-                            </a>
-
-                            <form action={aplicarAccion}>
-                              <input type="hidden" name="id" value={c.id} />
-                              <input
-                                type="hidden"
-                                name="actionType"
-                                value="schedule"
-                              />
-                              <button
-                                type="submit"
-                                className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-slate-800"
-                              >
-                                Agendar siguiente
-                              </button>
-                            </form>
-                          </div>
-                        </div>
+                      {proximosClientes.map((cliente) => (
+                        <CalendarClientCard
+                          key={cliente.id}
+                          cliente={cliente}
+                          tone="sky"
+                          whatsappMessage={
+                            whatsappMap.get(cliente.id) || ""
+                          }
+                          actionType="schedule"
+                          actionLabel="Agendar siguiente"
+                          aplicarAccion={aplicarAccion}
+                        />
                       ))}
                     </div>
                   )}
@@ -411,6 +538,8 @@ export default async function CalendarioPage() {
           </div>
         </div>
       </main>
+
+      <MobileDashboardNav />
     </div>
   );
 }
