@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   const nextStatus = String(formData.get("status") || "").trim();
 
   if (!profileId || !nextStatus) {
-    return NextResponse.redirect(new URL("/admin", request.url));
+    return NextResponse.redirect(new URL("/dashboard/admin", request.url));
   }
 
   const supabase = createAdminClient();
@@ -29,5 +29,5 @@ export async function POST(request: Request) {
     })
     .eq("id", profileId);
 
-  return NextResponse.redirect(new URL("/admin", request.url));
+  return NextResponse.redirect(new URL("/dashboard/admin", request.url));
 }

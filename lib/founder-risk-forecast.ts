@@ -1,4 +1,4 @@
-import type { CommercialMemoryClient } from "./commercial-memory-signals";
+import type { CommercialMemoryRelationship } from "./commercial-memory-signals";
 
 export type FounderRiskForecastPriority =
   | "critical"
@@ -7,8 +7,8 @@ export type FounderRiskForecastPriority =
   | "low";
 
 export type FounderRiskForecast = {
-  clienteId: string;
-  clienteNombre: string;
+  relationshipId: string;
+  relationshipName: string;
   riskAmount: number;
   riskProbability: number;
   daysWithoutContact: number;
@@ -20,17 +20,17 @@ export type FounderRiskForecast = {
 function clamp(
   value: number,
   min = 0,
-  max = 100,
+  max = 100
 ) {
   return Math.max(
     min,
-    Math.min(max, value),
+    Math.min(max, value)
   );
 }
 
 function safeNumber(
   value: unknown,
-  fallback = 0,
+  fallback = 0
 ) {
   if (
     typeof value !== "number" ||
@@ -43,7 +43,7 @@ function safeNumber(
 }
 
 function daysBetween(
-  date?: string | null,
+  date?: string | null
 ) {
   if (!date) {
     return 30;
@@ -67,45 +67,43 @@ function daysBetween(
     0,
     Math.floor(
       diff /
-        (1000 * 60 * 60 * 24),
-    ),
+        (1000 * 60 * 60 * 24)
+    )
   );
 }
 
-function getClientName(
-  client: CommercialMemoryClient,
+function getRelationshipName(
+  relationship: CommercialMemoryRelationship
 ) {
   return (
-    client.nombre?.trim() ||
-    "Cliente sin nombre"
+    relationship.nombre?.trim() ||
+    "Relación sin nombre"
   );
 }
 
 function getRiskProbability(
-  client: CommercialMemoryClient,
-  daysWithoutContact: number,
+  relationship: CommercialMemoryRelationship,
+  daysWithoutContact: number
 ) {
   let probability = 20;
 
   probability +=
     daysWithoutContact * 2.2;
 
-  if (!client.notas?.trim()) {
+  if (!relationship.notas?.trim()) {
     probability += 10;
   }
 
-  if (!client.recordatorio?.trim()) {
+  if (!relationship.recordatorio?.trim()) {
+    probability += 10;
+  }
+
+  if (!relationship.proximo_contacto) {
     probability += 10;
   }
 
   if (
-    !client.proximo_contacto
-  ) {
-    probability += 10;
-  }
-
-  if (
-    client.estado
+    relationship.estado
       ?.toLowerCase()
       .includes("pendiente")
   ) {
@@ -113,12 +111,12 @@ function getRiskProbability(
   }
 
   return clamp(
-    Math.round(probability),
+    Math.round(probability)
   );
 }
 
 function getPriority(
-  probability: number,
+  probability: number
 ): FounderRiskForecastPriority {
   if (probability >= 80) {
     return "critical";
@@ -137,7 +135,7 @@ function getPriority(
 
 function getRecommendation(
   probability: number,
-  daysWithoutContact: number,
+  daysWithoutContact: number
 ) {
   if (
     probability >= 80
@@ -167,11 +165,10 @@ function getReasoning(params: {
   const reasons: string[] = [];
 
   if (
-    params.daysWithoutContact >=
-    21
+    params.daysWithoutContact >= 21
   ) {
     reasons.push(
-      "sin contacto reciente",
+      "sin contacto reciente"
     );
   }
 
@@ -179,16 +176,15 @@ function getReasoning(params: {
     params.probability >= 70
   ) {
     reasons.push(
-      "alto riesgo de pérdida",
+      "alto riesgo de pérdida"
     );
   }
 
   if (
-    params.daysWithoutContact >=
-    14
+    params.daysWithoutContact >= 14
   ) {
     reasons.push(
-      "relación enfriándose",
+      "relación enfriándose"
     );
   }
 
@@ -196,62 +192,64 @@ function getReasoning(params: {
     reasons.length === 0
   ) {
     reasons.push(
-      "mantener seguimiento",
+      "mantener seguimiento"
     );
   }
 
   return reasons.join(
-    " + ",
+    " + "
   );
 }
 
 export function buildFounderRiskForecast(
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[]
 ): FounderRiskForecast[] {
-  return clients
-    .map((client) => {
+  return relationships
+    .map((relationship) => {
       const amount =
         Math.max(
           0,
           safeNumber(
-            client.monto,
-          ),
+            relationship.monto
+          )
         );
 
       const daysWithoutContact =
         daysBetween(
-          client.updated_at ||
-            client.created_at,
+          relationship.updated_at ||
+            relationship.created_at
         );
 
       const riskProbability =
         getRiskProbability(
-          client,
-          daysWithoutContact,
+          relationship,
+          daysWithoutContact
         );
 
       const riskAmount =
         Math.round(
           amount *
-            (riskProbability /
-              100),
+            (riskProbability / 100)
         );
 
       return {
-        clienteId: client.id,
-        clienteNombre:
-          getClientName(client),
+        relationshipId:
+          relationship.id,
+        relationshipName:
+          getRelationshipName(
+            relationship
+          ),
         riskAmount,
         riskProbability,
         daysWithoutContact,
         priority:
           getPriority(
-            riskProbability,
+            riskProbability
           ),
         recommendation:
           getRecommendation(
             riskProbability,
-            daysWithoutContact,
+            daysWithoutContact
           ),
         reasoning:
           getReasoning({
@@ -263,17 +261,17 @@ export function buildFounderRiskForecast(
     })
     .filter(
       (item) =>
-        item.riskAmount > 0,
+        item.riskAmount > 0
     )
     .sort(
       (a, b) =>
         b.riskAmount -
-        a.riskAmount,
+        a.riskAmount
     );
 }
 
 export function getFounderRiskForecastPriorityLabel(
-  priority: FounderRiskForecastPriority,
+  priority: FounderRiskForecastPriority
 ) {
   switch (priority) {
     case "critical":
@@ -292,7 +290,7 @@ export function getFounderRiskForecastPriorityLabel(
 }
 
 export function getFounderRiskForecastPriorityClasses(
-  priority: FounderRiskForecastPriority,
+  priority: FounderRiskForecastPriority
 ) {
   switch (priority) {
     case "critical":

@@ -5,7 +5,7 @@ import {
   type StrategicInsight,
 } from "../../lib/strategic-advisor";
 
-import type { FounderBriefingClient } from "../../lib/founder-briefing";
+import type { FounderBriefingRelationship } from "../../lib/founder-briefing";
 
 function toneClasses(tone: StrategicAdvisorTone) {
   if (tone === "critical") {
@@ -45,7 +45,7 @@ function ProgressBar({
   color: string;
 }) {
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
       <div
         className={`h-full rounded-full ${color}`}
         style={{
@@ -87,7 +87,7 @@ function InsightCard({ insight }: { insight: StrategicInsight }) {
 
   return (
     <div className={`rounded-2xl border ${classes.shell} p-5 shadow-sm`}>
-      <div className="flex items-start gap-3">
+      <div className="flex gap-3">
         <div
           className={`mt-1 h-2.5 w-2.5 flex-none rounded-full ${classes.dot}`}
         />
@@ -117,11 +117,13 @@ function InsightCard({ insight }: { insight: StrategicInsight }) {
 }
 
 export default function StrategicAdvisorCard({
-  clients,
+  relationships,
 }: {
-  clients: FounderBriefingClient[];
+  relationships: FounderBriefingRelationship[];
 }) {
-  const report: StrategicAdvisorReport = buildStrategicAdvisorReport(clients);
+  const report: StrategicAdvisorReport =
+    buildStrategicAdvisorReport(relationships);
+
   const classes = toneClasses(report.tone);
 
   return (
@@ -129,7 +131,7 @@ export default function StrategicAdvisorCard({
       className={`mb-6 overflow-hidden rounded-3xl border ${classes.shell} shadow-sm`}
     >
       <div className="border-b border-slate-200 px-5 py-5 sm:px-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div className="grid gap-4 lg:grid-cols-[1fr_180px] lg:items-start">
           <div>
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <span

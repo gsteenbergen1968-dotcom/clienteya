@@ -85,7 +85,7 @@ export default function AICockpitPanel({
   const title = briefing?.title || "AI Cockpit";
   const summary =
     briefing?.summary ||
-    "ClienteYA analiza clientes, riesgos, oportunidades y próximos pasos.";
+    "ClienteYA analiza relaciones, riesgos, oportunidades y próximos pasos.";
   const focus =
     briefing?.focus ||
     "Revisar prioridades comerciales y ejecutar los seguimientos más importantes.";
@@ -98,10 +98,10 @@ export default function AICockpitPanel({
   const insights = Array.isArray(briefing?.insights) ? briefing.insights : [];
 
   return (
-    <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] text-violet-700">
+          <div className="mb-2 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
             🧠 AI Cockpit
           </div>
 
@@ -182,7 +182,8 @@ export default function AICockpitPanel({
             const description =
               insight.description ||
               "ClienteYA detectó una señal comercial relevante.";
-            const actionHref = insight.actionHref || "/dashboard/clientes";
+            const actionHref =
+              insight.actionHref || "/dashboard/relationships";
             const actionLabel = insight.actionLabel || "Abrir";
 
             return (

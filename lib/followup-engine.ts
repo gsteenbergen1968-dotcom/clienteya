@@ -3,11 +3,11 @@ import { buildAssistantMessage } from "./whatsapp-assistant";
 
 export async function scheduleAutoFollowup({
   userId,
-  clienteId,
+  relationshipId,
   days = 3,
 }: {
   userId: string;
-  clienteId: string;
+  relationshipId: string;
   days?: number;
 }) {
   const admin = createAdminClient();
@@ -21,19 +21,19 @@ export async function scheduleAutoFollowup({
     String(due.getDate()).padStart(2, "0"),
   ].join("-");
 
-  const { data: cliente } = await admin
-    .from("clientes")
+  const { data: relationship } = await admin
+    .from("relationships")
     .select("*")
-    .eq("id", clienteId)
-    .eq("user_id", userId)
+    .eq("id", relationshipId)
+    .eq("owner_id", userId)
     .maybeSingle();
 
-  if (!cliente) return null;
+  if (!relationship) return null;
 
   const ai = await buildAssistantMessage({
     userId,
-    cliente: {
-      ...cliente,
+    relationship: {
+      ...relationship,
       estado: "Sin respuesta",
       proximo_contacto: dueDate,
       recordatorio: "Seguimiento automático pendiente",
@@ -42,7 +42,7 @@ export async function scheduleAutoFollowup({
 
   await admin.from("scheduled_followups").insert({
     user_id: userId,
-    cliente_id: clienteId,
+    relationship_id: relationshipId,
     due_date: dueDate,
     status: "scheduled",
     message: ai.message,

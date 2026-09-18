@@ -1,4 +1,4 @@
-import type { CommercialMemoryClient } from "./commercial-memory-signals";
+import type { CommercialMemoryRelationship } from "./commercial-memory-signals";
 
 export type FounderGrowthPriority =
   | "critical"
@@ -7,8 +7,8 @@ export type FounderGrowthPriority =
   | "low";
 
 export type FounderGrowthOpportunity = {
-  clienteId: string;
-  clienteNombre: string;
+  relationshipId: string;
+  relationshipName: string;
   growthPotential: number;
   growthScore: number;
   recommendation: string;
@@ -19,17 +19,17 @@ export type FounderGrowthOpportunity = {
 function clamp(
   value: number,
   min = 0,
-  max = 100,
+  max = 100
 ) {
   return Math.max(
     min,
-    Math.min(max, value),
+    Math.min(max, value)
   );
 }
 
 function safeNumber(
   value: unknown,
-  fallback = 0,
+  fallback = 0
 ) {
   if (
     typeof value !== "number" ||
@@ -41,34 +41,34 @@ function safeNumber(
   return value;
 }
 
-function getClientName(
-  client: CommercialMemoryClient,
+function getRelationshipName(
+  relationship: CommercialMemoryRelationship
 ) {
   return (
-    client.nombre?.trim() ||
-    "Cliente sin nombre"
+    relationship.nombre?.trim() ||
+    "Relación sin nombre"
   );
 }
 
 function getRelationshipScore(
-  client: CommercialMemoryClient,
+  relationship: CommercialMemoryRelationship
 ) {
   let score = 40;
 
-  if (client.notas?.trim()) {
+  if (relationship.notas?.trim()) {
     score += 20;
   }
 
-  if (client.recordatorio?.trim()) {
+  if (relationship.recordatorio?.trim()) {
     score += 15;
   }
 
-  if (client.pagado) {
+  if (relationship.pagado) {
     score += 15;
   }
 
   if (
-    client.estado
+    relationship.estado
       ?.toLowerCase()
       .includes("activo")
   ) {
@@ -79,14 +79,14 @@ function getRelationshipScore(
 }
 
 function getGrowthScore(
-  client: CommercialMemoryClient,
+  relationship: CommercialMemoryRelationship
 ) {
   const monto = safeNumber(
-    client.monto,
+    relationship.monto
   );
 
   const relationshipScore =
-    getRelationshipScore(client);
+    getRelationshipScore(relationship);
 
   let score =
     relationshipScore * 0.6;
@@ -95,12 +95,12 @@ function getGrowthScore(
     score += 20;
   }
 
-  if (client.pagado) {
+  if (relationship.pagado) {
     score += 10;
   }
 
   if (
-    client.estado
+    relationship.estado
       ?.toLowerCase()
       .includes("activo")
   ) {
@@ -108,12 +108,12 @@ function getGrowthScore(
   }
 
   return clamp(
-    Math.round(score),
+    Math.round(score)
   );
 }
 
 function getPriority(
-  score: number,
+  score: number
 ): FounderGrowthPriority {
   if (score >= 85) {
     return "critical";
@@ -131,7 +131,7 @@ function getPriority(
 }
 
 function getRecommendation(
-  score: number,
+  score: number
 ) {
   if (score >= 85) {
     return "Proponer expansión inmediata";
@@ -156,11 +156,10 @@ function getReasoning(params: {
   const reasons: string[] = [];
 
   if (
-    params.relationshipScore >=
-    70
+    params.relationshipScore >= 70
   ) {
     reasons.push(
-      "relación sólida",
+      "relación sólida"
     );
   }
 
@@ -168,16 +167,15 @@ function getReasoning(params: {
     params.amount > 0
   ) {
     reasons.push(
-      "historial comercial existente",
+      "historial comercial existente"
     );
   }
 
   if (
-    params.growthScore >=
-    80
+    params.growthScore >= 80
   ) {
     reasons.push(
-      "alto potencial de expansión",
+      "alto potencial de expansión"
     );
   }
 
@@ -185,54 +183,56 @@ function getReasoning(params: {
     reasons.length === 0
   ) {
     reasons.push(
-      "potencial de crecimiento moderado",
+      "potencial de crecimiento moderado"
     );
   }
 
   return reasons.join(
-    " + ",
+    " + "
   );
 }
 
 export function buildFounderGrowthEngine(
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[]
 ): FounderGrowthOpportunity[] {
-  return clients
-    .map((client) => {
+  return relationships
+    .map((relationship) => {
       const amount =
         Math.max(
           0,
           safeNumber(
-            client.monto,
-          ),
+            relationship.monto
+          )
         );
 
       const relationshipScore =
         getRelationshipScore(
-          client,
+          relationship
         );
 
       const growthScore =
         getGrowthScore(
-          client,
+          relationship
         );
 
       const growthPotential =
         Math.round(
           amount *
-            (growthScore /
-              100),
+            (growthScore / 100)
         );
 
       return {
-        clienteId: client.id,
-        clienteNombre:
-          getClientName(client),
+        relationshipId:
+          relationship.id,
+        relationshipName:
+          getRelationshipName(
+            relationship
+          ),
         growthPotential,
         growthScore,
         recommendation:
           getRecommendation(
-            growthScore,
+            growthScore
           ),
         reasoning:
           getReasoning({
@@ -242,23 +242,23 @@ export function buildFounderGrowthEngine(
           }),
         priority:
           getPriority(
-            growthScore,
+            growthScore
           ),
       };
     })
     .filter(
       (item) =>
-        item.growthPotential > 0,
+        item.growthPotential > 0
     )
     .sort(
       (a, b) =>
         b.growthPotential -
-        a.growthPotential,
+        a.growthPotential
     );
 }
 
 export function getFounderGrowthPriorityLabel(
-  priority: FounderGrowthPriority,
+  priority: FounderGrowthPriority
 ) {
   switch (priority) {
     case "critical":
@@ -277,7 +277,7 @@ export function getFounderGrowthPriorityLabel(
 }
 
 export function getFounderGrowthPriorityClasses(
-  priority: FounderGrowthPriority,
+  priority: FounderGrowthPriority
 ) {
   switch (priority) {
     case "critical":

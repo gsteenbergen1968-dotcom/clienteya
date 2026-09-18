@@ -1,4 +1,4 @@
-type Cliente = {
+type Relationship = {
   id: string;
   nombre: string;
   estado?: string | null;
@@ -12,79 +12,149 @@ export type AIRecommendation = {
   tone: "green" | "amber" | "red" | "blue";
 };
 
-function daysSince(dateString?: string | null) {
-  if (!dateString) return 0;
+function daysSince(
+  dateString?: string | null,
+) {
+  if (!dateString) {
+    return 0;
+  }
 
-  const now = new Date();
-  const target = new Date(dateString);
+  const now =
+    new Date();
 
-  const diff = now.getTime() - target.getTime();
+  const target =
+    new Date(
+      dateString,
+    );
 
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
+  const diff =
+    now.getTime() -
+    target.getTime();
+
+  return Math.floor(
+    diff /
+      (
+        1000 *
+        60 *
+        60 *
+        24
+      ),
+  );
 }
 
 export function buildAIRecommendations(
-  cliente: Cliente
+  relationship: Relationship,
 ): AIRecommendation[] {
-  const recommendations: AIRecommendation[] = [];
+  const recommendations:
+    AIRecommendation[] = [];
 
-  const estado = (cliente.estado || "").toLowerCase();
-  const notas = (cliente.notas || "").toLowerCase();
+  const estado =
+    (
+      relationship.estado ||
+      ""
+    ).toLowerCase();
 
-  const overdueDays = daysSince(cliente.proximo_contacto);
+  const notas =
+    (
+      relationship.notas ||
+      ""
+    ).toLowerCase();
 
-  if (overdueDays >= 7) {
+  const overdueDays =
+    daysSince(
+      relationship.proximo_contacto,
+    );
+
+  if (
+    overdueDays >= 7
+  ) {
     recommendations.push({
-      title: "Lead enfriándose",
+      title:
+        "Relación enfriándose",
+
       description:
-        "Este cliente lleva varios días sin seguimiento. Conviene responder hoy.",
-      tone: "red",
+        "Esta relación lleva varios días sin seguimiento. Conviene responder hoy.",
+
+      tone:
+        "red",
     });
   }
 
   if (
-    notas.includes("precio") ||
-    notas.includes("interesado") ||
-    notas.includes("listo")
+    notas.includes(
+      "precio",
+    ) ||
+    notas.includes(
+      "interesado",
+    ) ||
+    notas.includes(
+      "listo",
+    )
   ) {
     recommendations.push({
-      title: "Cliente listo para cerrar",
+      title:
+        "Relación lista para cerrar",
+
       description:
         "Las notas indican intención de compra. Momento ideal para cierre.",
-      tone: "green",
+
+      tone:
+        "green",
     });
   }
 
   if (
-    estado.includes("sin respuesta") ||
-    estado.includes("no responde")
+    estado.includes(
+      "sin respuesta",
+    ) ||
+    estado.includes(
+      "no responde",
+    )
   ) {
     recommendations.push({
-      title: "Enviar prueba social",
+      title:
+        "Enviar prueba social",
+
       description:
         "Comparte resultados, testimonios o casos de éxito para reactivar interés.",
-      tone: "amber",
+
+      tone:
+        "amber",
     });
   }
 
   if (
-    estado.includes("pago") ||
-    notas.includes("comprobante")
+    estado.includes(
+      "pago",
+    ) ||
+    notas.includes(
+      "comprobante",
+    )
   ) {
     recommendations.push({
-      title: "Pedir comprobante",
+      title:
+        "Pedir comprobante",
+
       description:
         "Haz seguimiento del comprobante para avanzar al siguiente paso.",
-      tone: "blue",
+
+      tone:
+        "blue",
     });
   }
 
-  if (recommendations.length === 0) {
+  if (
+    recommendations.length === 0
+  ) {
     recommendations.push({
-      title: "Seguimiento saludable",
+      title:
+        "Seguimiento saludable",
+
       description:
-        "El cliente no presenta alertas importantes por ahora.",
-      tone: "blue",
+        "La relación no presenta alertas importantes por ahora.",
+
+      tone:
+        "blue",
     });
   }
 

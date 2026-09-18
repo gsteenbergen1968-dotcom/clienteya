@@ -1,4 +1,4 @@
-import type { CommercialMemoryClient } from "./commercial-memory-signals";
+import type { CommercialMemoryRelationship } from "./commercial-memory-signals";
 
 export type FounderOpportunityPriority =
   | "critical"
@@ -12,8 +12,8 @@ export type FounderOpportunityMomentum =
 
 export type FounderOpportunity = {
   id: string;
-  clientId: string;
-  clientName: string;
+  relationshipId: string;
+  relationshipName: string;
 
   title: string;
   description: string;
@@ -39,10 +39,12 @@ function normalizeText(value?: string | null) {
 }
 
 function hasOpportunitySignal(
-  client: CommercialMemoryClient,
+  relationship: CommercialMemoryRelationship
 ) {
   const text = normalizeText(
-    `${client.estado ?? ""} ${client.notas ?? ""} ${client.recordatorio ?? ""}`,
+    `${relationship.estado ?? ""} ${relationship.notas ?? ""} ${
+      relationship.recordatorio ?? ""
+    }`
   );
 
   return (
@@ -58,9 +60,7 @@ function hasOpportunitySignal(
   );
 }
 
-function daysSince(
-  dateString?: string | null,
-) {
+function daysSince(dateString?: string | null) {
   if (!dateString) return null;
 
   const date = new Date(dateString);
@@ -71,15 +71,15 @@ function daysSince(
 
   return Math.floor(
     (Date.now() - date.getTime()) /
-      (1000 * 60 * 60 * 24),
+      (1000 * 60 * 60 * 24)
   );
 }
 
 function buildMomentum(
-  client: CommercialMemoryClient,
+  relationship: CommercialMemoryRelationship
 ) {
   const updatedDays = daysSince(
-    client.updated_at,
+    relationship.updated_at
   );
 
   if (
@@ -88,8 +88,7 @@ function buildMomentum(
   ) {
     return {
       momentum: "accelerating" as const,
-      reason:
-        "Actividad reciente detectada.",
+      reason: "Actividad reciente detectada.",
     };
   }
 
@@ -99,37 +98,35 @@ function buildMomentum(
   ) {
     return {
       momentum: "stable" as const,
-      reason:
-        "Seguimiento dentro del ciclo comercial.",
+      reason: "Seguimiento dentro del ciclo comercial.",
     };
   }
 
   return {
     momentum: "cooling" as const,
-    reason:
-      "Sin actividad reciente.",
+    reason: "Sin actividad reciente.",
   };
 }
 
 function buildOpportunity(
-  client: CommercialMemoryClient,
+  relationship: CommercialMemoryRelationship
 ): FounderOpportunity | null {
   const amount = Number(
-    client.monto ?? 0,
+    relationship.monto ?? 0
   );
 
-  if (Boolean(client.pagado)) {
+  if (Boolean(relationship.pagado)) {
     return null;
   }
 
   let probability = 35;
 
-  if (hasOpportunitySignal(client)) {
+  if (hasOpportunitySignal(relationship)) {
     probability += 25;
   }
 
   const updatedDays = daysSince(
-    client.updated_at,
+    relationship.updated_at
   );
 
   if (updatedDays !== null) {
@@ -161,16 +158,16 @@ function buildOpportunity(
         : "medium";
 
   const momentumData =
-    buildMomentum(client);
+    buildMomentum(relationship);
 
   return {
-    id: `opportunity-${client.id}`,
+    id: `opportunity-${relationship.id}`,
 
-    clientId: client.id,
+    relationshipId: relationship.id,
 
-    clientName:
-      client.nombre?.trim() ||
-      "Cliente sin nombre",
+    relationshipName:
+      relationship.nombre?.trim() ||
+      "Relación sin nombre",
 
     title:
       probability >= 80
@@ -181,10 +178,10 @@ function buildOpportunity(
 
     description:
       amount > 0
-        ? `Cliente con potencial comercial estimado de Gs. ${amount.toLocaleString(
-            "es-PY",
+        ? `Relación con potencial comercial estimado de Gs. ${amount.toLocaleString(
+            "es-PY"
           )}.`
-        : "Cliente con señales de interés y posibilidad de avance.",
+        : "Relación con señales de interés y posibilidad de avance.",
 
     recommendation:
       probability >= 80
@@ -208,27 +205,27 @@ function buildOpportunity(
 }
 
 export function buildFounderOpportunities(
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[]
 ): FounderOpportunity[] {
-  return clients
+  return relationships
     .map(buildOpportunity)
     .filter(
       (
-        item,
+        item
       ): item is FounderOpportunity =>
-        item !== null,
+        item !== null
     )
     .sort(
       (a, b) =>
         b.probability -
           a.probability ||
         b.potentialRevenue -
-          a.potentialRevenue,
+          a.potentialRevenue
     );
 }
 
 export function getFounderOpportunityPriorityLabel(
-  priority: FounderOpportunityPriority,
+  priority: FounderOpportunityPriority
 ) {
   if (priority === "critical") {
     return "Crítica";
@@ -242,7 +239,7 @@ export function getFounderOpportunityPriorityLabel(
 }
 
 export function getFounderOpportunityPriorityClasses(
-  priority: FounderOpportunityPriority,
+  priority: FounderOpportunityPriority
 ) {
   if (priority === "critical") {
     return "border-red-200 bg-red-50 text-red-700";
@@ -256,7 +253,7 @@ export function getFounderOpportunityPriorityClasses(
 }
 
 export function getFounderOpportunityMomentumLabel(
-  momentum: FounderOpportunityMomentum,
+  momentum: FounderOpportunityMomentum
 ) {
   if (
     momentum ===
@@ -273,7 +270,7 @@ export function getFounderOpportunityMomentumLabel(
 }
 
 export function getFounderOpportunityMomentumClasses(
-  momentum: FounderOpportunityMomentum,
+  momentum: FounderOpportunityMomentum
 ) {
   if (
     momentum ===

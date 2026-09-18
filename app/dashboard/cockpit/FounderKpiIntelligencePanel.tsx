@@ -12,12 +12,12 @@ import {
 
 type FounderKpiPanelInput = {
   sector: string;
-  totalClients: number;
-  activeClients: number;
-  clientsToContactToday: number;
-  overdueClients: number;
-  paidClients: number;
-  unpaidClients: number;
+  totalRelationships: number;
+  activeRelationships: number;
+  relationshipsToContactToday: number;
+  overdueRelationships: number;
+  paidRelationships: number;
+  unpaidRelationships: number;
   totalRevenue: number;
 };
 
@@ -40,6 +40,7 @@ function getPriorityClasses(priority: FounderKpiInsight["priority"]) {
 function getPriorityLabel(priority: FounderKpiInsight["priority"]) {
   if (priority === "high") return "Alta";
   if (priority === "medium") return "Media";
+
   return "Baja";
 }
 
@@ -54,30 +55,36 @@ export default function FounderKpiIntelligencePanel({
   const topInsights = intelligence.insights.slice(0, 3);
 
   const responseRate = clamp(
-    Math.round((input.activeClients / Math.max(input.totalClients, 1)) * 100),
+    Math.round(
+      (input.activeRelationships / Math.max(input.totalRelationships, 1)) * 100
+    )
   );
 
   const conversionRate = clamp(
-    Math.round((input.paidClients / Math.max(input.totalClients, 1)) * 100),
+    Math.round(
+      (input.paidRelationships / Math.max(input.totalRelationships, 1)) * 100
+    )
   );
 
   const followupRate = clamp(
     Math.round(
-      ((input.totalClients - input.overdueClients) /
-        Math.max(input.totalClients, 1)) *
-        100,
-    ),
+      ((input.totalRelationships - input.overdueRelationships) /
+        Math.max(input.totalRelationships, 1)) *
+        100
+    )
   );
 
-  const impactLayer = buildKPIImpactSignals({
+  const impact = buildKPIImpactSignals({
     responseRate,
     conversionRate,
     followupRate,
-    activeClients: input.activeClients,
-    opportunities: input.clientsToContactToday + input.overdueClients,
+    activeRelationships: input.activeRelationships,
+    opportunities:
+      input.relationshipsToContactToday +
+      input.overdueRelationships,
   });
 
-  const topImpactSignals = impactLayer.signals.slice(0, 3);
+  const topImpactSignals = impact.signals.slice(0, 3);
 
   return (
     <section className="relative overflow-hidden rounded-[40px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
@@ -122,7 +129,7 @@ export default function FounderKpiIntelligencePanel({
               </div>
 
               <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-950">
-                {impactLayer.score}/100
+                {impact.score}/100
               </span>
             </div>
 
@@ -142,6 +149,7 @@ export default function FounderKpiIntelligencePanel({
               <p className="text-[9px] font-black uppercase tracking-[0.14em] text-blue-700">
                 Respuesta
               </p>
+
               <p className="mt-1 text-xl font-black text-slate-950">
                 {responseRate}%
               </p>
@@ -151,6 +159,7 @@ export default function FounderKpiIntelligencePanel({
               <p className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
                 Conversión
               </p>
+
               <p className="mt-1 text-xl font-black text-slate-950">
                 {conversionRate}%
               </p>
@@ -160,6 +169,7 @@ export default function FounderKpiIntelligencePanel({
               <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-700">
                 Seguimiento
               </p>
+
               <p className="mt-1 text-xl font-black text-slate-950">
                 {followupRate}%
               </p>
@@ -181,7 +191,7 @@ export default function FounderKpiIntelligencePanel({
             </div>
 
             <span className="inline-flex w-fit rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-blue-700">
-              {intelligence.insights.length + impactLayer.signals.length} señales
+              {intelligence.insights.length + impact.signals.length} señales
             </span>
           </div>
 
@@ -198,7 +208,7 @@ export default function FounderKpiIntelligencePanel({
 
                   <span
                     className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${getPriorityClasses(
-                      insight.priority,
+                      insight.priority
                     )}`}
                   >
                     {getPriorityLabel(insight.priority)}
@@ -233,7 +243,7 @@ export default function FounderKpiIntelligencePanel({
 
                   <span
                     className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${getKPIImpactPriorityClasses(
-                      signal.priority,
+                      signal.priority
                     )}`}
                   >
                     {getKPIImpactPriorityLabel(signal.priority)}

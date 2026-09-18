@@ -1,5 +1,7 @@
-import type { ClienteForRevenueForecast } from "./revenue-forecast";
-import type { RevenueForecast } from "./revenue-forecast";
+import type {
+  RelationshipForRevenueForecast,
+  RevenueForecast,
+} from "./revenue-forecast";
 
 export type FounderActionPriority =
   | "critical"
@@ -25,7 +27,7 @@ function formatImpact(value: number) {
 }
 
 export function buildFounderActions(
-  clientes: ClienteForRevenueForecast[],
+  relationships: RelationshipForRevenueForecast[],
   forecast: RevenueForecast
 ): FounderAction[] {
   const actions: FounderAction[] = [];
@@ -36,8 +38,8 @@ export function buildFounderActions(
       title: `Contactar ${opportunity.nombre}`,
       description: opportunity.reason,
       impact: formatImpact(opportunity.expectedRevenue),
-      actionLabel: "Abrir cliente",
-      actionHref: `/dashboard/clientes/${opportunity.id}`,
+      actionLabel: "Abrir relación",
+      actionHref: `/dashboard/relationships/${opportunity.id}`,
       priority:
         opportunity.probability >= 70
           ? "critical"
@@ -57,29 +59,29 @@ export function buildFounderActions(
       description:
         "Hay ingresos potenciales que pueden perderse sin seguimiento.",
       impact: formatImpact(forecast.revenueAtRisk),
-      actionLabel: "Ver clientes",
-      actionHref: "/dashboard/clientes",
+      actionLabel: "Ver relaciones",
+      actionHref: "/dashboard/relationships",
       priority: "critical",
     });
   }
 
-  clientes.forEach((cliente) => {
-    const estado = normalizeText(cliente.estado);
+  relationships.forEach((relationship) => {
+    const estado = normalizeText(relationship.estado);
 
     if (
       estado.includes("interes") &&
       !forecast.topOpportunities.some(
-        (item) => item.id === cliente.id
+        (item) => item.id === relationship.id
       )
     ) {
       actions.push({
-        id: `interest-${cliente.id}`,
-        title: `Avanzar negociación con ${cliente.nombre}`,
+        id: `interest-${relationship.id}`,
+        title: `Avanzar negociación con ${relationship.nombre || "relación"}`,
         description:
-          "Cliente con señales de interés que necesita seguimiento.",
-        impact: formatImpact(Number(cliente.monto || 0)),
-        actionLabel: "Abrir cliente",
-        actionHref: `/dashboard/clientes/${cliente.id}`,
+          "Relación con señales de interés que necesita seguimiento.",
+        impact: formatImpact(Number(relationship.monto || 0)),
+        actionLabel: "Abrir relación",
+        actionHref: `/dashboard/relationships/${relationship.id}`,
         priority: "high",
       });
     }

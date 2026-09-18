@@ -1,4 +1,8 @@
-export type CommercialMemoryPriority = "critical" | "high" | "medium" | "low";
+export type CommercialMemoryPriority =
+  | "critical"
+  | "high"
+  | "medium"
+  | "low";
 
 export type CommercialMemoryTone =
   | "red"
@@ -7,7 +11,7 @@ export type CommercialMemoryTone =
   | "sky"
   | "slate";
 
-export type CommercialMemoryClient = {
+export type CommercialMemoryRelationship = {
   id: string;
   nombre?: string | null;
   telefono?: string | null;
@@ -56,8 +60,8 @@ export type CommercialRelationshipSignal = {
 };
 
 export type CommercialMemoryOSResult = {
-  clientId: string;
-  clientName: string;
+  relationshipId: string;
+  relationshipName: string;
 
   priorityScore: number;
   memoryHealth: number;
@@ -93,42 +97,61 @@ function daysBetween(date?: string | null) {
   if (!date) return null;
 
   const target = new Date(date);
-  if (Number.isNaN(target.getTime())) return null;
+
+  if (Number.isNaN(target.getTime())) {
+    return null;
+  }
 
   const today = new Date();
+
   today.setHours(0, 0, 0, 0);
   target.setHours(0, 0, 0, 0);
 
-  return Math.round((today.getTime() - target.getTime()) / 86400000);
+  return Math.round(
+    (today.getTime() - target.getTime()) / 86400000
+  );
 }
 
 function hasAny(text: string, words: string[]) {
   return words.some((word) => text.includes(word));
 }
 
-function getPriority(score: number): CommercialMemoryPriority {
+function getPriority(
+  score: number
+): CommercialMemoryPriority {
   if (score >= 80) return "critical";
   if (score >= 60) return "high";
   if (score >= 35) return "medium";
+
   return "low";
 }
 
-function getTone(priority: CommercialMemoryPriority): CommercialMemoryTone {
+function getTone(
+  priority: CommercialMemoryPriority
+): CommercialMemoryTone {
   if (priority === "critical") return "red";
   if (priority === "high") return "amber";
   if (priority === "medium") return "sky";
+
   return "emerald";
 }
 
-function getClientName(client: CommercialMemoryClient) {
-  return client.nombre?.trim() || "Cliente sin nombre";
+function getRelationshipName(
+  relationship: CommercialMemoryRelationship
+) {
+  return (
+    relationship.nombre?.trim() ||
+    "Relación sin nombre"
+  );
 }
 
 function buildPromiseSignals(
-  client: CommercialMemoryClient,
+  relationship: CommercialMemoryRelationship
 ): CommercialPromiseSignal[] {
   const text = normalizeText(
-    `${client.notas || ""} ${client.recordatorio || ""}`,
+    `${relationship.notas || ""} ${
+      relationship.recordatorio || ""
+    }`
   );
 
   const signals: CommercialPromiseSignal[] = [];
@@ -150,35 +173,49 @@ function buildPromiseSignals(
 
   if (hasAny(text, promiseWords)) {
     signals.push({
-      id: `${client.id}-promise-main`,
+      id: `${relationship.id}-promise-main`,
       title: "Promesa comercial detectada",
       description:
-        "Hay una posible promesa, seguimiento o compromiso pendiente con este cliente.",
+        "Hay una posible promesa, seguimiento o compromiso pendiente con esta relación.",
       priority: "high",
       tone: "amber",
     });
   }
 
-  const daysUntilContact = daysBetween(client.proximo_contacto);
+  const daysUntilContact = daysBetween(
+    relationship.proximo_contacto
+  );
 
-  if (daysUntilContact !== null && daysUntilContact > 0) {
+  if (
+    daysUntilContact !== null &&
+    daysUntilContact > 0
+  ) {
     signals.push({
-      id: `${client.id}-promise-overdue`,
+      id: `${relationship.id}-promise-overdue`,
       title: "Seguimiento vencido",
       description: `El próximo contacto estaba planificado hace ${daysUntilContact} día${
         daysUntilContact === 1 ? "" : "s"
       }.`,
-      priority: daysUntilContact >= 5 ? "critical" : "high",
-      tone: daysUntilContact >= 5 ? "red" : "amber",
+      priority:
+        daysUntilContact >= 5
+          ? "critical"
+          : "high",
+      tone:
+        daysUntilContact >= 5
+          ? "red"
+          : "amber",
     });
   }
 
-  if (daysUntilContact !== null && daysUntilContact === 0) {
+  if (
+    daysUntilContact !== null &&
+    daysUntilContact === 0
+  ) {
     signals.push({
-      id: `${client.id}-promise-today`,
+      id: `${relationship.id}-promise-today`,
       title: "Seguimiento para hoy",
       description:
-        "Este cliente tiene un contacto planificado para hoy. Conviene actuar antes de que pierda temperatura.",
+        "Esta relación tiene un contacto planificado para hoy. Conviene actuar antes de que pierda temperatura.",
       priority: "high",
       tone: "amber",
     });
@@ -188,10 +225,12 @@ function buildPromiseSignals(
 }
 
 function buildOpportunitySignals(
-  client: CommercialMemoryClient,
+  relationship: CommercialMemoryRelationship
 ): CommercialOpportunitySignal[] {
   const text = normalizeText(
-    `${client.estado || ""} ${client.notas || ""} ${client.recordatorio || ""}`,
+    `${relationship.estado || ""} ${
+      relationship.notas || ""
+    } ${relationship.recordatorio || ""}`
   );
 
   const signals: CommercialOpportunitySignal[] = [];
@@ -211,21 +250,24 @@ function buildOpportunitySignals(
 
   if (hasAny(text, opportunityWords)) {
     signals.push({
-      id: `${client.id}-opportunity-interest`,
+      id: `${relationship.id}-opportunity-interest`,
       title: "Oportunidad comercial activa",
       description:
-        "El cliente muestra señales de interés, consulta o intención comercial.",
+        "La relación muestra señales de interés, consulta o intención comercial.",
       priority: "high",
       tone: "emerald",
     });
   }
 
-  if ((client.monto || 0) > 0 && !client.pagado) {
+  if (
+    (relationship.monto || 0) > 0 &&
+    !relationship.pagado
+  ) {
     signals.push({
-      id: `${client.id}-opportunity-value`,
+      id: `${relationship.id}-opportunity-value`,
       title: "Valor comercial pendiente",
       description:
-        "Existe un monto asociado a este cliente que todavía puede convertirse en ingreso confirmado.",
+        "Existe un monto asociado a esta relación que todavía puede convertirse en ingreso confirmado.",
       priority: "high",
       tone: "amber",
     });
@@ -234,18 +276,24 @@ function buildOpportunitySignals(
   return signals;
 }
 
-function buildMoneySignals(client: CommercialMemoryClient): CommercialMoneySignal[] {
-  const amount = Number(client.monto || 0);
+function buildMoneySignals(
+  relationship: CommercialMemoryRelationship
+): CommercialMoneySignal[] {
+  const amount = Number(
+    relationship.monto || 0
+  );
 
-  if (amount <= 0) return [];
+  if (amount <= 0) {
+    return [];
+  }
 
-  if (client.pagado) {
+  if (relationship.pagado) {
     return [
       {
-        id: `${client.id}-money-paid`,
+        id: `${relationship.id}-money-paid`,
         title: "Ingreso confirmado",
         description:
-          "Este cliente ya tiene un monto registrado como pagado. Mantener relación y buscar recompra.",
+          "Esta relación ya tiene un monto registrado como pagado. Mantener la relación y buscar recompra.",
         amount,
         priority: "low",
         tone: "emerald",
@@ -255,7 +303,7 @@ function buildMoneySignals(client: CommercialMemoryClient): CommercialMoneySigna
 
   return [
     {
-      id: `${client.id}-money-pending`,
+      id: `${relationship.id}-money-pending`,
       title: "Dinero pendiente",
       description:
         "Hay un monto registrado que todavía no aparece como pagado. Conviene revisar o hacer seguimiento.",
@@ -267,27 +315,40 @@ function buildMoneySignals(client: CommercialMemoryClient): CommercialMoneySigna
 }
 
 function buildRelationshipSignals(
-  client: CommercialMemoryClient,
+  relationship: CommercialMemoryRelationship
 ): CommercialRelationshipSignal[] {
   const signals: CommercialRelationshipSignal[] = [];
-  const daysSinceUpdate = daysBetween(client.updated_at || client.created_at);
 
-  if (daysSinceUpdate !== null && daysSinceUpdate >= 14) {
+  const daysSinceUpdate = daysBetween(
+    relationship.updated_at ||
+      relationship.created_at
+  );
+
+  if (
+    daysSinceUpdate !== null &&
+    daysSinceUpdate >= 14
+  ) {
     signals.push({
-      id: `${client.id}-relationship-silent`,
+      id: `${relationship.id}-relationship-silent`,
       title: "Relación enfriándose",
-      description: `Hace ${daysSinceUpdate} días que no se registra movimiento relevante con este cliente.`,
-      priority: daysSinceUpdate >= 30 ? "high" : "medium",
-      tone: daysSinceUpdate >= 30 ? "amber" : "sky",
+      description: `Hace ${daysSinceUpdate} días que no se registra movimiento relevante con esta relación.`,
+      priority:
+        daysSinceUpdate >= 30
+          ? "high"
+          : "medium",
+      tone:
+        daysSinceUpdate >= 30
+          ? "amber"
+          : "sky",
     });
   }
 
-  if (!client.telefono) {
+  if (!relationship.telefono) {
     signals.push({
-      id: `${client.id}-relationship-no-phone`,
+      id: `${relationship.id}-relationship-no-phone`,
       title: "Contacto incompleto",
       description:
-        "Este cliente no tiene teléfono registrado. Eso limita la acción directa por WhatsApp.",
+        "Esta relación no tiene teléfono registrado. Eso limita la acción directa por WhatsApp.",
       priority: "medium",
       tone: "sky",
     });
@@ -312,94 +373,136 @@ function calculatePriorityScore(input: {
   ];
 
   for (const signal of allSignals) {
-    if (signal.priority === "critical") score += 35;
-    if (signal.priority === "high") score += 22;
-    if (signal.priority === "medium") score += 12;
-    if (signal.priority === "low") score += 5;
+    if (signal.priority === "critical") {
+      score += 35;
+    }
+
+    if (signal.priority === "high") {
+      score += 22;
+    }
+
+    if (signal.priority === "medium") {
+      score += 12;
+    }
+
+    if (signal.priority === "low") {
+      score += 5;
+    }
   }
 
   return clamp(score);
 }
 
 function calculateMemoryHealth(input: {
-  client: CommercialMemoryClient;
+  relationship: CommercialMemoryRelationship;
   promises: CommercialPromiseSignal[];
   relationshipSignals: CommercialRelationshipSignal[];
 }) {
   let score = 80;
 
-  if (!input.client.telefono) score -= 20;
-  if (!input.client.notas) score -= 15;
-  if (!input.client.recordatorio) score -= 10;
-  if (!input.client.proximo_contacto) score -= 10;
+  if (!input.relationship.telefono) {
+    score -= 20;
+  }
 
-  score -= input.promises.filter((signal) => signal.priority === "critical")
-    .length * 15;
+  if (!input.relationship.notas) {
+    score -= 15;
+  }
 
-  score -= input.relationshipSignals.filter(
-    (signal) => signal.priority === "high",
-  ).length * 12;
+  if (!input.relationship.recordatorio) {
+    score -= 10;
+  }
+
+  if (!input.relationship.proximo_contacto) {
+    score -= 10;
+  }
+
+  score -=
+    input.promises.filter(
+      (signal) =>
+        signal.priority === "critical"
+    ).length * 15;
+
+  score -=
+    input.relationshipSignals.filter(
+      (signal) =>
+        signal.priority === "high"
+    ).length * 12;
 
   return clamp(score);
 }
 
 function buildNextBestAction(input: {
-  client: CommercialMemoryClient;
+  relationship: CommercialMemoryRelationship;
   promises: CommercialPromiseSignal[];
   opportunities: CommercialOpportunitySignal[];
   moneySignals: CommercialMoneySignal[];
   relationshipSignals: CommercialRelationshipSignal[];
 }) {
-  const hasPendingMoney = input.moneySignals.some(
-    (signal) => signal.priority === "critical",
-  );
+  const hasPendingMoney =
+    input.moneySignals.some(
+      (signal) =>
+        signal.priority === "critical"
+    );
 
   if (hasPendingMoney) {
     return {
-      nextBestAction: "Revisar el pago pendiente y contactar al cliente hoy.",
+      nextBestAction:
+        "Revisar el pago pendiente y contactar la relación hoy.",
       actionReason:
         "Hay dinero registrado que todavía no aparece como pagado. Esto impacta directamente el ingreso.",
     };
   }
 
-  const hasOverduePromise = input.promises.some(
-    (signal) => signal.priority === "critical" || signal.priority === "high",
-  );
+  const hasOverduePromise =
+    input.promises.some(
+      (signal) =>
+        signal.priority === "critical" ||
+        signal.priority === "high"
+    );
 
   if (hasOverduePromise) {
     return {
-      nextBestAction: "Cumplir o cerrar el seguimiento pendiente hoy.",
+      nextBestAction:
+        "Cumplir o cerrar el seguimiento pendiente hoy.",
       actionReason:
         "Existe una promesa o seguimiento pendiente. Actuar rápido protege la confianza comercial.",
     };
   }
 
-  const hasOpportunity = input.opportunities.some(
-    (signal) => signal.priority === "high",
-  );
+  const hasOpportunity =
+    input.opportunities.some(
+      (signal) =>
+        signal.priority === "high"
+    );
 
   if (hasOpportunity) {
     return {
-      nextBestAction: "Enviar un mensaje comercial claro y avanzar al próximo paso.",
+      nextBestAction:
+        "Enviar un mensaje comercial claro y avanzar al próximo paso.",
       actionReason:
-        "El cliente muestra señales de interés. La oportunidad todavía tiene temperatura.",
+        "La relación muestra señales de interés. La oportunidad todavía tiene temperatura.",
     };
   }
 
-  const hasColdRelationship = input.relationshipSignals.some(
-    (signal) => signal.priority === "high" || signal.priority === "medium",
-  );
+  const hasColdRelationship =
+    input.relationshipSignals.some(
+      (signal) =>
+        signal.priority === "high" ||
+        signal.priority === "medium"
+    );
 
   if (hasColdRelationship) {
     return {
-      nextBestAction: "Reactivar la relación con un mensaje simple por WhatsApp.",
+      nextBestAction:
+        "Reactivar la relación con un mensaje simple por WhatsApp.",
       actionReason:
         "La relación lleva tiempo sin movimiento. Un contacto breve puede recuperar momentum.",
     };
   }
 
   return {
-    nextBestAction: "Mantener relación y registrar el próximo paso.",
+    nextBestAction:
+      "Mantener la relación y registrar el próximo paso.",
     actionReason:
       "No hay riesgo crítico, pero conviene mantener memoria comercial activa.",
   };
@@ -411,15 +514,30 @@ function buildHeadline(input: {
   opportunities: CommercialOpportunitySignal[];
   moneySignals: CommercialMoneySignal[];
 }) {
-  if (input.moneySignals.some((signal) => signal.priority === "critical")) {
+  if (
+    input.moneySignals.some(
+      (signal) =>
+        signal.priority === "critical"
+    )
+  ) {
     return "Dinero pendiente requiere acción";
   }
 
-  if (input.promises.some((signal) => signal.priority === "critical")) {
+  if (
+    input.promises.some(
+      (signal) =>
+        signal.priority === "critical"
+    )
+  ) {
     return "Promesa vencida requiere seguimiento";
   }
 
-  if (input.promises.some((signal) => signal.priority === "high")) {
+  if (
+    input.promises.some(
+      (signal) =>
+        signal.priority === "high"
+    )
+  ) {
     return "Seguimiento comercial pendiente";
   }
 
@@ -458,54 +576,72 @@ function buildSummary(input: {
 }
 
 export function buildCommercialMemoryOS(
-  client: CommercialMemoryClient,
+  relationship: CommercialMemoryRelationship
 ): CommercialMemoryOSResult {
-  const promises = buildPromiseSignals(client);
-  const opportunities = buildOpportunitySignals(client);
-  const moneySignals = buildMoneySignals(client);
-  const relationshipSignals = buildRelationshipSignals(client);
+  const promises =
+    buildPromiseSignals(relationship);
 
-  const priorityScore = calculatePriorityScore({
+  const opportunities =
+    buildOpportunitySignals(relationship);
+
+  const moneySignals =
+    buildMoneySignals(relationship);
+
+  const relationshipSignals =
+    buildRelationshipSignals(relationship);
+
+  const priorityScore =
+    calculatePriorityScore({
+      promises,
+      opportunities,
+      moneySignals,
+      relationshipSignals,
+    });
+
+  const memoryHealth =
+    calculateMemoryHealth({
+      relationship,
+      promises,
+      relationshipSignals,
+    });
+
+  const priority =
+    getPriority(priorityScore);
+
+  const tone =
+    getTone(priority);
+
+  const {
+    nextBestAction,
+    actionReason,
+  } = buildNextBestAction({
+    relationship,
     promises,
     opportunities,
     moneySignals,
     relationshipSignals,
   });
 
-  const memoryHealth = calculateMemoryHealth({
-    client,
-    promises,
-    relationshipSignals,
-  });
+  const headline =
+    buildHeadline({
+      priority,
+      promises,
+      opportunities,
+      moneySignals,
+    });
 
-  const priority = getPriority(priorityScore);
-  const tone = getTone(priority);
-
-  const { nextBestAction, actionReason } = buildNextBestAction({
-    client,
-    promises,
-    opportunities,
-    moneySignals,
-    relationshipSignals,
-  });
-
-  const headline = buildHeadline({
-    priority,
-    promises,
-    opportunities,
-    moneySignals,
-  });
-
-  const summary = buildSummary({
-    promises,
-    opportunities,
-    moneySignals,
-    relationshipSignals,
-  });
+  const summary =
+    buildSummary({
+      promises,
+      opportunities,
+      moneySignals,
+      relationshipSignals,
+    });
 
   return {
-    clientId: client.id,
-    clientName: getClientName(client),
+    relationshipId: relationship.id,
+    relationshipName:
+      getRelationshipName(relationship),
 
     priorityScore,
     memoryHealth,
@@ -527,23 +663,32 @@ export function buildCommercialMemoryOS(
 }
 
 export function buildCommercialMemoryOSList(
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[]
 ): CommercialMemoryOSResult[] {
-  return clients
-    .map((client) => buildCommercialMemoryOS(client))
-    .sort((a, b) => b.priorityScore - a.priorityScore);
+  return relationships
+    .map((relationship) =>
+      buildCommercialMemoryOS(relationship)
+    )
+    .sort(
+      (a, b) =>
+        b.priorityScore -
+        a.priorityScore
+    );
 }
 
 export function getCommercialMemoryPriorityLabel(
-  priority: CommercialMemoryPriority,
+  priority: CommercialMemoryPriority
 ) {
   if (priority === "critical") return "Crítica";
   if (priority === "high") return "Alta";
   if (priority === "medium") return "Media";
+
   return "Baja";
 }
 
-export function getCommercialMemoryToneClasses(tone: CommercialMemoryTone) {
+export function getCommercialMemoryToneClasses(
+  tone: CommercialMemoryTone
+) {
   if (tone === "red") {
     return "border-red-200 bg-red-50 text-red-900";
   }

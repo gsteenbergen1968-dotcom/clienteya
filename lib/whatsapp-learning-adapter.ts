@@ -1,4 +1,8 @@
-import { buildClienteMemoryProfile, type ClienteMemorySource } from "./whatsapp-memory-adapter";
+import {
+  buildRelationshipMemoryProfile,
+  type RelationshipMemorySource,
+} from "./whatsapp-memory-adapter";
+
 import { detectWhatsAppPatterns } from "./whatsapp-patterns";
 import { buildWhatsAppActionTemplate } from "./whatsapp-action-templates";
 
@@ -11,12 +15,14 @@ function normalize(value: string | null | undefined) {
   return (value || "").toLowerCase().trim();
 }
 
-function getLearningOutcome(cliente: ClienteMemorySource): WhatsAppLearningOutcome {
-  const estado = normalize(cliente.estado);
-  const notas = normalize(cliente.notas);
-  const recordatorio = normalize(cliente.recordatorio);
+function getLearningOutcome(
+  relationship: RelationshipMemorySource
+): WhatsAppLearningOutcome {
+  const estado = normalize(relationship.estado);
+  const notas = normalize(relationship.notas);
+  const recordatorio = normalize(relationship.recordatorio);
 
-  if (cliente.pagado || estado.includes("pag")) {
+  if (relationship.pagado || estado.includes("pag")) {
     return "success";
   }
 
@@ -41,31 +47,31 @@ function getLearningOutcome(cliente: ClienteMemorySource): WhatsAppLearningOutco
   return "pending";
 }
 
-export function buildWhatsAppLearningEventsFromClientes(
-  clientes: ClienteMemorySource[],
+export function buildWhatsAppLearningEventsFromRelationships(
+  relationships: RelationshipMemorySource[]
 ): WhatsAppLearningEvent[] {
-  return clientes.flatMap((cliente) => {
-    const memory = buildClienteMemoryProfile(cliente);
+  return relationships.flatMap((relationship) => {
+    const memory = buildRelationshipMemoryProfile(relationship);
     const patterns = detectWhatsAppPatterns(memory.timeline);
-    const outcome = getLearningOutcome(cliente);
+    const outcome = getLearningOutcome(relationship);
 
     return patterns.map((pattern, index) => {
       const template = buildWhatsAppActionTemplate({
-        clienteNombre: cliente.nombre,
-        pattern,
-      });
+  relationshipName: relationship.nombre,
+  pattern,
+});
 
       return {
-        id: `${cliente.id}-${pattern.id}-${index}`,
-        clienteId: cliente.id,
-        patternId: pattern.id,
-        actionId: template.id,
-        outcome,
-        createdAt:
-          cliente.proximo_contacto ||
-          cliente.created_at ||
-          new Date().toISOString(),
-      };
+  id: `${relationship.id}-${pattern.id}-${index}`,
+  relationshipId: relationship.id,
+  patternId: pattern.id,
+  actionId: template.id,
+  outcome,
+  createdAt:
+    relationship.proximo_contacto ||
+    relationship.created_at ||
+    new Date().toISOString(),
+};
     });
   });
 }

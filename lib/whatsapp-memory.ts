@@ -21,7 +21,7 @@ export type WhatsAppMemoryActionType =
 
 export type WhatsAppMemoryEvent = {
   id: string;
-  clienteId: string;
+  relationshipId: string;
   date: string;
   type: WhatsAppMemoryEventType;
   summary: string;
@@ -37,7 +37,7 @@ export type WhatsAppMemoryInsight = {
 };
 
 export type WhatsAppMemoryProfile = {
-  clienteId: string;
+  relationshipId: string;
   timeline: WhatsAppMemoryEvent[];
   totalInteractions: number;
   promisesMade: number;
@@ -49,11 +49,13 @@ export type WhatsAppMemoryProfile = {
 
 function toDate(value: string) {
   const date = new Date(value);
+
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function daysBetween(start: Date, end: Date) {
   const ms = end.getTime() - start.getTime();
+
   return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
 }
 
@@ -116,7 +118,7 @@ function calculateRelationshipScore(params: {
 }
 
 function buildInsights(params: {
-  clienteId: string;
+  relationshipId: string;
   timeline: WhatsAppMemoryEvent[];
   promisesMade: number;
   ignoredFollowups: number;
@@ -126,17 +128,17 @@ function buildInsights(params: {
   const insights: WhatsAppMemoryInsight[] = [];
 
   const hasPriceRequest = params.timeline.some(
-    (event) => event.type === "price_request",
+    (event) => event.type === "price_request"
   );
 
   const hasMeeting = params.timeline.some((event) => event.type === "meeting");
 
   if (params.promisesMade >= 3) {
     insights.push({
-      id: `${params.clienteId}-third-delay`,
+      id: `${params.relationshipId}-third-delay`,
       title: "Tercer aplazamiento detectado",
       description:
-        "Este cliente ya pospuso varias veces. El riesgo comercial está subiendo.",
+        "Esta relación ya pospuso varias veces. El riesgo comercial está subiendo.",
       riskLevel: "high",
       actionType: "send_whatsapp",
       actionLabel: "Hacer seguimiento hoy por WhatsApp",
@@ -145,10 +147,10 @@ function buildInsights(params: {
 
   if (hasPriceRequest && params.silenceDays >= 7) {
     insights.push({
-      id: `${params.clienteId}-price-silence`,
+      id: `${params.relationshipId}-price-silence`,
       title: "Interés sin respuesta",
       description:
-        "El cliente pidió precio, pero no respondió después. El momentum puede estar bajando.",
+        "La relación pidió precio, pero no respondió después. El momentum puede estar bajando.",
       riskLevel: "medium",
       actionType: "send_whatsapp",
       actionLabel: "Enviar recordatorio amable",
@@ -157,7 +159,7 @@ function buildInsights(params: {
 
   if (params.timeline.length >= 4 && !hasMeeting) {
     insights.push({
-      id: `${params.clienteId}-no-next-step`,
+      id: `${params.relationshipId}-no-next-step`,
       title: "Conversación sin próximo paso",
       description:
         "Hay varias interacciones, pero todavía no hay una acción concreta acordada.",
@@ -169,7 +171,7 @@ function buildInsights(params: {
 
   if (params.silenceDays >= 14) {
     insights.push({
-      id: `${params.clienteId}-long-silence`,
+      id: `${params.relationshipId}-long-silence`,
       title: "Silencio prolongado",
       description:
         "No hay interacción reciente. Conviene recuperar la relación antes de que se enfríe.",
@@ -181,7 +183,7 @@ function buildInsights(params: {
 
   if (params.relationshipScore <= 35) {
     insights.push({
-      id: `${params.clienteId}-relationship-risk`,
+      id: `${params.relationshipId}-relationship-risk`,
       title: "Relación en riesgo",
       description:
         "La combinación de silencio, aplazamientos y falta de avance indica riesgo comercial.",
@@ -195,7 +197,7 @@ function buildInsights(params: {
 }
 
 export function buildWhatsAppMemoryProfile(params: {
-  clienteId: string;
+  relationshipId: string;
   events: WhatsAppMemoryEvent[];
 }): WhatsAppMemoryProfile {
   const timeline = [...params.events].sort((a, b) => {
@@ -218,7 +220,7 @@ export function buildWhatsAppMemoryProfile(params: {
   });
 
   const insights = buildInsights({
-    clienteId: params.clienteId,
+    relationshipId: params.relationshipId,
     timeline,
     promisesMade,
     ignoredFollowups,
@@ -227,7 +229,7 @@ export function buildWhatsAppMemoryProfile(params: {
   });
 
   return {
-    clienteId: params.clienteId,
+    relationshipId: params.relationshipId,
     timeline,
     totalInteractions,
     promisesMade,
@@ -242,6 +244,7 @@ export function getWhatsAppMemoryRiskLabel(risk: WhatsAppMemoryRiskLevel) {
   if (risk === "critical") return "Crítico";
   if (risk === "high") return "Alto";
   if (risk === "medium") return "Medio";
+
   return "Bajo";
 }
 

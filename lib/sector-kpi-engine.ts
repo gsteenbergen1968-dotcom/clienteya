@@ -33,18 +33,18 @@ export function buildSectorKpiVocabulary(
       sectorLabel,
       dashboardTitle: "Pulso comercial del restaurante",
       dashboardDescription:
-        "ClienteYA resume reservas, clientes ausentes, reactivaciones e ingresos potenciales.",
+        "ClienteYA resume relaciones, ausencias, reactivaciones e ingresos potenciales.",
       kpis: [
         {
-          key: "clients",
-          label: "Clientes",
+          key: "relationships",
+          label: "Relaciones",
           description: "Personas registradas en la memoria comercial.",
           tone: "slate",
         },
         {
           key: "urgent",
           label: "Reactivaciones",
-          description: "Clientes que pueden volver si se contactan hoy.",
+          description: "Relaciones que pueden volver si se contactan hoy.",
           tone: "red",
         },
         {
@@ -72,7 +72,7 @@ export function buildSectorKpiVocabulary(
         "ClienteYA resume miembros, inactivos, renovaciones y riesgo de abandono.",
       kpis: [
         {
-          key: "clients",
+          key: "relationships",
           label: "Miembros",
           description: "Personas registradas como miembros o prospectos.",
           tone: "slate",
@@ -108,7 +108,7 @@ export function buildSectorKpiVocabulary(
         "ClienteYA resume interesados, visitas, propiedades abiertas y cierres potenciales.",
       kpis: [
         {
-          key: "clients",
+          key: "relationships",
           label: "Interesados",
           description: "Personas activas en búsqueda o consulta inmobiliaria.",
           tone: "slate",
@@ -144,15 +144,15 @@ export function buildSectorKpiVocabulary(
         "ClienteYA resume compradores, recompras, seguimientos y ventas potenciales.",
       kpis: [
         {
-          key: "clients",
+          key: "relationships",
           label: "Compradores",
-          description: "Clientes registrados con historial o intención de compra.",
+          description: "Relaciones registradas con historial o intención de compra.",
           tone: "slate",
         },
         {
           key: "urgent",
           label: "Recompras",
-          description: "Clientes que pueden volver a comprar con seguimiento.",
+          description: "Relaciones que pueden volver a comprar con seguimiento.",
           tone: "red",
         },
         {
@@ -177,18 +177,18 @@ export function buildSectorKpiVocabulary(
       sectorLabel,
       dashboardTitle: "Pulso comercial de belleza",
       dashboardDescription:
-        "ClienteYA resume citas, clientes sin retorno, reservas y oportunidades de recompra.",
+        "ClienteYA resume citas, relaciones sin retorno, reservas y oportunidades de recompra.",
       kpis: [
         {
-          key: "clients",
-          label: "Clientes",
+          key: "relationships",
+          label: "Relaciones",
           description: "Personas registradas en la memoria comercial.",
           tone: "slate",
         },
         {
           key: "urgent",
           label: "Sin cita",
-          description: "Clientes que pueden volver con una invitación simple.",
+          description: "Relaciones que pueden volver con una invitación simple.",
           tone: "red",
         },
         {
@@ -216,9 +216,9 @@ export function buildSectorKpiVocabulary(
         "ClienteYA resume interesados, cotizaciones, pruebas y ventas potenciales.",
       kpis: [
         {
-          key: "clients",
+          key: "relationships",
           label: "Interesados",
-          description: "Clientes registrados con interés comercial.",
+          description: "Relaciones registradas con interés comercial.",
           tone: "slate",
         },
         {
@@ -252,7 +252,7 @@ export function buildSectorKpiVocabulary(
         "ClienteYA resume pacientes, consultas pendientes, controles y continuidad.",
       kpis: [
         {
-          key: "clients",
+          key: "relationships",
           label: "Pacientes",
           description: "Personas registradas con seguimiento activo.",
           tone: "slate",
@@ -288,7 +288,7 @@ export function buildSectorKpiVocabulary(
         "ClienteYA resume alumnos, inscripciones, seguimientos y oportunidades académicas.",
       kpis: [
         {
-          key: "clients",
+          key: "relationships",
           label: "Alumnos",
           description: "Alumnos o prospectos registrados.",
           tone: "slate",
@@ -324,9 +324,9 @@ export function buildSectorKpiVocabulary(
         "ClienteYA resume prospectos, seguimientos, reuniones y oportunidades abiertas.",
       kpis: [
         {
-          key: "clients",
+          key: "relationships",
           label: "Prospectos",
-          description: "Contactos comerciales o clientes potenciales.",
+          description: "Contactos comerciales o relaciones potenciales.",
           tone: "slate",
         },
         {
@@ -356,18 +356,18 @@ export function buildSectorKpiVocabulary(
     sectorLabel,
     dashboardTitle: "Pulso comercial",
     dashboardDescription:
-      "ClienteYA resume clientes, urgencias, acciones de hoy y oportunidades.",
+      "ClienteYA resume relaciones, urgencias, acciones de hoy y oportunidades.",
     kpis: [
       {
-        key: "clients",
-        label: "Clientes",
+        key: "relationships",
+        label: "Relaciones",
         description: "Personas registradas en la memoria comercial.",
         tone: "slate",
       },
       {
         key: "urgent",
         label: "Urgentes",
-        description: "Clientes que necesitan atención prioritaria.",
+        description: "Relaciones que necesitan atención prioritaria.",
         tone: "red",
       },
       {

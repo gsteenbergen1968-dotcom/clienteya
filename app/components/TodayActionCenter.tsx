@@ -61,7 +61,12 @@ function ActionButton({
 
   if (isExternalHref(href)) {
     return (
-      <a href={href} target="_blank" rel="noreferrer" className={className}>
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+      >
         {children}
       </a>
     );
@@ -82,48 +87,46 @@ export default function TodayActionCenter({
 
   return (
     <section className={`${ui.cards.base} ${ui.cards.padding.lg}`}>
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className={`${ui.badges.neutral} mb-3 w-fit`}>
-            Hoy en ClienteYA
-          </div>
-
-          <h2 className={ui.typography.sectionTitle}>
-            Centro de acciones inteligentes
-          </h2>
-
-          <p className={`${ui.typography.body} mt-2 max-w-2xl`}>
-            ClienteYA prioriza automáticamente qué cliente necesita atención
-            ahora, con foco en WhatsApp, seguimiento y oportunidades reales.
-          </p>
+      <div>
+        <div className={`${ui.badges.neutral} mb-3 w-fit`}>
+          Hoy en ClienteYA
         </div>
 
-        <div className="grid grid-cols-3 gap-2 rounded-3xl border border-slate-200 bg-slate-50 p-2 text-center">
-          <div className="rounded-2xl bg-white px-3 py-2 shadow-sm">
-            <div className="text-lg font-black text-slate-950">
-              {summary.total}
-            </div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-              Acciones
-            </div>
-          </div>
+        <h2 className={ui.typography.sectionTitle}>
+          Centro de acciones inteligentes
+        </h2>
 
-          <div className="rounded-2xl bg-white px-3 py-2 shadow-sm">
-            <div className="text-lg font-black text-red-600">
-              {summary.urgent}
-            </div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-              Urgente
-            </div>
-          </div>
+        <p className={`${ui.typography.body} mt-2 max-w-2xl`}>
+          ClienteYA prioriza automáticamente qué relación necesita atención
+          ahora, con foco en WhatsApp, seguimiento y oportunidades reales.
+        </p>
+      </div>
 
-          <div className="rounded-2xl bg-white px-3 py-2 shadow-sm">
-            <div className="text-lg font-black text-amber-600">
-              {summary.opportunities}
-            </div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-              Oportunidad
-            </div>
+      <div className="grid grid-cols-3 gap-2 rounded-3xl border border-slate-200 bg-slate-50 p-2 text-center">
+        <div className="rounded-2xl bg-white px-3 py-2 shadow-sm">
+          <div className="text-lg font-black text-slate-950">
+            {summary.total}
+          </div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+            Acciones
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-white px-3 py-2 shadow-sm">
+          <div className="text-lg font-black text-red-600">
+            {summary.urgent}
+          </div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+            Urgente
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-white px-3 py-2 shadow-sm">
+          <div className="text-lg font-black text-amber-600">
+            {summary.opportunities}
+          </div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+            Oportunidad
           </div>
         </div>
       </div>
@@ -140,10 +143,10 @@ export default function TodayActionCenter({
           </p>
 
           <Link
-            href="/dashboard/nuevo"
+            href="/dashboard/new"
             className="mt-4 inline-flex rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800"
           >
-            Agregar cliente
+            Agregar relación
           </Link>
         </div>
       ) : (

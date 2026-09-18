@@ -1,4 +1,4 @@
-type ClientSearchItem = {
+type RelationshipSearchItem = {
   id: string;
   nombre: string;
   telefono?: string | null;
@@ -6,7 +6,7 @@ type ClientSearchItem = {
 };
 
 type TopBarActionsProps = {
-  clientes: ClientSearchItem[];
+  relationships: RelationshipSearchItem[];
   urgentCount?: number;
 };
 

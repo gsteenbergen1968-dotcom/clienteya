@@ -1,4 +1,4 @@
-type Cliente = {
+type Relationship = {
   id: string;
   nombre: string;
   estado?: string | null;
@@ -45,14 +45,19 @@ function daysUntil(date?: string | null) {
   );
 }
 
-export function buildTimelineInsight(cliente: Cliente): TimelineInsight {
-  const estado = normalize(cliente.estado);
-  const notas = normalize(cliente.notas);
-  const recordatorio = normalize(cliente.recordatorio);
+export function buildTimelineInsight(
+  relationship: Relationship
+): TimelineInsight {
+  const estado = normalize(relationship.estado);
+  const notas = normalize(relationship.notas);
+  const recordatorio = normalize(relationship.recordatorio);
   const text = `${estado} ${notas} ${recordatorio}`;
 
-  const daysInPipeline = daysBetween(cliente.created_at || cliente.updated_at);
-  const daysToContact = daysUntil(cliente.proximo_contacto);
+  const daysInPipeline = daysBetween(
+    relationship.created_at || relationship.updated_at
+  );
+
+  const daysToContact = daysUntil(relationship.proximo_contacto);
 
   if (
     text.includes("pagado") ||
@@ -63,7 +68,7 @@ export function buildTimelineInsight(cliente: Cliente): TimelineInsight {
       daysInPipeline,
       daysUntilNextContact: daysToContact,
       momentum: "strong",
-      label: "Cliente convertido",
+      label: "Relación convertida",
       description: "La oportunidad ya fue cerrada o convertida.",
       recommendation: "Mantener relación y buscar oportunidad futura.",
       tone: "green",
@@ -77,11 +82,11 @@ export function buildTimelineInsight(cliente: Cliente): TimelineInsight {
       daysInPipeline,
       daysUntilNextContact: daysToContact,
       momentum: overdueDays >= 7 ? "stalled" : "slow",
-      label: overdueDays >= 7 ? "Lead estancado" : "Follow-up vencido",
+      label: overdueDays >= 7 ? "Relación estancada" : "Follow-up vencido",
       description:
         overdueDays >= 7
-          ? `Este lead lleva ${overdueDays} día(s) vencido. Riesgo alto de enfriarse.`
-          : `Este lead tiene ${overdueDays} día(s) de atraso en seguimiento.`,
+          ? `Esta relación lleva ${overdueDays} día(s) vencida. Riesgo alto de enfriarse.`
+          : `Esta relación tiene ${overdueDays} día(s) de atraso en seguimiento.`,
       recommendation:
         overdueDays >= 7
           ? "Enviar mensaje directo y breve hoy."
@@ -102,7 +107,7 @@ export function buildTimelineInsight(cliente: Cliente): TimelineInsight {
       daysUntilNextContact: daysToContact,
       momentum: "strong",
       label: "Momentum comercial fuerte",
-      description: "El cliente muestra señales activas de avance comercial.",
+      description: "La relación muestra señales activas de avance comercial.",
       recommendation: "Acelerar el cierre con una propuesta clara.",
       tone: "green",
     };
@@ -118,7 +123,7 @@ export function buildTimelineInsight(cliente: Cliente): TimelineInsight {
       daysUntilNextContact: daysToContact,
       momentum: "slow",
       label: "Respuesta lenta",
-      description: "El cliente necesita reactivación con mensaje simple.",
+      description: "La relación necesita reactivación con mensaje simple.",
       recommendation: "Usar una pregunta corta y fácil de responder.",
       tone: "amber",
     };
@@ -129,8 +134,9 @@ export function buildTimelineInsight(cliente: Cliente): TimelineInsight {
       daysInPipeline,
       daysUntilNextContact: daysToContact,
       momentum: "stalled",
-      label: "Lead antiguo",
-      description: "Este lead lleva bastante tiempo abierto sin señales fuertes.",
+      label: "Relación antigua",
+      description:
+        "Esta relación lleva bastante tiempo abierta sin señales fuertes.",
       recommendation: "Decidir si vale la pena reactivar o cerrar.",
       tone: "red",
     };
@@ -141,7 +147,7 @@ export function buildTimelineInsight(cliente: Cliente): TimelineInsight {
     daysUntilNextContact: daysToContact,
     momentum: "stable",
     label: "Momentum estable",
-    description: "El lead no muestra señales críticas por ahora.",
+    description: "La relación no muestra señales críticas por ahora.",
     recommendation: "Mantener seguimiento normal.",
     tone: "blue",
   };

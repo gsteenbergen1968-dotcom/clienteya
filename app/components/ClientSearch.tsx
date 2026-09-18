@@ -2,15 +2,15 @@
 
 import { useMemo, useState } from "react";
 
-type ClientSearchItem = {
+type RelationshipSearchItem = {
   id: string;
   nombre: string;
   telefono?: string | null;
   estado?: string | null;
 };
 
-type ClientSearchProps = {
-  clientes: ClientSearchItem[];
+type RelationshipSearchProps = {
+  relationships: RelationshipSearchItem[];
   title?: string;
   description?: string;
   compact?: boolean;
@@ -38,25 +38,27 @@ function getBadgeClasses(estado?: string | null) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-export default function ClientSearch({
-  clientes,
-  title = "Buscar clientes",
-  description = "Encuentra clientes rápidamente por nombre, teléfono o estado.",
+export default function RelationshipSearch({
+  relationships,
+  title = "Buscar relaciones",
+  description = "Encuentra relaciones rápidamente por nombre, teléfono o estado.",
   compact = false,
-}: ClientSearchProps) {
+}: RelationshipSearchProps) {
   const [query, setQuery] = useState("");
 
-  const filteredClientes = useMemo(() => {
+  const filteredRelationships = useMemo(() => {
     const normalizedQuery = query.toLowerCase().trim();
 
-    if (!normalizedQuery) return clientes.slice(0, compact ? 3 : 6);
+    if (!normalizedQuery) {
+      return relationships.slice(0, compact ? 3 : 6);
+    }
 
-    return clientes
-      .filter((cliente) => {
+    return relationships
+      .filter((relationship) => {
         const haystack = [
-          cliente.nombre,
-          cliente.telefono || "",
-          cliente.estado || "",
+          relationship.nombre,
+          relationship.telefono || "",
+          relationship.estado || "",
         ]
           .join(" ")
           .toLowerCase();
@@ -64,7 +66,7 @@ export default function ClientSearch({
         return haystack.includes(normalizedQuery);
       })
       .slice(0, compact ? 3 : 8);
-  }, [clientes, compact, query]);
+  }, [relationships, compact, query]);
 
   return (
     <section
@@ -76,9 +78,9 @@ export default function ClientSearch({
     >
       {!compact ? (
         <div className="mb-4">
-          <div className="mb-2 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-700">
-            Búsqueda de clientes
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Búsqueda de relaciones
+          </p>
 
           <h2 className="text-xl font-black tracking-tight text-slate-950">
             {title}
@@ -98,33 +100,33 @@ export default function ClientSearch({
       />
 
       <div className="mt-4 space-y-2.5">
-        {filteredClientes.length > 0 ? (
-          filteredClientes.map((cliente) => (
+        {filteredRelationships.length > 0 ? (
+          filteredRelationships.map((relationship) => (
             <a
-              key={cliente.id}
-              href={`/dashboard/editar?id=${cliente.id}`}
+              key={relationship.id}
+              href={`/dashboard/relationships/${relationship.id}`}
               className="block rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:border-blue-200 hover:bg-blue-50"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-black text-slate-950">
-                    {cliente.nombre}
+                    {relationship.nombre}
                   </p>
 
-                  {cliente.telefono ? (
+                  {relationship.telefono ? (
                     <p className="mt-1 truncate text-xs text-slate-500">
-                      {cliente.telefono}
+                      {relationship.telefono}
                     </p>
                   ) : null}
                 </div>
 
-                {cliente.estado ? (
+                {relationship.estado ? (
                   <span
                     className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-black ${getBadgeClasses(
-                      cliente.estado
+                      relationship.estado
                     )}`}
                   >
-                    {cliente.estado}
+                    {relationship.estado}
                   </span>
                 ) : null}
               </div>
@@ -132,7 +134,7 @@ export default function ClientSearch({
           ))
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-500">
-            No se encontraron clientes.
+            No se encontraron relaciones.
           </div>
         )}
       </div>

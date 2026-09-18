@@ -1,21 +1,12 @@
-import { buildClientMemory } from "./client-memory";
-
-type Cliente = {
-  id: string;
-  nombre: string;
-  telefono?: string | null;
-  estado?: string | null;
-  notas?: string | null;
-  recordatorio?: string | null;
-  proximo_contacto?: string | null;
-  monto?: number | null;
-  pagado?: boolean | null;
-  fecha_pago?: string | null;
-  created_at?: string | null;
-};
+import { adaptRelationshipMemory } from "./relationship-memory-adapter";
+import {
+  buildRelationshipMemory,
+  type RelationshipMemoryProfile,
+} from "./relationship-memory";
+import type { RelationshipRecord } from "./relationship-repository";
 
 export type DailyFocusItem = {
-  cliente: Cliente;
+  relationship: RelationshipRecord;
   title: string;
   description: string;
   priority: "critical" | "high" | "medium";
@@ -31,17 +22,11 @@ export type DailyFocusItem = {
 export type DailyFocusEngine = {
   summary: string;
   operationalAdvice: string;
-
   topPriorities: DailyFocusItem[];
-
   hotLeads: DailyFocusItem[];
-
   ghostingRisks: DailyFocusItem[];
-
   revenueOpportunities: DailyFocusItem[];
-
   noTouchRisks: DailyFocusItem[];
-
   stats: {
     critical: number;
     high: number;
@@ -52,31 +37,99 @@ export type DailyFocusEngine = {
   };
 };
 
-function todayISO() {
+function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function daysBetween(date: string | null | undefined, today: string) {
+function daysBetween(
+  date: string | null | undefined,
+  today: string,
+): number | null {
   if (!date) return null;
 
   const target = new Date(`${date.slice(0, 10)}T00:00:00`);
   const current = new Date(`${today}T00:00:00`);
 
+  if (Number.isNaN(target.getTime()) || Number.isNaN(current.getTime())) {
+    return null;
+  }
+
   return Math.round(
-    (target.getTime() - current.getTime()) / (1000 * 60 * 60 * 24)
+    (target.getTime() - current.getTime()) / (1000 * 60 * 60 * 24),
   );
 }
 
+function normalizeText(
+  value: string | null | undefined,
+): string {
+  return (value || "").trim().toLowerCase();
+}
+
+function getRelationshipName(relationship: RelationshipRecord): string {
+  return (
+    relationship.name?.trim() ||
+    relationship.company?.trim() ||
+    "Relación sin nombre"
+  );
+}
+
+function getRelationshipAmount(
+  relationship: RelationshipRecord,
+): number {
+  void relationship;
+  return 0;
+}
+
+function getRelationshipPaid(
+  relationship: RelationshipRecord,
+): boolean {
+  const status = normalizeText(relationship.status);
+
+  return (
+    status.includes("pag") ||
+    status.includes("convert")
+  );
+}
+
+function getRelationshipPaymentDate(
+  relationship: RelationshipRecord,
+): string | null {
+  void relationship;
+  return null;
+}
+
+function buildRelationshipMemoryProfile(
+  relationship: RelationshipRecord,
+): RelationshipMemoryProfile {
+  const model = adaptRelationshipMemory({
+    id: relationship.id,
+    name: getRelationshipName(relationship),
+    phone: relationship.phone,
+    status: relationship.status,
+    notes: relationship.notes,
+    reminder: relationship.reminder,
+    next_follow_up_at: relationship.next_contact_at,
+    estimated_value: getRelationshipAmount(relationship),
+    pagado: getRelationshipPaid(relationship),
+    payment_date: getRelationshipPaymentDate(relationship),
+    created_at: relationship.created_at,
+  });
+
+  return buildRelationshipMemory(model);
+}
+
 function buildPriority(
-  score: number
-): "critical" | "high" | "medium" {
+  score: number,
+): DailyFocusItem["priority"] {
   if (score >= 85) return "critical";
   if (score >= 65) return "high";
 
   return "medium";
 }
 
-function buildAction(memory: ReturnType<typeof buildClientMemory>) {
+function buildAction(
+  memory: RelationshipMemoryProfile,
+): DailyFocusItem["action"] {
   if (memory.recommendedAction === "close") {
     return "close_sale";
   }
@@ -97,47 +150,53 @@ function buildAction(memory: ReturnType<typeof buildClientMemory>) {
 }
 
 function buildDescription(
-  cliente: Cliente,
-  memory: ReturnType<typeof buildClientMemory>
-) {
-  const amount =
-    cliente.monto && cliente.monto > 0
-      ? ` Potencial: ${cliente.monto.toLocaleString("es-PY")} PYG.`
+  relationship: RelationshipRecord,
+  memory: RelationshipMemoryProfile,
+): string {
+  const amount = getRelationshipAmount(relationship);
+
+  const valueText =
+    amount > 0
+      ? ` Potencial: ${amount.toLocaleString("es-PY")} PYG.`
       : "";
 
-  return `${memory.summary} ${memory.nextBestStep}${amount}`;
+  return `${memory.summary} ${memory.nextBestStep}${valueText}`;
 }
 
 function buildTitle(
-  cliente: Cliente,
-  memory: ReturnType<typeof buildClientMemory>
-) {
+  relationship: RelationshipRecord,
+  memory: RelationshipMemoryProfile,
+): string {
+  const name = getRelationshipName(relationship);
+
   if (memory.salesTemperature === "hot") {
-    return `🔥 ${cliente.nombre} puede cerrar hoy`;
+    return `🔥 ${name} puede cerrar hoy`;
   }
 
   if (memory.ghostingRisk === "high") {
-    return `⚠️ ${cliente.nombre} está desapareciendo`;
+    return `⚠️ ${name} está desapareciendo`;
   }
 
   if (memory.salesTemperature === "closed") {
-    return `💚 Mantener relación con ${cliente.nombre}`;
+    return `💚 Mantener relación con ${name}`;
   }
 
   if (memory.followupFatigue === "high") {
-    return `🧠 ${cliente.nombre} necesita menos presión`;
+    return `🧠 ${name} necesita menos presión`;
   }
 
-  return `📌 Seguimiento para ${cliente.nombre}`;
+  return `📌 Seguimiento para ${name}`;
 }
 
-function buildFocusItem(cliente: Cliente): DailyFocusItem {
-  const memory = buildClientMemory(cliente);
+function buildFocusItem(
+  relationship: RelationshipRecord,
+): DailyFocusItem {
+  const memory = buildRelationshipMemoryProfile(relationship);
 
   return {
-    cliente,
-    title: buildTitle(cliente, memory),
-    description: buildDescription(cliente, memory),
+    relationship,
+    title: buildTitle(relationship, memory),
+    description: buildDescription(relationship, memory),
     priority: buildPriority(memory.score),
     action: buildAction(memory),
     score: memory.score,
@@ -145,36 +204,34 @@ function buildFocusItem(cliente: Cliente): DailyFocusItem {
 }
 
 export function buildDailyFocus(
-  clientes: Cliente[]
+  relationships: RelationshipRecord[],
 ): DailyFocusEngine {
   const today = todayISO();
 
-  const focusItems = clientes.map(buildFocusItem);
-
+  const focusItems = relationships.map(buildFocusItem);
   const sorted = [...focusItems].sort((a, b) => b.score - a.score);
 
   const hotLeads = sorted.filter((item) => {
-    const memory = buildClientMemory(item.cliente);
+    const memory = buildRelationshipMemoryProfile(item.relationship);
 
     return memory.salesTemperature === "hot";
   });
 
   const ghostingRisks = sorted.filter((item) => {
-    const memory = buildClientMemory(item.cliente);
+    const memory = buildRelationshipMemoryProfile(item.relationship);
 
     return memory.ghostingRisk === "high";
   });
 
-  const revenueOpportunities = sorted.filter((item) => {
-    return (item.cliente.monto || 0) > 0;
-  });
+  const revenueOpportunities = sorted.filter(
+    (item) => getRelationshipAmount(item.relationship) > 0,
+  );
 
   const noTouchRisks = sorted.filter((item) => {
-    const memory = buildClientMemory(item.cliente);
-
+    const memory = buildRelationshipMemoryProfile(item.relationship);
     const delta = daysBetween(
-      item.cliente.proximo_contacto,
-      today
+      item.relationship.next_contact_at,
+      today,
     );
 
     return (
@@ -185,32 +242,32 @@ export function buildDailyFocus(
   });
 
   const critical = sorted.filter(
-    (item) => item.priority === "critical"
+    (item) => item.priority === "critical",
   );
 
   const high = sorted.filter(
-    (item) => item.priority === "high"
+    (item) => item.priority === "high",
   );
 
   const medium = sorted.filter(
-    (item) => item.priority === "medium"
+    (item) => item.priority === "medium",
   );
 
   let summary =
     "La operación está estable. Mantener ritmo de seguimiento.";
 
   let operationalAdvice =
-    "Prioriza clientes con mayor intención comercial antes de hacer nuevos contactos.";
+    "Prioriza relaciones con mayor intención comercial antes de hacer nuevos contactos.";
 
   if (critical.length >= 3) {
     summary =
       "Hay múltiples oportunidades críticas que necesitan atención inmediata.";
 
     operationalAdvice =
-      "Enfócate primero en cerrar oportunidades calientes y recuperar clientes en riesgo.";
+      "Enfócate primero en cerrar oportunidades calientes y recuperar relaciones en riesgo.";
   } else if (ghostingRisks.length >= 3) {
     summary =
-      "Hay señales fuertes de ghosting en varios clientes.";
+      "Hay señales fuertes de ghosting en varias relaciones.";
 
     operationalAdvice =
       "Reduce presión comercial y utiliza mensajes más suaves y simples.";
@@ -225,17 +282,11 @@ export function buildDailyFocus(
   return {
     summary,
     operationalAdvice,
-
     topPriorities: sorted.slice(0, 5),
-
     hotLeads: hotLeads.slice(0, 5),
-
     ghostingRisks: ghostingRisks.slice(0, 5),
-
     revenueOpportunities: revenueOpportunities.slice(0, 5),
-
     noTouchRisks: noTouchRisks.slice(0, 5),
-
     stats: {
       critical: critical.length,
       high: high.length,
@@ -243,8 +294,9 @@ export function buildDailyFocus(
       hotLeads: hotLeads.length,
       ghostingRisks: ghostingRisks.length,
       revenuePipeline: revenueOpportunities.reduce(
-        (acc, item) => acc + (item.cliente.monto || 0),
-        0
+        (total, item) =>
+          total + getRelationshipAmount(item.relationship),
+        0,
       ),
     },
   };

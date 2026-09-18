@@ -1,4 +1,4 @@
-import type { FounderBriefingClient } from "./founder-briefing";
+import type { FounderBriefingRelationship } from "./founder-briefing";
 
 export type StrategicAdvisorTone = "good" | "warning" | "critical";
 
@@ -63,16 +63,18 @@ function daysUntil(value?: string | null) {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
-function getStatus(client: FounderBriefingClient) {
-  return (client.estado || client.status || "").toLowerCase().trim();
+function getStatus(relationship: FounderBriefingRelationship) {
+  return (relationship.estado || relationship.status || "")
+    .toLowerCase()
+    .trim();
 }
 
-function getClientValue(client: FounderBriefingClient) {
-  return Number(client.monto || 50000);
+function getRelationshipValue(relationship: FounderBriefingRelationship) {
+  return Number(relationship.monto || 50000);
 }
 
-function isWarm(client: FounderBriefingClient) {
-  const status = getStatus(client);
+function isWarm(relationship: FounderBriefingRelationship) {
+  const status = getStatus(relationship);
 
   return (
     status.includes("warm") ||
@@ -84,8 +86,8 @@ function isWarm(client: FounderBriefingClient) {
   );
 }
 
-function isCold(client: FounderBriefingClient) {
-  const status = getStatus(client);
+function isCold(relationship: FounderBriefingRelationship) {
+  const status = getStatus(relationship);
 
   return (
     status.includes("cold") ||
@@ -97,18 +99,20 @@ function isCold(client: FounderBriefingClient) {
   );
 }
 
-function estimateProbability(client: FounderBriefingClient) {
+function estimateProbability(relationship: FounderBriefingRelationship) {
   let probability = 40;
 
-  if (isWarm(client)) probability += 30;
+  if (isWarm(relationship)) probability += 30;
 
-  const activity = daysSince(client.updated_at || client.created_at) || 0;
+  const activity =
+    daysSince(relationship.updated_at || relationship.created_at) || 0;
 
   if (activity <= 2) probability += 20;
   if (activity >= 7) probability -= 25;
 
   const followUp =
-    daysUntil(client.proximo_contacto) ?? daysUntil(client.recordatorio);
+    daysUntil(relationship.proximo_contacto) ??
+    daysUntil(relationship.recordatorio);
 
   if (followUp === 0) probability += 10;
 
@@ -116,7 +120,7 @@ function estimateProbability(client: FounderBriefingClient) {
     probability -= 20;
   }
 
-  if (isCold(client)) {
+  if (isCold(relationship)) {
     probability -= 30;
   }
 
@@ -140,16 +144,16 @@ function buildInsight(
 }
 
 export function buildStrategicAdvisorReport(
-  clients: FounderBriefingClient[] = []
+  relationships: FounderBriefingRelationship[] = []
 ): StrategicAdvisorReport {
-  const totalClients = clients.length;
+  const totalRelationships = relationships.length;
 
-  const forecast = clients.map((client) => {
-    const probability = estimateProbability(client);
-    const value = getClientValue(client);
+  const forecast = relationships.map((relationship) => {
+    const probability = estimateProbability(relationship);
+    const value = getRelationshipValue(relationship);
 
     return {
-      client,
+      relationship,
       value,
       probability,
       expected: (value * probability) / 100,
@@ -172,33 +176,43 @@ export function buildStrategicAdvisorReport(
       ? Math.round((topTwoRevenue / projectedRevenue) * 100)
       : 0;
 
-  const overdueCount = clients.filter((client) => {
+  const overdueCount = relationships.filter((relationship) => {
     const followUp =
-      daysUntil(client.proximo_contacto) ?? daysUntil(client.recordatorio);
+      daysUntil(relationship.proximo_contacto) ??
+      daysUntil(relationship.recordatorio);
 
     return followUp !== null && followUp < 0;
   }).length;
 
-  const inactiveCount = clients.filter((client) => {
-    const activity = daysSince(client.updated_at || client.created_at);
+  const inactiveCount = relationships.filter((relationship) => {
+    const activity = daysSince(
+      relationship.updated_at || relationship.created_at
+    );
 
     return activity !== null && activity >= 7;
   }).length;
 
-  const ghostingCount = clients.filter((client) => {
-    const activity = daysSince(client.updated_at || client.created_at);
+  const ghostingCount = relationships.filter((relationship) => {
+    const activity = daysSince(
+      relationship.updated_at || relationship.created_at
+    );
 
-    return isWarm(client) && activity !== null && activity >= 5;
+    return isWarm(relationship) && activity !== null && activity >= 5;
   }).length;
 
-  const weakProbability = forecast.filter((item) => item.probability <= 35).length;
+  const weakProbability = forecast.filter(
+    (item) => item.probability <= 35
+  ).length;
 
-  const warmLeads = clients.filter(isWarm).length;
+  const warmRelationships = relationships.filter(isWarm).length;
 
   const commercialMomentum =
-    warmLeads >= 5 ? 80 : warmLeads >= 2 ? 55 : 30;
+    warmRelationships >= 5 ? 80 : warmRelationships >= 2 ? 55 : 30;
 
-  const executionPressure = Math.min(100, overdueCount * 15 + inactiveCount * 8);
+  const executionPressure = Math.min(
+    100,
+    overdueCount * 15 + inactiveCount * 8
+  );
 
   const pipelineHealth = Math.max(
     0,
@@ -224,7 +238,7 @@ export function buildStrategicAdvisorReport(
       buildInsight(
         "revenue-concentration",
         "Se detectó concentración de ingresos",
-        `${concentrationRisk}% del ingreso proyectado depende de un grupo pequeño de clientes.`,
+        `${concentrationRisk}% del ingreso proyectado depende de un grupo pequeño de relaciones.`,
         "Diversifica el pipeline antes de aumentar inversión en adquisición.",
         concentrationRisk >= 75 ? "critical" : "warning"
       )
@@ -248,14 +262,14 @@ export function buildStrategicAdvisorReport(
   if (ghostingCount >= 1) {
     insights.push(
       buildInsight(
-        "ghosting-clients",
+        "ghosting-relationships",
         "Se detectó pérdida de momentum comercial",
         `${ghostingCount} oportunidad${
           ghostingCount === 1 ? "" : "es"
         } caliente${ghostingCount === 1 ? "" : "s"} muestra${
           ghostingCount === 1 ? "" : "n"
         } señales de enfriamiento.`,
-        "Reactiva primero los clientes con mayor intención antes de que pierdan temperatura comercial.",
+        "Reactiva primero las relaciones con mayor intención antes de que pierdan temperatura comercial.",
         ghostingCount >= 3 ? "critical" : "warning"
       )
     );
@@ -295,10 +309,10 @@ export function buildStrategicAdvisorReport(
         : "La estructura comercial se mantiene estable";
 
   const summary =
-    totalClients === 0
-      ? "ClientYA necesita datos activos del pipeline para generar inteligencia estratégica."
-      : `ClientYA analizó ${totalClients} cliente${
-          totalClients === 1 ? "" : "s"
+    totalRelationships === 0
+      ? "ClienteYA necesita datos activos del pipeline para generar inteligencia estratégica."
+      : `ClienteYA analizó ${totalRelationships} relación${
+          totalRelationships === 1 ? "" : "es"
         } y detectó ${insights.length} señal${
           insights.length === 1 ? "" : "es"
         } estratégica${insights.length === 1 ? "" : "s"} del negocio.`;

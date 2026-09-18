@@ -24,7 +24,8 @@ export default function UpgradeTriggerCard({
           ✅ Estás usando ClienteYA Pro
         </p>
         <p className="mt-2 text-sm leading-6 text-emerald-700">
-          Esta semana generaste {stats.ai} mensajes AI y abriste {stats.whatsapp} conversaciones en WhatsApp.
+          Esta semana generaste {stats.ai} mensajes AI y abriste{" "}
+          {stats.whatsapp} conversaciones en WhatsApp.
         </p>
       </div>
     );
@@ -37,10 +38,11 @@ export default function UpgradeTriggerCard({
           🚀 Prueba el poder de AI WhatsApp
         </p>
         <p className="mt-2 text-sm leading-6 text-blue-700">
-          Genera tus primeros mensajes AI gratis. Cuando quieras automatizar sin límites, activa Pro.
+          Genera tus primeros mensajes AI gratis. Cuando quieras automatizar sin
+          límites, activa Pro.
         </p>
         <a
-          href="/billing"
+          href="/dashboard/billing"
           className="mt-4 inline-block rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
         >
           Ver Pro
@@ -55,13 +57,14 @@ export default function UpgradeTriggerCard({
         ⚡ Ya estás generando actividad comercial
       </p>
       <p className="mt-2 text-sm leading-6 text-amber-800">
-        Esta semana: {stats.ai} mensajes AI, {stats.whatsapp} WhatsApp abiertos y {stats.contacted} clientes trabajados.
+        Esta semana: {stats.ai} mensajes AI, {stats.whatsapp} WhatsApp abiertos
+        y {stats.contacted} relaciones trabajadas.
       </p>
       <p className="mt-2 text-sm leading-6 text-amber-800">
         Activa Pro para quitar límites y usar follow-ups automáticos completos.
       </p>
       <a
-        href="/billing"
+        href="/dashboard/billing"
         className="mt-4 inline-block rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
       >
         Activar Pro

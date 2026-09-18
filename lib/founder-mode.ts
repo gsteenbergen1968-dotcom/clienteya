@@ -1,32 +1,46 @@
 // lib/founder-mode.ts
 
-export function canUseFounderMode(email?: string | null) {
-  const isDevelopment = process.env.NODE_ENV === "development";
+export function canUseFounderMode(
+  email?: string | null,
+) {
+  const founderModeEnabled =
+    process.env.CLIENTEYA_FOUNDER_MODE ===
+    "true";
 
-  if (!isDevelopment) {
+  if (!founderModeEnabled) {
     return false;
   }
 
-  // Alleen expliciet uitzetten als dit op false staat
-  if (process.env.CLIENTEYA_FOUNDER_MODE === "false") {
+  const rawEmails =
+    process.env
+      .CLIENTEYA_FOUNDER_EMAILS || "";
+
+  const allowedEmails =
+    rawEmails
+      .split(",")
+      .map((item) =>
+        item
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean);
+
+  if (
+    allowedEmails.length === 0
+  ) {
     return false;
-  }
-
-  const rawEmails = process.env.CLIENTEYA_FOUNDER_EMAILS || "";
-
-  const allowedEmails = rawEmails
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-
-  // Geen emails ingesteld = lokale founder/dev toegang
-  if (allowedEmails.length === 0) {
-    return true;
   }
 
   if (!email) {
     return false;
   }
 
-  return allowedEmails.includes(email.toLowerCase());
+  const normalizedEmail =
+    email
+      .trim()
+      .toLowerCase();
+
+  return allowedEmails.includes(
+    normalizedEmail,
+  );
 }

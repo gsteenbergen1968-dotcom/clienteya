@@ -1,25 +1,16 @@
 import { ui } from "../../../lib/ui";
 
 import {
-  buildRevenueAnalytics,
-  formatGuarani,
-} from "../../../lib/revenue-analytics";
+  buildRevenueAnalyticsV2,
+  formatGuaraniV2,
+} from "../../../lib/revenue-analytics-v2";
+import type { RelationshipRecord } from "../../../lib/relationship-repository";
 
 import KpiCard from "../../components/KpiCard";
 import SectionCard from "../../components/SectionCard";
 
-type Cliente = {
-  id: string;
-  nombre: string;
-  estado?: string | null;
-  monto?: number | null;
-  pagado?: boolean | null;
-  fecha_pago?: string | null;
-  proximo_contacto?: string | null;
-};
-
 type RevenueForecastCardProps = {
-  clientes: Cliente[];
+  relationships: RelationshipRecord[];
 };
 
 function getConfidenceTone(confidence: string) {
@@ -37,9 +28,9 @@ function getPressureTone(pressure: string) {
 }
 
 export default function RevenueForecastCard({
-  clientes,
+  relationships,
 }: RevenueForecastCardProps) {
-  const revenue = buildRevenueAnalytics(clientes);
+  const revenue = buildRevenueAnalyticsV2(relationships);
 
   return (
     <SectionCard
@@ -51,13 +42,13 @@ export default function RevenueForecastCard({
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <KpiCard
             label="Forecast ponderado"
-            value={formatGuarani(revenue.weightedForecast)}
+            value={formatGuaraniV2(revenue.weightedForecast)}
             tone="emerald"
           />
 
           <KpiCard
             label="Pipeline abierto"
-            value={formatGuarani(revenue.expectedRevenue)}
+            value={formatGuaraniV2(revenue.expectedRevenue)}
             tone="sky"
           />
 

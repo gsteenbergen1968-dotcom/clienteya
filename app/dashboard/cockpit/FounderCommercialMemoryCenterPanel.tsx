@@ -15,19 +15,16 @@ export default function FounderCommercialMemoryCenterPanel({
   center,
 }: FounderCommercialMemoryCenterPanelProps) {
   return (
-    <SectionCard
-      title="Founder Commercial Memory Center"
-      description="Las acciones que requieren atención ahora."
-    >
+    <SectionCard title="Founder Commercial Memory Center">
       <div className="space-y-6">
         <div
           className={`rounded-2xl border p-5 ${getFounderCommercialMemoryToneClasses(
-            center.tone,
+            center.tone
           )}`}
         >
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-3xl">
-              <div className="text-xs font-semibold uppercase tracking-wide opacity-80">
+          <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide opacity-70">
                 Executive Summary
               </div>
 
@@ -57,9 +54,7 @@ export default function FounderCommercialMemoryCenterPanel({
                 </div>
 
                 <div className="mt-1 text-sm font-bold">
-                  {getFounderCommercialMemoryPriorityLabel(
-                    center.priority,
-                  )}
+                  {getFounderCommercialMemoryPriorityLabel(center.priority)}
                 </div>
               </div>
             </div>
@@ -161,12 +156,12 @@ export default function FounderCommercialMemoryCenterPanel({
                         </div>
 
                         <div className="font-semibold text-slate-900">
-                          {action.clientName}
+                          {action.relationshipName}
                         </div>
 
                         <div className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
                           {getFounderCommercialMemoryActionTypeLabel(
-                            action.type,
+                            action.type
                           )}
                         </div>
                       </div>
@@ -208,8 +203,7 @@ export default function FounderCommercialMemoryCenterPanel({
                       </div>
 
                       <div className="mt-1 text-sm font-semibold text-slate-900">
-                        Gs.{" "}
-                        {action.protectedAmount.toLocaleString("es-PY")}
+                        Gs. {action.protectedAmount.toLocaleString("es-PY")}
                       </div>
                     </div>
                   </div>

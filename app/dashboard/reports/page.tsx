@@ -1,30 +1,18 @@
 import { redirect } from "next/navigation";
 
-import { createAdminClient } from "../../../lib/supabase/server";
 import { createAuthServerClient } from "../../../lib/supabase/auth-server";
 import { buildFounderBriefing } from "../../../lib/founder-briefing";
 import { buildWeeklyFounderReport } from "../../../lib/founder-weekly-report";
+
+import type {
+  RelationshipRecord,
+} from "../../../lib/relationship-repository";
 
 import { AppHeader } from "../../components/AppHeader";
 import SidebarNav from "../SidebarNav";
 import PrintReportButton from "../../components/PrintReportButton";
 
 export const dynamic = "force-dynamic";
-
-type Cliente = {
-  id: string;
-  user_id: string | null;
-  nombre: string;
-  telefono: string;
-  estado: string;
-  notas: string | null;
-  recordatorio: string | null;
-  proximo_contacto: string | null;
-  created_at: string;
-  updated_at?: string | null;
-  monto?: number | null;
-  pagado?: boolean | null;
-};
 
 function formatGs(value: number) {
   return `Gs. ${value.toLocaleString("es-ES")}`;
@@ -51,38 +39,63 @@ function Metric({
       <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-xl font-black text-slate-950">{value}</p>
+
+      <p className="mt-2 text-2xl font-black text-slate-950">
+        {value}
+      </p>
     </div>
   );
 }
 
 export default async function FounderReportPage() {
-  const authSupabase = await createAuthServerClient();
+  const authSupabase =
+    await createAuthServerClient();
 
   const {
     data: { user },
-  } = await authSupabase.auth.getUser();
+  } =
+    await authSupabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) {
+    redirect("/login");
+  }
 
-  const admin = createAdminClient();
+  const {
+    data,
+    error,
+  } =
+    await authSupabase
+      .from("relationships")
+      .select("*")
+      .eq("owner_id", user.id)
+      .order("created_at", {
+        ascending: false,
+      });
 
-  const { data } = await admin
-    .from("clientes")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+  if (error) {
+    throw new Error(
+      error.message,
+    );
+  }
 
-  const clientes: Cliente[] = data || [];
+  const relationships =
+    (
+      data || []
+    ) as RelationshipRecord[];
 
-  const briefing = buildFounderBriefing(clientes);
-  const weekly = buildWeeklyFounderReport(clientes);
+  const briefing =
+    buildFounderBriefing(
+      relationships,
+    );
+
+  const weekly =
+    buildWeeklyFounderReport(
+      relationships,
+    );
 
   return (
-    <div className="min-h-screen bg-slate-50 print:bg-white">
-      <div className="print:hidden">
-        <AppHeader />
-      </div>
+    <div className="dashboard-shell">
+      <AppHeader />
 
       <main className="flex min-h-screen">
         <aside className="hidden w-72 border-r border-slate-200 bg-white print:hidden lg:block">
@@ -105,7 +118,7 @@ export default async function FounderReportPage() {
                 </h1>
 
                 <p className="mt-2 text-sm text-slate-600">
-                  Reporte ejecutivo generado por ClientYA AI.
+                  Reporte ejecutivo generado por ClienteYA AI.
                 </p>
               </div>
 
@@ -115,14 +128,16 @@ export default async function FounderReportPage() {
             <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm print:border-0 print:shadow-none">
               <header className="border-b border-slate-200 pb-6">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">
-                  ClientYA Founder Report
+                  ClienteYA Founder Report
                 </p>
 
                 <h2 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
                   Weekly Executive Briefing
                 </h2>
 
-                <p className="mt-3 text-sm text-slate-600">{todayLabel()}</p>
+                <p className="mt-3 text-sm text-slate-600">
+                  {todayLabel()}
+                </p>
 
                 <p className="mt-5 max-w-3xl text-base leading-7 text-slate-700">
                   {weekly.summary}
@@ -135,9 +150,18 @@ export default async function FounderReportPage() {
                 </h3>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-3">
-                  <Metric label="Founder Score" value={`${briefing.score}/100`} />
-                  <Metric label="Weekly Score" value={`${weekly.score}/100`} />
-                  <Metric label="Pipeline Health" value={weekly.pipelineHealth} />
+                  <Metric
+                    label="Founder Score"
+                    value={`${briefing.score}/100`}
+                  />
+                  <Metric
+                    label="Weekly Score"
+                    value={`${weekly.score}/100`}
+                  />
+                  <Metric
+                    label="Pipeline Health"
+                    value={weekly.pipelineHealth}
+                  />
                 </div>
 
                 <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -182,7 +206,10 @@ export default async function FounderReportPage() {
                 </h3>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-3">
-                  <Metric label="Momentum" value={weekly.momentum} />
+                  <Metric
+                    label="Momentum"
+                    value={weekly.momentum}
+                  />
                   <Metric
                     label="Execution"
                     value={weekly.executionDiscipline}
@@ -264,7 +291,7 @@ export default async function FounderReportPage() {
 
               <footer className="mt-10 border-t border-slate-200 pt-5">
                 <p className="text-xs text-slate-500">
-                  Generated by ClientYA AI Founder Operating System.
+                  Generated by ClienteYA AI Founder Operating System.
                 </p>
               </footer>
             </section>

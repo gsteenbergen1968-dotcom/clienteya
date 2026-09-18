@@ -1,24 +1,14 @@
 import {
-  buildCommercialCalendarActions,
-  type CommercialCalendarAction,
-} from "./commercial-operating-adapter";
+  buildCommercialActions,
+  type CommercialRelationship,
+} from "./commercial-action-engine";
 
-export type CalendarCommercialClient = {
-  id: string;
-  user_id?: string | null;
-  nombre: string | null;
-  telefono?: string | null;
-  estado?: string | null;
-  notas?: string | null;
-  memory?: string | null;
-  recordatorio?: string | null;
-  proximo_contacto?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  monto?: number | null;
-  pagado?: boolean | null;
-  fecha_pago?: string | null;
-};
+import {
+  buildCalendarDecisionPresentation,
+  type CalendarDecisionPresentation,
+} from "./decision-presentation-engine";
+
+import type { RelationshipRecord } from "./relationship-repository";
 
 export type CalendarCommercialTone =
   | "red"
@@ -36,8 +26,15 @@ export type CalendarCommercialBucketKey =
   | "proximos14"
   | "sinFecha";
 
+export type CalendarCommercialUrgency =
+  | "critical"
+  | "high"
+  | "medium"
+  | "low"
+  | "none";
+
 export type CalendarCommercialItem = {
-  cliente: CalendarCommercialClient;
+  relationship: RelationshipRecord;
   id: string;
   nombre: string;
   telefono: string;
@@ -49,12 +46,15 @@ export type CalendarCommercialItem = {
   pagado: boolean;
   fecha_pago: string | null;
   tone: CalendarCommercialTone;
-  actionType: "contactado" | "listo" | "schedule";
+  actionType:
+    | "contactado"
+    | "listo"
+    | "schedule";
   actionLabel: string;
   reason: string;
   nextActionLabel: string;
   score: number;
-  urgency: CommercialCalendarAction["urgency"];
+  urgency: CalendarCommercialUrgency;
   commercialScore: number;
   memoryScore: number;
   relationshipScore: number;
@@ -80,230 +80,396 @@ export type CalendarCommercialOverview = {
   };
 };
 
-function normalizeDate(value?: string | null) {
-  if (!value) return null;
-
-  const clean = value.slice(0, 10);
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+function normalizeDate(
+  value?: string | null,
+): string | null {
+  if (!value) {
     return null;
   }
 
-  return clean;
+  const clean = value.slice(
+    0,
+    10,
+  );
+
+  return /^\d{4}-\d{2}-\d{2}$/.test(
+    clean,
+  )
+    ? clean
+    : null;
 }
 
-function normalizeCliente(
-  cliente: CalendarCommercialClient,
-): CalendarCommercialClient {
+function normalizeText(
+  value?: string | null,
+): string {
+  return (value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function getRelationshipName(
+  relationship: RelationshipRecord,
+): string {
+  return (
+    relationship.name?.trim() ||
+    relationship.company?.trim() ||
+    "Relación sin nombre"
+  );
+}
+
+function getRelationshipAmount(
+  relationship: RelationshipRecord,
+): number {
+  void relationship;
+  return 0;
+}
+
+function getRelationshipPaid(
+  relationship: RelationshipRecord,
+): boolean {
+  const status =
+    normalizeText(
+      relationship.status,
+    );
+
+  return (
+    status.includes("pag") ||
+    status.includes("convert")
+  );
+}
+
+function toCommercialRelationship(
+  relationship: RelationshipRecord,
+): CommercialRelationship {
   return {
-    id: String(cliente.id || ""),
-    user_id: cliente.user_id ?? null,
-    nombre: cliente.nombre || "Cliente sin nombre",
-    telefono: cliente.telefono || "",
-    estado: cliente.estado || "Sin estado",
-    notas: cliente.notas ?? null,
-    memory: cliente.memory ?? null,
-    recordatorio: cliente.recordatorio ?? null,
-    proximo_contacto: normalizeDate(cliente.proximo_contacto),
-    created_at: cliente.created_at || new Date().toISOString(),
-    updated_at: cliente.updated_at ?? null,
-    monto: cliente.monto ?? null,
-    pagado: cliente.pagado ?? false,
-    fecha_pago: cliente.fecha_pago ?? null,
+    id:
+      relationship.id,
+
+    owner_id:
+      relationship.owner_id,
+
+    name:
+      getRelationshipName(
+        relationship,
+      ),
+
+    phone:
+      relationship.phone,
+
+    status:
+      relationship.status,
+
+    notes:
+      relationship.notes,
+
+    created_at:
+      relationship.created_at,
+
+    reminder:
+      relationship.reminder,
+
+    next_contact_at:
+      normalizeDate(
+        relationship.next_contact_at,
+      ),
+
+    updated_at:
+      relationship.updated_at,
+
+    amount:
+      getRelationshipAmount(
+        relationship,
+      ),
+
+    paid:
+      getRelationshipPaid(
+        relationship,
+      ),
+
+    paid_at:
+      null,
+
+    memory:
+      null,
   };
 }
 
-function getCalendarTone(
-  action: CommercialCalendarAction,
-): CalendarCommercialTone {
-  if (
-    action.daysUntilNextContact !== null &&
-    action.daysUntilNextContact < 0
-  ) {
-    return "red";
-  }
-
-  if (action.daysUntilNextContact === 0) {
-    return "amber";
-  }
-
-  if (action.daysUntilNextContact === 1) {
-    return "emerald";
-  }
-
-  if (action.daysUntilNextContact === 2) {
-    return "violet";
-  }
-
-  return "sky";
-}
-
-function getActionType(
-  action: CommercialCalendarAction,
-): CalendarCommercialItem["actionType"] {
-  if (
-    action.daysUntilNextContact !== null &&
-    action.daysUntilNextContact < 0
-  ) {
-    return "contactado";
-  }
-
-  if (action.daysUntilNextContact === 0) {
-    return "listo";
-  }
-
-  return "schedule";
-}
-
-function getActionLabel(action: CommercialCalendarAction) {
-  if (
-    action.daysUntilNextContact !== null &&
-    action.daysUntilNextContact < 0
-  ) {
-    return "✔ Contactado";
-  }
-
-  if (action.daysUntilNextContact === 0) {
-    return "✔ Listo";
-  }
-
-  return "Agendar siguiente";
-}
-
 function toCalendarItem(
-  action: CommercialCalendarAction,
+  item: CalendarDecisionPresentation,
+  relationship: RelationshipRecord,
 ): CalendarCommercialItem {
-  const cliente = normalizeCliente(action.cliente);
-
   return {
-    cliente,
-    id: cliente.id,
-    nombre: cliente.nombre || "Cliente sin nombre",
-    telefono: cliente.telefono || "",
-    estado: cliente.estado || "Sin estado",
-    notas: cliente.notas ?? null,
-    recordatorio: cliente.recordatorio ?? null,
-    proximo_contacto: cliente.proximo_contacto ?? null,
-    monto: cliente.monto ?? null,
-    pagado: Boolean(cliente.pagado),
-    fecha_pago: cliente.fecha_pago ?? null,
-    tone: getCalendarTone(action),
-    actionType: getActionType(action),
-    actionLabel: getActionLabel(action),
-    reason: action.reason,
-    nextActionLabel: action.nextActionLabel,
-    score: action.score,
-    urgency: action.urgency,
-    commercialScore: action.commercialScore,
-    memoryScore: action.memoryScore,
-    relationshipScore: action.relationshipScore,
-    daysUntilNextContact: action.daysUntilNextContact,
+    relationship,
+
+    id:
+      item.id,
+
+    nombre:
+      getRelationshipName(
+        relationship,
+      ) ||
+      item.name ||
+      "Relación sin nombre",
+
+    telefono:
+      relationship.phone ||
+      item.phone ||
+      "",
+
+    estado:
+      relationship.status ||
+      item.status ||
+      "Sin estado",
+
+    notas:
+      relationship.notes ??
+      item.notes ??
+      null,
+
+    recordatorio:
+      relationship.reminder ??
+      item.reminder ??
+      null,
+
+    proximo_contacto:
+      relationship.next_contact_at ??
+      item.nextContactAt ??
+      null,
+
+    monto:
+      getRelationshipAmount(
+        relationship,
+      ) ||
+      item.amount ||
+      null,
+
+    pagado:
+      getRelationshipPaid(
+        relationship,
+      ) ||
+      item.paid,
+
+    fecha_pago:
+      item.paidAt ??
+      null,
+
+    tone:
+      item.tone,
+
+    actionType:
+      item.actionType,
+
+    actionLabel:
+      item.actionLabel,
+
+    reason:
+      item.summary,
+
+    nextActionLabel:
+      item.nextActionLabel,
+
+    score:
+      item.score,
+
+    urgency:
+      item.urgency,
+
+    commercialScore:
+      item.commercialScore,
+
+    memoryScore:
+      item.memoryScore,
+
+    relationshipScore:
+      item.relationshipScore,
+
+    daysUntilNextContact:
+      item.daysUntilNextContact,
   };
 }
 
 function sortCalendarItems(
   a: CalendarCommercialItem,
   b: CalendarCommercialItem,
-) {
-  const dayA = a.daysUntilNextContact ?? 999;
-  const dayB = b.daysUntilNextContact ?? 999;
+): number {
+  const dayA =
+    a.daysUntilNextContact ??
+    999;
 
-  if (dayA !== dayB) {
+  const dayB =
+    b.daysUntilNextContact ??
+    999;
+
+  if (
+    dayA !== dayB
+  ) {
     return dayA - dayB;
   }
 
-  return b.score - a.score;
+  return (
+    b.score -
+    a.score
+  );
 }
 
 function sortUpcomingItems(
   a: CalendarCommercialItem,
   b: CalendarCommercialItem,
-) {
-  const scoreDifference = b.score - a.score;
+): number {
+  const scoreDifference =
+    b.score -
+    a.score;
 
-  if (scoreDifference !== 0) {
+  if (
+    scoreDifference !== 0
+  ) {
     return scoreDifference;
   }
 
-  return sortCalendarItems(a, b);
+  return sortCalendarItems(
+    a,
+    b,
+  );
 }
 
 export function buildCalendarCommercialOverview(
-  clients: CalendarCommercialClient[],
+  relationships: RelationshipRecord[],
 ): CalendarCommercialOverview {
-  const normalizedClients = clients
-    .map(normalizeCliente)
-    .filter((cliente) => cliente.id);
-
-  const allCalendarItems = buildCommercialCalendarActions(
-    normalizedClients,
-  )
-    .map(toCalendarItem)
-    .sort(sortCalendarItems);
-
-  const calendarClientIds = new Set(
-    allCalendarItems.map((item) => item.id),
-  );
-
-  const sinFecha = normalizedClients
-    .filter(
-      (cliente) =>
-        !cliente.proximo_contacto &&
-        !calendarClientIds.has(cliente.id) &&
-        !cliente.pagado,
+  const safeRelationships =
+    Array.isArray(
+      relationships,
     )
-    .map((cliente) => ({
-      cliente,
-      id: cliente.id,
-      nombre: cliente.nombre || "Cliente sin nombre",
-      telefono: cliente.telefono || "",
-      estado: cliente.estado || "Sin estado",
-      notas: cliente.notas ?? null,
-      recordatorio: cliente.recordatorio ?? null,
-      proximo_contacto: null,
-      monto: cliente.monto ?? null,
-      pagado: Boolean(cliente.pagado),
-      fecha_pago: cliente.fecha_pago ?? null,
-      tone: "slate" as CalendarCommercialTone,
-      actionType: "schedule" as const,
-      actionLabel: "Agendar seguimiento",
-      reason: "Cliente sin próximo contacto planificado.",
-      nextActionLabel: "Planificar seguimiento",
-      score: 0,
-      urgency: "none" as const,
-      commercialScore: 0,
-      memoryScore: 0,
-      relationshipScore: 0,
-      daysUntilNextContact: null,
-    }))
-    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+      ? relationships.filter(
+          (relationship) =>
+            relationship.id,
+        )
+      : [];
 
-  const atrasados = allCalendarItems.filter(
-    (item) =>
-      item.daysUntilNextContact !== null &&
-      item.daysUntilNextContact < 0,
-  );
+  const relationshipById =
+    new Map(
+      safeRelationships.map(
+        (relationship) => [
+          relationship.id,
+          relationship,
+        ],
+      ),
+    );
 
-  const hoy = allCalendarItems.filter(
-    (item) => item.daysUntilNextContact === 0,
-  );
+  const actions =
+    buildCommercialActions({
+      relationships:
+        safeRelationships.map(
+          toCommercialRelationship,
+        ),
+    });
 
-  const manana = allCalendarItems.filter(
-    (item) => item.daysUntilNextContact === 1,
-  );
+  const presentations =
+    buildCalendarDecisionPresentation({
+      actions,
+    });
 
-  const pasadoManana = allCalendarItems.filter(
-    (item) => item.daysUntilNextContact === 2,
-  );
+  const items =
+    presentations
+      .map(
+        (item) => {
+          const relationship =
+            relationshipById.get(
+              item.id,
+            );
 
-  const proximos14 = allCalendarItems
-    .filter(
-      (item) =>
-        item.daysUntilNextContact !== null &&
-        item.daysUntilNextContact >= 3 &&
-        item.daysUntilNextContact <= 14,
-    )
-    .sort(sortUpcomingItems);
+          if (
+            !relationship
+          ) {
+            return null;
+          }
+
+          return toCalendarItem(
+            item,
+            relationship,
+          );
+        },
+      )
+      .filter(
+        (
+          item,
+        ): item is CalendarCommercialItem =>
+          item !== null,
+      );
+
+  const atrasados =
+    items
+      .filter(
+        (item) =>
+          item.daysUntilNextContact !==
+            null &&
+          item.daysUntilNextContact <
+            0,
+      )
+      .sort(
+        sortCalendarItems,
+      );
+
+  const hoy =
+    items
+      .filter(
+        (item) =>
+          item.daysUntilNextContact ===
+          0,
+      )
+      .sort(
+        sortCalendarItems,
+      );
+
+  const manana =
+    items
+      .filter(
+        (item) =>
+          item.daysUntilNextContact ===
+          1,
+      )
+      .sort(
+        sortCalendarItems,
+      );
+
+  const pasadoManana =
+    items
+      .filter(
+        (item) =>
+          item.daysUntilNextContact ===
+          2,
+      )
+      .sort(
+        sortCalendarItems,
+      );
+
+  const proximos14 =
+    items
+      .filter(
+        (item) =>
+          item.daysUntilNextContact !==
+            null &&
+          item.daysUntilNextContact >
+            2 &&
+          item.daysUntilNextContact <=
+            14,
+      )
+      .sort(
+        sortUpcomingItems,
+      );
+
+  const sinFecha =
+    items
+      .filter(
+        (item) =>
+          item.daysUntilNextContact ===
+          null,
+      )
+      .sort(
+        (a, b) =>
+          a.nombre.localeCompare(
+            b.nombre,
+          ),
+      );
 
   const all = [
     ...atrasados,
@@ -322,37 +488,67 @@ export function buildCalendarCommercialOverview(
     proximos14,
     sinFecha,
     all,
+
     counts: {
-      atrasados: atrasados.length,
-      hoy: hoy.length,
-      manana: manana.length,
-      pasadoManana: pasadoManana.length,
-      proximos14: proximos14.length,
-      sinFecha: sinFecha.length,
-      total: all.length,
+      atrasados:
+        atrasados.length,
+
+      hoy:
+        hoy.length,
+
+      manana:
+        manana.length,
+
+      pasadoManana:
+        pasadoManana.length,
+
+      proximos14:
+        proximos14.length,
+
+      sinFecha:
+        sinFecha.length,
+
+      total:
+        all.length,
     },
   };
 }
 
 export function getCalendarCommercialWhatsAppKey(
   item: CalendarCommercialItem,
-): "nuevo" | "hoy" | "pendiente" | "proximo" | "postventa" {
-  if (item.pagado) return "postventa";
+):
+  | "nuevo"
+  | "hoy"
+  | "pendiente"
+  | "proximo"
+  | "postventa" {
+  if (
+    item.pagado
+  ) {
+    return "postventa";
+  }
 
   if (
-    item.daysUntilNextContact !== null &&
-    item.daysUntilNextContact < 0
+    item.daysUntilNextContact !==
+      null &&
+    item.daysUntilNextContact <
+      0
   ) {
     return "pendiente";
   }
 
-  if (item.daysUntilNextContact === 0) {
+  if (
+    item.daysUntilNextContact ===
+    0
+  ) {
     return "hoy";
   }
 
   if (
-    item.daysUntilNextContact !== null &&
-    item.daysUntilNextContact > 0
+    item.daysUntilNextContact !==
+      null &&
+    item.daysUntilNextContact >
+      0
   ) {
     return "proximo";
   }
@@ -363,43 +559,73 @@ export function getCalendarCommercialWhatsAppKey(
 export function getCalendarCommercialEmptyText(
   bucket: CalendarCommercialBucketKey,
 ) {
-  if (bucket === "atrasados") {
+  if (
+    bucket === "atrasados"
+  ) {
     return {
-      title: "Nada urgente",
-      text: "No tienes seguimientos atrasados.",
+      title:
+        "Nada urgente",
+
+      text:
+        "No tienes seguimientos atrasados.",
     };
   }
 
-  if (bucket === "hoy") {
+  if (
+    bucket === "hoy"
+  ) {
     return {
-      title: "Todo despejado",
-      text: "No tienes seguimientos para hoy.",
+      title:
+        "Todo despejado",
+
+      text:
+        "No tienes seguimientos para hoy.",
     };
   }
 
-  if (bucket === "manana") {
+  if (
+    bucket === "manana"
+  ) {
     return {
-      title: "Mañana está libre",
-      text: "No tienes seguimientos programados para mañana.",
+      title:
+        "Mañana está libre",
+
+      text:
+        "No tienes seguimientos programados para mañana.",
     };
   }
 
-  if (bucket === "pasadoManana") {
+  if (
+    bucket ===
+    "pasadoManana"
+  ) {
     return {
-      title: "Sin presión inmediata",
-      text: "No tienes seguimientos para pasado mañana.",
+      title:
+        "Sin presión inmediata",
+
+      text:
+        "No tienes seguimientos para pasado mañana.",
     };
   }
 
-  if (bucket === "proximos14") {
+  if (
+    bucket ===
+    "proximos14"
+  ) {
     return {
-      title: "Sin próximos contactos",
-      text: "No tienes seguimientos programados para los próximos 14 días.",
+      title:
+        "Sin próximos contactos",
+
+      text:
+        "No tienes seguimientos programados para los próximos 14 días.",
     };
   }
 
   return {
-    title: "Todos tienen fecha",
-    text: "No hay clientes sin próximo contacto.",
+    title:
+      "Todas tienen fecha",
+
+    text:
+      "No hay relaciones sin próximo contacto.",
   };
 }

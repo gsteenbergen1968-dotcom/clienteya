@@ -9,8 +9,8 @@ type MobileTopBarProps = {
 };
 
 function getPageTitle(pathname: string) {
-  if (pathname.startsWith("/dashboard/clientes")) {
-    return "Clientes";
+  if (pathname.startsWith("/dashboard/relationships")) {
+    return "Relaciones";
   }
 
   if (pathname.startsWith("/dashboard/automations")) {
@@ -21,7 +21,7 @@ function getPageTitle(pathname: string) {
     return "WhatsApp AI";
   }
 
-  if (pathname.startsWith("/dashboard/calendario")) {
+  if (pathname.startsWith("/dashboard/planning")) {
     return "Calendario";
   }
 
@@ -29,8 +29,8 @@ function getPageTitle(pathname: string) {
     return "Settings";
   }
 
-  if (pathname.startsWith("/dashboard/nuevo")) {
-    return "Nuevo cliente";
+  if (pathname.startsWith("/dashboard/new")) {
+    return "Nueva relación";
   }
 
   return "Dashboard";
@@ -45,12 +45,12 @@ export default function MobileTopBar({
   const resolvedTitle = title || getPageTitle(pathname);
 
   return (
-    <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur lg:hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-3">
-        <div>
-          <div className="mb-1 inline-flex rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+    <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">
             ClienteYA
-          </div>
+          </p>
 
           <h1 className="text-lg font-bold tracking-tight text-slate-950">
             {resolvedTitle}
@@ -66,7 +66,7 @@ export default function MobileTopBar({
           </Link>
 
           <Link
-            href="/dashboard/nuevo"
+            href="/dashboard/new"
             className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-lg text-white shadow-sm transition hover:bg-blue-700"
           >
             ➕

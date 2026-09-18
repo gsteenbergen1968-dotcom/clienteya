@@ -1,9 +1,9 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { AppHeader } from "../../components/AppHeader";
 import SidebarNav from "../SidebarNav";
-import MobileDashboardNav from "../MobileDashboardNav";
 
 import { createAuthServerClient } from "../../../lib/supabase/auth-server";
 
@@ -19,6 +19,12 @@ type BusinessSettings = {
   whatsapp_number: string | null;
   country_label: string | null;
   city: string | null;
+  ruc: string | null;
+  billing_name: string | null;
+  billing_address: string | null;
+  billing_city: string | null;
+  billing_email: string | null;
+  billing_phone: string | null;
   ai_prompt: string | null;
 };
 
@@ -35,8 +41,8 @@ const businessTypeOptions = [
   {
     value: "restaurant",
     label: "Restaurante / Gastronomía",
-    description: "Clientes, pedidos, reservas, visitas y recompra.",
-    example: "Cliente ausente",
+    description: "Relaciones, pedidos, reservas, visitas y recompra.",
+    example: "Relación ausente",
   },
   {
     value: "consulting",
@@ -48,25 +54,25 @@ const businessTypeOptions = [
     value: "real_estate",
     label: "Inmobiliaria",
     description: "Propiedades, visitas, interesados y cierre de operación.",
-    example: "Cliente esperando seguimiento",
+    example: "Relación esperando seguimiento",
   },
   {
     value: "fitness",
     label: "Fitness / Gimnasio",
     description: "Miembros, entrenamiento, renovación y reactivación.",
-    example: "Cliente dejó de entrenar",
+    example: "Relación sin actividad",
   },
   {
     value: "beauty",
     label: "Belleza / Peluquería / Spa",
-    description: "Citas, reservas, recompra y clientes recurrentes.",
-    example: "Cliente listo para nueva cita",
+    description: "Citas, reservas, recompra y relaciones recurrentes.",
+    example: "Relación lista para nueva cita",
   },
   {
     value: "retail",
     label: "Retail / Tienda",
-    description: "Ventas, recompra, productos y clientes frecuentes.",
-    example: "Cliente sin retorno",
+    description: "Ventas, recompra, productos y relaciones frecuentes.",
+    example: "Relación sin retorno",
   },
   {
     value: "automotive",
@@ -89,8 +95,8 @@ const businessTypeOptions = [
   {
     value: "services",
     label: "Servicios",
-    description: "Seguimiento, trabajos, presupuestos y clientes activos.",
-    example: "Cliente en seguimiento",
+    description: "Seguimiento, trabajos, presupuestos y relaciones activas.",
+    example: "Relación en seguimiento",
   },
 ];
 
@@ -171,6 +177,12 @@ export default async function SettingsPage({
       formData.get("country_label") || "Paraguay"
     ).trim();
     const city = String(formData.get("city") || "").trim();
+    const ruc = String(formData.get("ruc") || "").trim();
+    const billingName = String(formData.get("billing_name") || "").trim();
+    const billingAddress = String(formData.get("billing_address") || "").trim();
+    const billingCity = String(formData.get("billing_city") || "").trim();
+    const billingEmail = String(formData.get("billing_email") || "").trim();
+    const billingPhone = String(formData.get("billing_phone") || "").trim();
 
     const businessType = String(
       formData.get("business_type") || "general"
@@ -193,6 +205,12 @@ export default async function SettingsPage({
         whatsapp_number: whatsappNumber,
         country_label: countryLabel || "Paraguay",
         city,
+        ruc,
+        billing_name: billingName,
+        billing_address: billingAddress,
+        billing_city: billingCity,
+        billing_email: billingEmail,
+        billing_phone: billingPhone,
         ai_prompt: aiPrompt || defaultPrompt,
       },
       { onConflict: "user_id" }
@@ -208,7 +226,7 @@ export default async function SettingsPage({
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/settings");
-    revalidatePath("/dashboard/clientes");
+    revalidatePath("/dashboard/relationships");
     revalidatePath("/dashboard/whatsapp");
 
     redirect("/dashboard/settings?ok=1");
@@ -217,7 +235,7 @@ export default async function SettingsPage({
   const { data: settingsData } = await supabase
     .from("business_settings")
     .select(
-      "user_id,company_name,business_type,business_tone,business_email,business_phone,whatsapp_number,country_label,city,ai_prompt"
+      "user_id,company_name,business_type,business_tone,business_email,business_phone,whatsapp_number,country_label,city,ruc,billing_name,billing_address,billing_city,billing_email,billing_phone,ai_prompt"
     )
     .eq("user_id", user.id)
     .maybeSingle();
@@ -232,6 +250,12 @@ export default async function SettingsPage({
   const whatsappNumber = settings?.whatsapp_number || "";
   const countryLabel = settings?.country_label || "Paraguay";
   const city = settings?.city || "";
+  const ruc = settings?.ruc || "";
+  const billingName = settings?.billing_name || "";
+  const billingAddress = settings?.billing_address || "";
+  const billingCity = settings?.billing_city || "";
+  const billingEmail = settings?.billing_email || "";
+  const billingPhone = settings?.billing_phone || "";
   const aiPrompt = settings?.ai_prompt || defaultPrompt;
 
   return (
@@ -248,13 +272,6 @@ export default async function SettingsPage({
             <div className="mx-auto max-w-6xl">
               <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <div className="mb-3">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
-                      <ParaguayBadge />
-                      Paraguay
-                    </span>
-                  </div>
-
                   <h1 className="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
                     Configuración
                   </h1>
@@ -279,24 +296,45 @@ export default async function SettingsPage({
                 </div>
               ) : null}
 
+              <section className="mb-6 rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+                      Relaciones
+                    </p>
+
+                    <h2 className="mt-2 text-2xl font-black text-slate-950">
+                      Administra e importa tus relaciones
+                    </h2>
+
+                    <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+                      Agrega relaciones desde WhatsApp, Apple Contacts, Outlook
+                      y Excel o CSV desde un solo lugar.
+                    </p>
+                  </div>
+
+                  <Link
+                    href="/dashboard/settings/relationships"
+                    className="inline-flex w-full items-center justify-center rounded-2xl bg-blue-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2 sm:w-auto"
+                  >
+                    Abrir relaciones
+                  </Link>
+                </div>
+              </section>
+
               <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
                 <form
                   action={saveBusinessSettings}
                   className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm"
                 >
                   <div className="mb-6">
-                    <div className="mb-3 inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-blue-700">
-                      V20.3.3 Auth Business Settings
-                    </div>
-
                     <h2 className="text-2xl font-black text-slate-950">
                       Perfil inteligente del negocio
                     </h2>
 
                     <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-                      Esta información define cómo ClienteYA interpreta clientes,
-                      acciones, WhatsApp y mensajes. Es la base de la Sector
-                      Intelligence Layer.
+                      Esta configuración ayuda a ClienteYA a comprender tu negocio
+                      para ofrecer mejores decisiones, mensajes y contexto.
                     </p>
                   </div>
 
@@ -399,6 +437,58 @@ export default async function SettingsPage({
                       </div>
                     </div>
 
+                    <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                      <div className="mb-5">
+                        <h3 className="text-xl font-black text-slate-950">
+                          Datos de facturación
+                        </h3>
+                        <p className="mt-2 text-sm font-semibold text-slate-500">
+                          Información utilizada para futuras facturas e IVA.
+                        </p>
+                      </div>
+
+                      <div className="grid gap-5">
+                        <input
+                          name="ruc"
+                          defaultValue={ruc}
+                          placeholder="RUC"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold"
+                        />
+                        <input
+                          name="billing_name"
+                          defaultValue={billingName}
+                          placeholder="Nombre fiscal"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold"
+                        />
+                        <input
+                          name="billing_address"
+                          defaultValue={billingAddress}
+                          placeholder="Dirección fiscal"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold"
+                        />
+                        <div className="grid gap-5 md:grid-cols-2">
+                          <input
+                            name="billing_city"
+                            defaultValue={billingCity}
+                            placeholder="Ciudad fiscal"
+                            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold"
+                          />
+                          <input
+                            name="billing_phone"
+                            defaultValue={billingPhone}
+                            placeholder="Teléfono facturación"
+                            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold"
+                          />
+                        </div>
+                        <input
+                          name="billing_email"
+                          defaultValue={billingEmail}
+                          placeholder="Email facturación"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold"
+                        />
+                      </div>
+                    </section>
+
                     <div>
                       <label className="mb-2 block text-sm font-black text-slate-700">
                         Sector principal
@@ -471,7 +561,7 @@ export default async function SettingsPage({
                 <div className="space-y-6">
                   <div className="rounded-[30px] border border-blue-200 bg-blue-50 p-6 shadow-sm">
                     <div className="mb-4 inline-flex rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-blue-700">
-                      Vista actual
+                      Tu negocio
                     </div>
 
                     <div className="rounded-[26px] border border-blue-200 bg-white p-5 shadow-sm">
@@ -482,43 +572,9 @@ export default async function SettingsPage({
                       <h3 className="mt-2 text-2xl font-black text-slate-950">
                         {companyName || "Sin empresa definida"}
                       </h3>
-
-                      <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-                        {city || countryLabel
-                          ? `${city ? `${city}, ` : ""}${countryLabel}`
-                          : "Ubicación no definida"}
-                      </p>
                     </div>
 
                     <div className="mt-4 grid gap-3">
-                      <div className="rounded-2xl border border-blue-200 bg-white px-4 py-4">
-                        <p className="text-xs font-black uppercase tracking-wide text-slate-400">
-                          Sector activo
-                        </p>
-
-                        <p className="mt-2 text-sm font-black text-slate-950">
-                          {getBusinessTypeLabel(businessType)}
-                        </p>
-
-                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
-                          {getBusinessTypeDescription(businessType)}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-blue-200 bg-white px-4 py-4">
-                        <p className="text-xs font-black uppercase tracking-wide text-slate-400">
-                          Ejemplo dashboard
-                        </p>
-
-                        <p className="mt-2 text-sm font-black text-slate-950">
-                          {getBusinessTypeExample(businessType)}
-                        </p>
-
-                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
-                          ClienteYA adapta las palabras al sector elegido.
-                        </p>
-                      </div>
-
                       <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
                         <p className="text-xs font-black uppercase tracking-wide text-slate-400">
                           WhatsApp
@@ -541,6 +597,40 @@ export default async function SettingsPage({
 
                       <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
                         <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                          Ubicación
+                        </p>
+
+                        <p className="mt-1 text-sm font-semibold text-slate-900">
+                          {city || countryLabel
+                            ? `${city ? `${city}, ` : ""}${countryLabel}`
+                            : "No definida"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[30px] border border-blue-200 bg-white p-6 shadow-sm">
+                    <div className="mb-4 inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+                      Cómo entiende ClienteYA tu negocio
+                    </div>
+
+                    <div className="grid gap-3">
+                      <div className="rounded-2xl border border-blue-200 bg-blue-50/40 px-4 py-4">
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                          Sector
+                        </p>
+
+                        <p className="mt-2 text-sm font-black text-slate-950">
+                          {getBusinessTypeLabel(businessType)}
+                        </p>
+
+                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                          {getBusinessTypeDescription(businessType)}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-400">
                           Tono
                         </p>
 
@@ -549,9 +639,24 @@ export default async function SettingsPage({
                         </p>
                       </div>
 
+                      <div className="rounded-2xl border border-blue-200 bg-blue-50/40 px-4 py-4">
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                          Lenguaje comercial
+                        </p>
+
+                        <p className="mt-2 text-sm font-black text-slate-950">
+                          {getBusinessTypeExample(businessType)}
+                        </p>
+
+                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                          ClienteYA adapta sus mensajes y acciones a la realidad
+                          de tu negocio.
+                        </p>
+                      </div>
+
                       <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
                         <p className="text-xs font-black uppercase tracking-wide text-slate-400">
-                          Prompt activo
+                          Cómo se comunica ClienteYA
                         </p>
 
                         <p className="mt-1 text-sm leading-6 text-slate-700">
@@ -563,12 +668,12 @@ export default async function SettingsPage({
 
                   <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="mb-4 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-slate-700">
-                      North Star
+                      Cómo utiliza ClienteYA esta información
                     </div>
 
                     <div className="space-y-3 text-sm font-semibold leading-6 text-slate-600">
                       <p>
-                        ClienteYA debe sentirse construido para cada negocio.
+                        ClienteYA adapta su inteligencia a la realidad de tu negocio.
                       </p>
                       <p>
                         WhatsApp, sector y empresa son la base de las próximas
@@ -586,8 +691,6 @@ export default async function SettingsPage({
           </div>
         </div>
       </main>
-
-      <MobileDashboardNav />
     </div>
   );
 }

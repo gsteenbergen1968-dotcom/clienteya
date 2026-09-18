@@ -1,6 +1,6 @@
 import { getRevenueScore } from "./revenue-scoring";
 
-export type ClienteForRevenueForecast = {
+export type RelationshipForRevenueForecast = {
   id: string;
   nombre?: string | null;
   estado?: string | null;
@@ -31,8 +31,8 @@ export type RevenueForecast = {
   expectedConversion: number;
   revenueAtRisk: number;
   openOpportunities: number;
-  paidClients: number;
-  unpaidClients: number;
+  paidRelationships: number;
+  unpaidRelationships: number;
   topOpportunities: RevenueForecastOpportunity[];
   atRiskOpportunities: RevenueForecastOpportunity[];
   summary: string;
@@ -54,6 +54,7 @@ function toNumber(value: number | null | undefined) {
 function todayStart() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
   return today;
 }
 
@@ -71,33 +72,51 @@ function daysUntil(dateValue: string | null | undefined) {
   );
 }
 
-function getBaseProbability(cliente: ClienteForRevenueForecast) {
-  const estado = normalizeText(cliente.estado);
+function getBaseProbability(
+  relationship: RelationshipForRevenueForecast
+) {
+  const estado = normalizeText(relationship.estado);
 
-  const score = getRevenueScore(cliente.estado, cliente.monto);
+  const score = getRevenueScore(
+    relationship.estado,
+    relationship.monto
+  );
 
-  if (cliente.pagado || estado.includes("pag")) return 100;
-  if (estado.includes("cerr") || estado.includes("perdido")) return 0;
+  if (relationship.pagado || estado.includes("pag")) return 100;
+
+  if (
+    estado.includes("cerr") ||
+    estado.includes("perdido")
+  ) {
+    return 0;
+  }
 
   return score.probability;
 }
 
-function getEstimatedValue(cliente: ClienteForRevenueForecast) {
-  const estado = normalizeText(cliente.estado);
-  const currentMonto = toNumber(cliente.monto);
+function getEstimatedValue(
+  relationship: RelationshipForRevenueForecast
+) {
+  const estado = normalizeText(relationship.estado);
+  const currentMonto = toNumber(relationship.monto);
 
-  if (cliente.pagado || estado.includes("pag")) {
+  if (relationship.pagado || estado.includes("pag")) {
     return currentMonto;
   }
 
-  const score = getRevenueScore(cliente.estado, cliente.monto);
+  const score = getRevenueScore(
+    relationship.estado,
+    relationship.monto
+  );
 
   return score.estimatedValue;
 }
 
-function getProbability(cliente: ClienteForRevenueForecast) {
-  const base = getBaseProbability(cliente);
-  const days = daysUntil(cliente.proximo_contacto);
+function getProbability(
+  relationship: RelationshipForRevenueForecast
+) {
+  const base = getBaseProbability(relationship);
+  const days = daysUntil(relationship.proximo_contacto);
 
   if (base === 0 || base === 100) return base;
 
@@ -110,15 +129,23 @@ function getProbability(cliente: ClienteForRevenueForecast) {
     if (days > 30) probability -= 5;
   }
 
-  return Math.max(0, Math.min(95, Math.round(probability)));
+  return Math.max(
+    0,
+    Math.min(95, Math.round(probability))
+  );
 }
 
-function getTiming(cliente: ClienteForRevenueForecast): "30d" | "90d" | "later" {
-  if (cliente.pagado || normalizeText(cliente.estado).includes("pag")) {
+function getTiming(
+  relationship: RelationshipForRevenueForecast
+): "30d" | "90d" | "later" {
+  if (
+    relationship.pagado ||
+    normalizeText(relationship.estado).includes("pag")
+  ) {
     return "30d";
   }
 
-  const days = daysUntil(cliente.proximo_contacto);
+  const days = daysUntil(relationship.proximo_contacto);
 
   if (typeof days !== "number") return "90d";
   if (days <= 30) return "30d";
@@ -128,13 +155,19 @@ function getTiming(cliente: ClienteForRevenueForecast): "30d" | "90d" | "later" 
 }
 
 function getRiskLevel(
-  cliente: ClienteForRevenueForecast,
+  relationship: RelationshipForRevenueForecast,
   probability: number
 ): "low" | "medium" | "high" {
-  const estado = normalizeText(cliente.estado);
-  const days = daysUntil(cliente.proximo_contacto);
+  const estado = normalizeText(relationship.estado);
+  const days = daysUntil(relationship.proximo_contacto);
 
-  if (estado.includes("cerr") || estado.includes("perdido")) return "high";
+  if (
+    estado.includes("cerr") ||
+    estado.includes("perdido")
+  ) {
+    return "high";
+  }
+
   if (typeof days === "number" && days < 0) return "high";
   if (estado.includes("sin")) return "high";
   if (probability < 35) return "high";
@@ -144,20 +177,27 @@ function getRiskLevel(
 }
 
 function getReason(
-  cliente: ClienteForRevenueForecast,
+  relationship: RelationshipForRevenueForecast,
   probability: number,
   riskLevel: "low" | "medium" | "high"
 ) {
-  const estado = cliente.estado || "Sin estado";
-  const days = daysUntil(cliente.proximo_contacto);
-  const estimatedValue = getEstimatedValue(cliente);
-  const hasManualMonto = toNumber(cliente.monto) > 0;
+  const estado = relationship.estado || "Sin estado";
+  const days = daysUntil(relationship.proximo_contacto);
+  const estimatedValue = getEstimatedValue(relationship);
+  const hasManualMonto = toNumber(relationship.monto) > 0;
 
-  if (cliente.pagado || normalizeText(estado).includes("pag")) {
+  if (
+    relationship.pagado ||
+    normalizeText(estado).includes("pag")
+  ) {
     return "Ingreso confirmado.";
   }
 
-  if (riskLevel === "high" && typeof days === "number" && days < 0) {
+  if (
+    riskLevel === "high" &&
+    typeof days === "number" &&
+    days < 0
+  ) {
     return `Seguimiento vencido hace ${Math.abs(days)} día(s).`;
   }
 
@@ -181,24 +221,36 @@ function getReason(
 }
 
 function buildOpportunity(
-  cliente: ClienteForRevenueForecast
+  relationship: RelationshipForRevenueForecast
 ): RevenueForecastOpportunity {
-  const monto = getEstimatedValue(cliente);
-  const probability = getProbability(cliente);
-  const expectedRevenue = Math.round(monto * (probability / 100));
-  const timing = getTiming(cliente);
-  const riskLevel = getRiskLevel(cliente, probability);
+  const monto = getEstimatedValue(relationship);
+  const probability = getProbability(relationship);
+
+  const expectedRevenue = Math.round(
+    monto * (probability / 100)
+  );
+
+  const timing = getTiming(relationship);
+
+  const riskLevel = getRiskLevel(
+    relationship,
+    probability
+  );
 
   return {
-    id: cliente.id,
-    nombre: cliente.nombre || "Cliente sin nombre",
-    estado: cliente.estado || "Sin estado",
+    id: relationship.id,
+    nombre: relationship.nombre || "Relación sin nombre",
+    estado: relationship.estado || "Sin estado",
     monto,
     probability,
     expectedRevenue,
     timing,
     riskLevel,
-    reason: getReason(cliente, probability, riskLevel),
+    reason: getReason(
+      relationship,
+      probability,
+      riskLevel
+    ),
   };
 }
 
@@ -233,7 +285,10 @@ function buildRecommendation(forecast: {
   atRiskCount: number;
   topOpportunityName?: string;
 }) {
-  if (forecast.revenueAtRisk > 0 && forecast.atRiskCount > 0) {
+  if (
+    forecast.revenueAtRisk > 0 &&
+    forecast.atRiskCount > 0
+  ) {
     return "Revisa primero las oportunidades en riesgo y agenda seguimiento por WhatsApp hoy.";
   }
 
@@ -249,16 +304,18 @@ function buildRecommendation(forecast: {
 }
 
 export function buildRevenueForecast(
-  clientes: ClienteForRevenueForecast[]
+  relationships: RelationshipForRevenueForecast[]
 ): RevenueForecast {
-  const opportunities = clientes.map(buildOpportunity);
+  const opportunities = relationships.map(buildOpportunity);
 
   const paidOpportunities = opportunities.filter(
     (item) => item.probability === 100
   );
 
   const openOpportunities = opportunities.filter(
-    (item) => item.probability > 0 && item.probability < 100
+    (item) =>
+      item.probability > 0 &&
+      item.probability < 100
   );
 
   const confirmedRevenue = paidOpportunities.reduce(
@@ -273,11 +330,21 @@ export function buildRevenueForecast(
 
   const forecast30Days = openOpportunities
     .filter((item) => item.timing === "30d")
-    .reduce((total, item) => total + item.expectedRevenue, 0);
+    .reduce(
+      (total, item) => total + item.expectedRevenue,
+      0
+    );
 
   const forecast90Days = openOpportunities
-    .filter((item) => item.timing === "30d" || item.timing === "90d")
-    .reduce((total, item) => total + item.expectedRevenue, 0);
+    .filter(
+      (item) =>
+        item.timing === "30d" ||
+        item.timing === "90d"
+    )
+    .reduce(
+      (total, item) => total + item.expectedRevenue,
+      0
+    );
 
   const expectedRevenue = openOpportunities.reduce(
     (total, item) => total + item.expectedRevenue,
@@ -286,25 +353,36 @@ export function buildRevenueForecast(
 
   const revenueAtRisk = openOpportunities
     .filter((item) => item.riskLevel === "high")
-    .reduce((total, item) => total + item.monto, 0);
+    .reduce(
+      (total, item) => total + item.monto,
+      0
+    );
 
   const expectedConversion =
     openOpportunities.length > 0
       ? Math.round(
           openOpportunities.reduce(
-            (total, item) => total + item.probability,
+            (total, item) =>
+              total + item.probability,
             0
           ) / openOpportunities.length
         )
       : 0;
 
   const topOpportunities = [...openOpportunities]
-    .sort((first, second) => second.expectedRevenue - first.expectedRevenue)
+    .sort(
+      (first, second) =>
+        second.expectedRevenue -
+        first.expectedRevenue
+    )
     .slice(0, 5);
 
   const atRiskOpportunities = [...openOpportunities]
     .filter((item) => item.riskLevel === "high")
-    .sort((first, second) => second.monto - first.monto)
+    .sort(
+      (first, second) =>
+        second.monto - first.monto
+    )
     .slice(0, 5);
 
   const summary = buildSummary({
@@ -330,8 +408,9 @@ export function buildRevenueForecast(
     expectedConversion,
     revenueAtRisk,
     openOpportunities: openOpportunities.length,
-    paidClients: paidOpportunities.length,
-    unpaidClients: clientes.length - paidOpportunities.length,
+    paidRelationships: paidOpportunities.length,
+    unpaidRelationships:
+      relationships.length - paidOpportunities.length,
     topOpportunities,
     atRiskOpportunities,
     summary,
@@ -339,7 +418,9 @@ export function buildRevenueForecast(
   };
 }
 
-export function getRevenueForecastHealth(forecast: RevenueForecast) {
+export function getRevenueForecastHealth(
+  forecast: RevenueForecast
+) {
   if (forecast.pipelineValue <= 0) {
     return {
       label: "Sin pipeline",
@@ -347,7 +428,10 @@ export function getRevenueForecastHealth(forecast: RevenueForecast) {
     };
   }
 
-  if (forecast.revenueAtRisk > forecast.expectedRevenue) {
+  if (
+    forecast.revenueAtRisk >
+    forecast.expectedRevenue
+  ) {
     return {
       label: "En riesgo",
       tone: "red" as const,

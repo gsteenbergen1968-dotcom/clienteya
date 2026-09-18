@@ -1,4 +1,4 @@
-type Cliente = {
+type Relationship = {
   nombre: string;
   estado?: string | null;
   notas?: string | null;
@@ -13,24 +13,24 @@ type Recommendation = {
 };
 
 export function buildWhatsAppDraft(
-  cliente: Cliente,
+  relationship: Relationship,
   recommendation?: Recommendation
 ) {
-  const nombre = cliente.nombre || "cliente";
-  const estado = (cliente.estado || "").toLowerCase();
-  const notas = (cliente.notas || "").toLowerCase();
+  const nombre = relationship.nombre || "relación";
+  const estado = (relationship.estado || "").toLowerCase();
+  const notas = (relationship.notas || "").toLowerCase();
   const title = recommendation?.title || "";
 
   if (title.includes("Lead enfriándose")) {
     return `Hola ${nombre}, ¿cómo estás? Te escribo para hacer seguimiento y ver si todavía te interesa avanzar. Si te parece bien, podemos retomar por acá.`;
   }
 
-  if (title.includes("Cliente listo para cerrar")) {
+  if (title.includes("Relación lista para cerrar")) {
     return `Hola ${nombre}, gracias por el interés. Creo que estamos en buen momento para avanzar. ¿Querés que te pase el siguiente paso para cerrar?`;
   }
 
   if (title.includes("Enviar prueba social")) {
-    return `Hola ${nombre}, te comparto esto porque puede ayudarte a decidir. Ya estamos trabajando con clientes que buscaban algo parecido y los resultados fueron muy positivos. ¿Querés que te cuente cómo sería en tu caso?`;
+    return `Hola ${nombre}, te comparto esto porque puede ayudarte a decidir. Ya estamos trabajando con relaciones que buscaban algo parecido y los resultados fueron muy positivos. ¿Querés que te cuente cómo sería en tu caso?`;
   }
 
   if (title.includes("Pedir comprobante")) {
@@ -50,7 +50,7 @@ export function buildWhatsAppDraft(
   }
 
   return (
-    cliente.recordatorio ||
+    relationship.recordatorio ||
     `Hola ${nombre}, te escribo para hacer seguimiento. ¿Seguimos avanzando?`
   );
 }

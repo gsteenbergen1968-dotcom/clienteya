@@ -30,12 +30,12 @@ export type SectorKpiExplanationUrgency =
 export type SectorKpiExplanationInput = {
   sector?: string | null;
 
-  totalClients: number;
-  activeClients: number;
-  clientsToContactToday: number;
-  overdueClients: number;
-  paidClients: number;
-  unpaidClients: number;
+  totalRelationships: number;
+  activeRelationships: number;
+  relationshipsToContactToday: number;
+  overdueRelationships: number;
+  paidRelationships: number;
+  unpaidRelationships: number;
   totalRevenue: number;
 
   responseProbability?: number | null;
@@ -62,7 +62,7 @@ export type SectorKpiExplanationResult = {
 };
 
 function normalizeSector(
-  sector?: string | null,
+  sector?: string | null
 ): SectorKpiExplanationSector {
   const value = String(sector ?? "")
     .trim()
@@ -203,6 +203,7 @@ function formatCurrency(value: number) {
 
 function percentage(value: number, total: number) {
   if (total <= 0) return 0;
+
   return clamp(Math.round((value / total) * 100));
 }
 
@@ -210,7 +211,7 @@ function getSectorVocabulary(sector: SectorKpiExplanationSector) {
   const map: Record<
     SectorKpiExplanationSector,
     {
-      client: string;
+      relationship: string;
       active: string;
       contact: string;
       overdue: string;
@@ -219,111 +220,124 @@ function getSectorVocabulary(sector: SectorKpiExplanationSector) {
     }
   > = {
     general: {
-      client: "clientes registrados",
-      active: "clientes activos",
+      relationship: "relaciones registradas",
+      active: "relaciones activas",
       contact: "seguimientos pendientes",
       overdue: "relaciones en riesgo",
-      paid: "clientes pagados",
+      paid: "relaciones con pago",
       revenue: "ingresos registrados",
     },
+
     beauty: {
-      client: "clientes de belleza",
-      active: "clientes con actividad reciente",
+      relationship: "relaciones de belleza",
+      active: "relaciones con actividad reciente",
       contact: "citas o seguimientos pendientes",
-      overdue: "clientes que pueden enfriarse",
+      overdue: "relaciones que pueden enfriarse",
       paid: "servicios cobrados",
       revenue: "ingresos de servicios",
     },
+
     wellness: {
-      client: "clientes de bienestar",
-      active: "clientes en seguimiento",
+      relationship: "relaciones de bienestar",
+      active: "relaciones en seguimiento",
       contact: "contactos de cuidado pendientes",
-      overdue: "clientes que pierden ritmo",
+      overdue: "relaciones que pierden ritmo",
       paid: "sesiones cobradas",
       revenue: "ingresos de sesiones",
     },
+
     gastronomy: {
-      client: "clientes o contactos comerciales",
-      active: "clientes con movimiento reciente",
+      relationship: "relaciones o contactos comerciales",
+      active: "relaciones con movimiento reciente",
       contact: "pedidos o seguimientos pendientes",
       overdue: "oportunidades que se enfrían",
       paid: "ventas cobradas",
       revenue: "ingresos de ventas",
     },
+
     medical: {
-      client: "pacientes o contactos",
+      relationship: "pacientes o contactos",
       active: "pacientes en seguimiento",
       contact: "controles o recordatorios pendientes",
       overdue: "pacientes sin continuidad",
       paid: "consultas cobradas",
       revenue: "ingresos de consultas",
     },
+
     real_estate: {
-      client: "prospectos inmobiliarios",
+      relationship: "prospectos inmobiliarios",
       active: "prospectos activos",
       contact: "visitas o llamadas pendientes",
       overdue: "prospectos que pierden interés",
       paid: "operaciones registradas",
       revenue: "valor comercial registrado",
     },
+
     automotive: {
-      client: "clientes de vehículo",
-      active: "clientes activos",
+      relationship: "relaciones de vehículo",
+      active: "relaciones activas",
       contact: "servicios o presupuestos pendientes",
-      overdue: "clientes que pueden ir a otro taller",
+      overdue: "relaciones que pueden ir a otro taller",
       paid: "trabajos cobrados",
       revenue: "ingresos de servicios",
     },
+
     education: {
-      client: "alumnos o interesados",
+      relationship: "alumnos o interesados",
       active: "alumnos activos",
       contact: "seguimientos académicos pendientes",
       overdue: "interesados que pierden motivación",
       paid: "inscripciones cobradas",
       revenue: "ingresos educativos",
     },
+
     services: {
-      client: "clientes de servicio",
-      active: "clientes activos",
+      relationship: "relaciones de servicio",
+      active: "relaciones activas",
       contact: "seguimientos pendientes",
-      overdue: "clientes que esperan respuesta",
+      overdue: "relaciones que esperan respuesta",
       paid: "servicios cobrados",
       revenue: "ingresos de servicios",
     },
+
     retail: {
-      client: "clientes de tienda",
-      active: "clientes activos",
+      relationship: "relaciones de tienda",
+      active: "relaciones activas",
       contact: "ventas o consultas pendientes",
-      overdue: "clientes que pueden comprar en otro lugar",
+      overdue: "relaciones que pueden comprar en otro lugar",
       paid: "ventas cobradas",
       revenue: "ingresos de ventas",
     },
+
     fitness: {
-      client: "miembros o interesados",
+      relationship: "miembros o interesados",
       active: "miembros activos",
       contact: "seguimientos de entrenamiento pendientes",
       overdue: "miembros que pierden constancia",
       paid: "planes cobrados",
       revenue: "ingresos de membresías",
     },
+
     finance: {
-      client: "clientes financieros",
-      active: "clientes activos",
+      relationship: "relaciones financieras",
+      active: "relaciones activas",
       contact: "seguimientos financieros pendientes",
-      overdue: "clientes sin decisión",
+      overdue: "relaciones sin decisión",
       paid: "servicios cobrados",
       revenue: "ingresos registrados",
     },
+
     legal: {
-      client: "clientes o casos",
+      relationship: "relaciones o casos",
       active: "casos activos",
       contact: "seguimientos legales pendientes",
       overdue: "casos sin avance reciente",
       paid: "honorarios cobrados",
       revenue: "honorarios registrados",
     },
+
     construction: {
-      client: "clientes o proyectos",
+      relationship: "relaciones o proyectos",
       active: "proyectos activos",
       contact: "presupuestos o avances pendientes",
       overdue: "proyectos sin seguimiento",
@@ -337,16 +351,20 @@ function getSectorVocabulary(sector: SectorKpiExplanationSector) {
 
 function getSectorSummary(
   sector: SectorKpiExplanationSector,
-  input: SectorKpiExplanationInput,
+  input: SectorKpiExplanationInput
 ) {
-  const overdueRate = percentage(input.overdueClients, input.totalClients);
-  const todayRate = percentage(
-    input.clientsToContactToday,
-    input.totalClients,
+  const overdueRate = percentage(
+    input.overdueRelationships,
+    input.totalRelationships
   );
 
-  if (input.totalClients <= 0) {
-    return "ClienteYA todavía no tiene suficientes datos para explicar patrones. Agrega clientes y seguimientos para activar inteligencia comercial.";
+  const todayRate = percentage(
+    input.relationshipsToContactToday,
+    input.totalRelationships
+  );
+
+  if (input.totalRelationships <= 0) {
+    return "ClienteYA todavía no tiene suficientes datos para explicar patrones. Agrega relaciones y seguimientos para activar inteligencia comercial.";
   }
 
   if (overdueRate >= 35) {
@@ -357,55 +375,70 @@ function getSectorSummary(
     return "ClienteYA muestra varios seguimientos para hoy porque hay oportunidades que todavía pueden avanzar si se actúa a tiempo.";
   }
 
-  if (input.activeClients >= input.totalClients * 0.6) {
+  if (
+    input.activeRelationships >=
+    input.totalRelationships * 0.6
+  ) {
     return "ClienteYA muestra una base saludable: hay movimiento reciente y suficiente actividad para tomar decisiones comerciales con más confianza.";
   }
 
-  return "ClienteYA resume estos indicadores para mostrar qué clientes requieren acción, qué relaciones están activas y dónde puede estar el próximo ingreso.";
+  return "ClienteYA resume estos indicadores para mostrar qué relaciones requieren acción, cuáles están activas y dónde puede estar el próximo ingreso.";
 }
 
-function buildTotalClientsExplanation(
+function buildTotalRelationshipsExplanation(
   sector: SectorKpiExplanationSector,
-  input: SectorKpiExplanationInput,
+  input: SectorKpiExplanationInput
 ): SectorKpiExplanation {
   const vocabulary = getSectorVocabulary(sector);
-  const activeRate = percentage(input.activeClients, input.totalClients);
+
+  const activeRate = percentage(
+    input.activeRelationships,
+    input.totalRelationships
+  );
 
   return {
-    id: "total-clients",
+    id: "total-relationships",
     title: "Base comercial",
-    valueLabel: `${formatNumber(input.totalClients)} ${vocabulary.client}`,
+    valueLabel: `${formatNumber(input.totalRelationships)} ${
+      vocabulary.relationship
+    }`,
     explanation:
-      input.totalClients > 0
-        ? `ClienteYA cuenta todos los ${vocabulary.client} guardados para medir el tamaño real de tu base comercial.`
-        : "ClienteYA todavía no tiene clientes suficientes para construir una lectura comercial.",
+      input.totalRelationships > 0
+        ? `ClienteYA cuenta todas las ${vocabulary.relationship} guardadas para medir el tamaño real de tu base comercial.`
+        : "ClienteYA todavía no tiene relaciones suficientes para construir una lectura comercial.",
     founderMeaning:
       activeRate >= 60
         ? "La base tiene buen movimiento. Ahora el foco es convertir actividad en ingresos."
         : "La base existe, pero necesita más seguimiento para convertirse en una agenda comercial viva.",
     actionHint:
-      input.totalClients > 0
-        ? "Revisa primero los clientes con acción pendiente."
-        : "Agrega tus primeros clientes para activar el sistema de seguimiento.",
-    tone: input.totalClients > 0 ? "sky" : "slate",
-    urgency: input.totalClients > 0 ? "low" : "medium",
+      input.totalRelationships > 0
+        ? "Revisa primero las relaciones con acción pendiente."
+        : "Agrega tus primeras relaciones para activar el sistema de seguimiento.",
+    tone: input.totalRelationships > 0 ? "sky" : "slate",
+    urgency: input.totalRelationships > 0 ? "low" : "medium",
   };
 }
 
-function buildActiveClientsExplanation(
+function buildActiveRelationshipsExplanation(
   sector: SectorKpiExplanationSector,
-  input: SectorKpiExplanationInput,
+  input: SectorKpiExplanationInput
 ): SectorKpiExplanation {
   const vocabulary = getSectorVocabulary(sector);
-  const activeRate = percentage(input.activeClients, input.totalClients);
+
+  const activeRate = percentage(
+    input.activeRelationships,
+    input.totalRelationships
+  );
 
   return {
-    id: "active-clients",
+    id: "active-relationships",
     title: "Actividad reciente",
-    valueLabel: `${formatNumber(input.activeClients)} ${vocabulary.active}`,
+    valueLabel: `${formatNumber(input.activeRelationships)} ${
+      vocabulary.active
+    }`,
     explanation:
       activeRate > 0
-        ? `ClienteYA marca como activos los clientes que todavía muestran movimiento, seguimiento o potencial comercial reciente.`
+        ? "ClienteYA marca como activas las relaciones que todavía muestran movimiento, seguimiento o potencial comercial reciente."
         : "ClienteYA no detecta suficiente actividad reciente en la base actual.",
     founderMeaning:
       activeRate >= 60
@@ -416,46 +449,59 @@ function buildActiveClientsExplanation(
     actionHint:
       activeRate >= 60
         ? "Mantén la frecuencia de seguimiento y busca cierres."
-        : "Reactiva clientes con mensajes simples y directos.",
-    tone: activeRate >= 60 ? "emerald" : activeRate >= 30 ? "amber" : "red",
-    urgency: activeRate >= 60 ? "low" : activeRate >= 30 ? "medium" : "high",
+        : "Reactiva relaciones con mensajes simples y directos.",
+    tone:
+      activeRate >= 60
+        ? "emerald"
+        : activeRate >= 30
+          ? "amber"
+          : "red",
+    urgency:
+      activeRate >= 60
+        ? "low"
+        : activeRate >= 30
+          ? "medium"
+          : "high",
   };
 }
 
 function buildTodayContactExplanation(
   sector: SectorKpiExplanationSector,
-  input: SectorKpiExplanationInput,
+  input: SectorKpiExplanationInput
 ): SectorKpiExplanation {
   const vocabulary = getSectorVocabulary(sector);
+
   const todayRate = percentage(
-    input.clientsToContactToday,
-    input.totalClients,
+    input.relationshipsToContactToday,
+    input.totalRelationships
   );
 
   return {
     id: "contact-today",
     title: "Acciones de hoy",
-    valueLabel: `${formatNumber(input.clientsToContactToday)} ${vocabulary.contact}`,
+    valueLabel: `${formatNumber(
+      input.relationshipsToContactToday
+    )} ${vocabulary.contact}`,
     explanation:
-      input.clientsToContactToday > 0
-        ? `ClienteYA muestra estos ${vocabulary.contact} porque hay clientes que necesitan una acción concreta hoy.`
+      input.relationshipsToContactToday > 0
+        ? `ClienteYA muestra estos ${vocabulary.contact} porque hay relaciones que necesitan una acción concreta hoy.`
         : "ClienteYA no detecta seguimientos urgentes para hoy.",
     founderMeaning:
-      input.clientsToContactToday > 0
+      input.relationshipsToContactToday > 0
         ? "Estas acciones protegen oportunidades que todavía pueden avanzar."
-        : "La agenda está limpia. Buen momento para crear nuevas oportunidades o revisar clientes tibios.",
+        : "La agenda está limpia. Buen momento para crear nuevas oportunidades o revisar relaciones tibias.",
     actionHint:
-      input.clientsToContactToday > 0
-        ? "Empieza por el cliente con mayor probabilidad de respuesta."
+      input.relationshipsToContactToday > 0
+        ? "Empieza por la relación con mayor probabilidad de respuesta."
         : "Usa este espacio para prospectar o fortalecer relaciones existentes.",
     tone:
-      input.clientsToContactToday === 0
+      input.relationshipsToContactToday === 0
         ? "emerald"
         : todayRate >= 30
           ? "amber"
           : "sky",
     urgency:
-      input.clientsToContactToday === 0
+      input.relationshipsToContactToday === 0
         ? "low"
         : todayRate >= 30
           ? "high"
@@ -465,27 +511,33 @@ function buildTodayContactExplanation(
 
 function buildOverdueExplanation(
   sector: SectorKpiExplanationSector,
-  input: SectorKpiExplanationInput,
+  input: SectorKpiExplanationInput
 ): SectorKpiExplanation {
   const vocabulary = getSectorVocabulary(sector);
-  const overdueRate = percentage(input.overdueClients, input.totalClients);
+
+  const overdueRate = percentage(
+    input.overdueRelationships,
+    input.totalRelationships
+  );
 
   return {
-    id: "overdue-clients",
+    id: "overdue-relationships",
     title: "Riesgo comercial",
-    valueLabel: `${formatNumber(input.overdueClients)} ${vocabulary.overdue}`,
+    valueLabel: `${formatNumber(input.overdueRelationships)} ${
+      vocabulary.overdue
+    }`,
     explanation:
-      input.overdueClients > 0
-        ? `ClienteYA marca estos casos porque llevan demasiado tiempo sin una acción clara o sin continuidad comercial.`
+      input.overdueRelationships > 0
+        ? "ClienteYA marca estos casos porque llevan demasiado tiempo sin una acción clara o sin continuidad comercial."
         : "ClienteYA no detecta relaciones atrasadas en este momento.",
     founderMeaning:
       overdueRate >= 35
-        ? "Aquí puede estar la pérdida silenciosa: clientes que no dicen que no, pero se enfrían."
+        ? "Aquí puede estar la pérdida silenciosa: relaciones que no dicen que no, pero se enfrían."
         : overdueRate > 0
           ? "Hay algunos puntos de atención, pero todavía se pueden recuperar con seguimiento rápido."
           : "La base está bajo control. No hay señales fuertes de abandono por falta de seguimiento.",
     actionHint:
-      input.overdueClients > 0
+      input.overdueRelationships > 0
         ? "Envía mensajes cortos de recuperación antes de insistir con venta directa."
         : "Mantén la disciplina de seguimiento para que esta cifra siga baja.",
     tone:
@@ -505,18 +557,24 @@ function buildOverdueExplanation(
 
 function buildPaymentExplanation(
   sector: SectorKpiExplanationSector,
-  input: SectorKpiExplanationInput,
+  input: SectorKpiExplanationInput
 ): SectorKpiExplanation {
   const vocabulary = getSectorVocabulary(sector);
-  const paymentRate = percentage(input.paidClients, input.paidClients + input.unpaidClients);
+
+  const paymentRate = percentage(
+    input.paidRelationships,
+    input.paidRelationships + input.unpaidRelationships
+  );
 
   return {
     id: "payment-status",
     title: "Estado de cobro",
-    valueLabel: `${formatNumber(input.paidClients)} ${vocabulary.paid}`,
+    valueLabel: `${formatNumber(input.paidRelationships)} ${
+      vocabulary.paid
+    }`,
     explanation:
-      input.paidClients + input.unpaidClients > 0
-        ? `ClienteYA compara clientes cobrados y pendientes para mostrar la salud inmediata del flujo de caja.`
+      input.paidRelationships + input.unpaidRelationships > 0
+        ? "ClienteYA compara relaciones cobradas y pendientes para mostrar la salud inmediata del flujo de caja."
         : "ClienteYA todavía no tiene suficientes datos de cobro para explicar el flujo comercial.",
     founderMeaning:
       paymentRate >= 70
@@ -525,17 +583,27 @@ function buildPaymentExplanation(
           ? "Hay ventas, pero el flujo todavía necesita control."
           : "Puede haber dinero pendiente que afecta la estabilidad diaria.",
     actionHint:
-      input.unpaidClients > 0
+      input.unpaidRelationships > 0
         ? "Prioriza recordatorios de pago antes de abrir demasiadas oportunidades nuevas."
         : "Mantén registro de cada cobro para que el sistema aprenda mejor.",
-    tone: paymentRate >= 70 ? "emerald" : paymentRate >= 40 ? "amber" : "red",
-    urgency: paymentRate >= 70 ? "low" : paymentRate >= 40 ? "medium" : "high",
+    tone:
+      paymentRate >= 70
+        ? "emerald"
+        : paymentRate >= 40
+          ? "amber"
+          : "red",
+    urgency:
+      paymentRate >= 70
+        ? "low"
+        : paymentRate >= 40
+          ? "medium"
+          : "high",
   };
 }
 
 function buildRevenueExplanation(
   sector: SectorKpiExplanationSector,
-  input: SectorKpiExplanationInput,
+  input: SectorKpiExplanationInput
 ): SectorKpiExplanation {
   const vocabulary = getSectorVocabulary(sector);
 
@@ -545,7 +613,7 @@ function buildRevenueExplanation(
     valueLabel: formatCurrency(input.totalRevenue),
     explanation:
       input.totalRevenue > 0
-        ? `ClienteYA suma los ${vocabulary.revenue} para que el fundador vea el impacto comercial de la base actual.`
+        ? `ClienteYA suma los ${vocabulary.revenue} para que el founder vea el impacto comercial de la base actual.`
         : "ClienteYA no detecta ingresos registrados todavía.",
     founderMeaning:
       input.totalRevenue > 0
@@ -553,7 +621,7 @@ function buildRevenueExplanation(
         : "Sin ingresos registrados, el sistema todavía no puede separar actividad de resultado.",
     actionHint:
       input.totalRevenue > 0
-        ? "Compara ingresos con clientes activos para detectar los mejores segmentos."
+        ? "Compara ingresos con relaciones activas para detectar los mejores segmentos."
         : "Registra montos y pagos para activar lectura financiera real.",
     tone: input.totalRevenue > 0 ? "emerald" : "slate",
     urgency: input.totalRevenue > 0 ? "low" : "medium",
@@ -561,7 +629,7 @@ function buildRevenueExplanation(
 }
 
 function buildProbabilityExplanation(
-  input: SectorKpiExplanationInput,
+  input: SectorKpiExplanationInput
 ): SectorKpiExplanation | null {
   const responseProbability =
     typeof input.responseProbability === "number"
@@ -573,17 +641,24 @@ function buildProbabilityExplanation(
       ? clamp(Math.round(input.closeProbability))
       : null;
 
-  if (responseProbability === null && closeProbability === null) {
+  if (
+    responseProbability === null &&
+    closeProbability === null
+  ) {
     return null;
   }
 
-  const bestValue = Math.max(responseProbability ?? 0, closeProbability ?? 0);
+  const bestValue = Math.max(
+    responseProbability ?? 0,
+    closeProbability ?? 0
+  );
 
   return {
     id: "commercial-probability",
     title: "Probabilidad comercial",
     valueLabel:
-      responseProbability !== null && closeProbability !== null
+      responseProbability !== null &&
+      closeProbability !== null
         ? `${responseProbability}% respuesta · ${closeProbability}% cierre`
         : responseProbability !== null
           ? `${responseProbability}% respuesta`
@@ -602,26 +677,37 @@ function buildProbabilityExplanation(
         : bestValue >= 40
           ? "Haz una pregunta simple para recuperar conversación."
           : "Usa un mensaje suave de reactivación, no presión de venta.",
-    tone: bestValue >= 70 ? "emerald" : bestValue >= 40 ? "amber" : "red",
-    urgency: bestValue >= 70 ? "medium" : bestValue >= 40 ? "medium" : "high",
+    tone:
+      bestValue >= 70
+        ? "emerald"
+        : bestValue >= 40
+          ? "amber"
+          : "red",
+    urgency:
+      bestValue >= 70
+        ? "medium"
+        : bestValue >= 40
+          ? "medium"
+          : "high",
   };
 }
 
 export function buildSectorKpiExplanations(
-  input: SectorKpiExplanationInput,
+  input: SectorKpiExplanationInput
 ): SectorKpiExplanationResult {
   const sector = normalizeSector(input.sector);
 
   const explanations: SectorKpiExplanation[] = [
-    buildTotalClientsExplanation(sector, input),
-    buildActiveClientsExplanation(sector, input),
+    buildTotalRelationshipsExplanation(sector, input),
+    buildActiveRelationshipsExplanation(sector, input),
     buildTodayContactExplanation(sector, input),
     buildOverdueExplanation(sector, input),
     buildPaymentExplanation(sector, input),
     buildRevenueExplanation(sector, input),
   ];
 
-  const probabilityExplanation = buildProbabilityExplanation(input);
+  const probabilityExplanation =
+    buildProbabilityExplanation(input);
 
   if (probabilityExplanation) {
     explanations.push(probabilityExplanation);
@@ -636,7 +722,7 @@ export function buildSectorKpiExplanations(
 }
 
 export function getSectorKpiExplanationToneClasses(
-  tone: SectorKpiExplanationTone,
+  tone: SectorKpiExplanationTone
 ) {
   const map: Record<SectorKpiExplanationTone, string> = {
     emerald:
@@ -655,7 +741,7 @@ export function getSectorKpiExplanationToneClasses(
 }
 
 export function getSectorKpiExplanationBadgeClasses(
-  tone: SectorKpiExplanationTone,
+  tone: SectorKpiExplanationTone
 ) {
   const map: Record<SectorKpiExplanationTone, string> = {
     emerald:
@@ -674,7 +760,7 @@ export function getSectorKpiExplanationBadgeClasses(
 }
 
 export function getSectorKpiExplanationUrgencyLabel(
-  urgency: SectorKpiExplanationUrgency,
+  urgency: SectorKpiExplanationUrgency
 ) {
   const map: Record<SectorKpiExplanationUrgency, string> = {
     low: "Controlado",

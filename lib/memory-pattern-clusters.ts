@@ -1,17 +1,15 @@
 import {
-  type CommercialMemoryClient,
+  type CommercialMemoryRelationship,
   type CommercialMemorySignal,
-  type CommercialMemorySignalPriority,
-  type CommercialMemorySignalTone,
   buildCommercialMemorySignals,
 } from "./commercial-memory-signals";
 
 export type MemoryPatternClusterType =
-  | "hot_clients"
-  | "loyal_clients"
-  | "sleeping_clients"
-  | "risk_clients"
-  | "vip_clients"
+  | "hot_relationships"
+  | "loyal_relationships"
+  | "sleeping_relationships"
+  | "risk_relationships"
+  | "vip_relationships"
   | "payment_attention"
   | "new_opportunities"
   | "needs_memory";
@@ -30,7 +28,7 @@ export type MemoryPatternClusterTone =
   | "slate"
   | "violet";
 
-export type MemoryPatternClusterClient = {
+export type MemoryPatternClusterRelationship = {
   id: string;
   name: string;
   reason: string;
@@ -51,7 +49,7 @@ export type MemoryPatternCluster = {
   score: number;
   priority: MemoryPatternClusterPriority;
   tone: MemoryPatternClusterTone;
-  clients: MemoryPatternClusterClient[];
+  relationships: MemoryPatternClusterRelationship[];
 };
 
 export type MemoryPatternClusterSummary = {
@@ -61,7 +59,7 @@ export type MemoryPatternClusterSummary = {
   mainRisk: string;
   bestAction: string;
   totalClusters: number;
-  totalClientsInClusters: number;
+  totalRelationshipsInClusters: number;
   criticalClusters: number;
   highClusters: number;
 };
@@ -110,8 +108,10 @@ function normalizeText(value?: string | null) {
     .toLowerCase();
 }
 
-function getClientName(client: CommercialMemoryClient) {
-  return client.nombre?.trim() || "Cliente sin nombre";
+function getRelationshipName(
+  relationship: CommercialMemoryRelationship,
+) {
+  return relationship.nombre?.trim() || "Relación sin nombre";
 }
 
 function includesAny(value: string, terms: string[]) {
@@ -126,7 +126,9 @@ function formatCurrency(value: number) {
   }).format(Math.max(0, value));
 }
 
-function getPriorityWeight(priority: MemoryPatternClusterPriority) {
+function getPriorityWeight(
+  priority: MemoryPatternClusterPriority,
+) {
   const map: Record<MemoryPatternClusterPriority, number> = {
     critical: 4,
     high: 3,
@@ -137,50 +139,26 @@ function getPriorityWeight(priority: MemoryPatternClusterPriority) {
   return map[priority];
 }
 
-function mapSignalPriority(
-  priority: CommercialMemorySignalPriority,
-): MemoryPatternClusterPriority {
-  const map: Record<
-    CommercialMemorySignalPriority,
-    MemoryPatternClusterPriority
-  > = {
-    critical: "critical",
-    high: "high",
-    medium: "medium",
-    low: "low",
-  };
-
-  return map[priority];
+function getStatus(
+  relationship: CommercialMemoryRelationship,
+) {
+  return normalizeText(relationship.estado);
 }
 
-function mapSignalTone(
-  tone: CommercialMemorySignalTone,
-): MemoryPatternClusterTone {
-  const map: Record<CommercialMemorySignalTone, MemoryPatternClusterTone> = {
-    emerald: "emerald",
-    sky: "sky",
-    amber: "amber",
-    red: "red",
-    slate: "slate",
-  };
-
-  return map[tone];
-}
-
-function getStatus(client: CommercialMemoryClient) {
-  return normalizeText(client.estado);
-}
-
-function getMemoryText(client: CommercialMemoryClient) {
+function getMemoryText(
+  relationship: CommercialMemoryRelationship,
+) {
   return normalizeText(
-    `${client.estado ?? ""} ${client.notas ?? ""} ${
-      client.recordatorio ?? ""
+    `${relationship.estado ?? ""} ${relationship.notas ?? ""} ${
+      relationship.recordatorio ?? ""
     }`,
   );
 }
 
-function hasPromiseSignal(client: CommercialMemoryClient) {
-  const text = getMemoryText(client);
+function hasPromiseSignal(
+  relationship: CommercialMemoryRelationship,
+) {
+  const text = getMemoryText(relationship);
 
   return includesAny(text, [
     "promet",
@@ -200,8 +178,10 @@ function hasPromiseSignal(client: CommercialMemoryClient) {
   ]);
 }
 
-function hasRiskText(client: CommercialMemoryClient) {
-  const text = getMemoryText(client);
+function hasRiskText(
+  relationship: CommercialMemoryRelationship,
+) {
+  const text = getMemoryText(relationship);
 
   return includesAny(text, [
     "no responde",
@@ -220,8 +200,10 @@ function hasRiskText(client: CommercialMemoryClient) {
   ]);
 }
 
-function hasLoyaltyText(client: CommercialMemoryClient) {
-  const text = getMemoryText(client);
+function hasLoyaltyText(
+  relationship: CommercialMemoryRelationship,
+) {
+  const text = getMemoryText(relationship);
 
   return includesAny(text, [
     "recurrente",
@@ -236,8 +218,10 @@ function hasLoyaltyText(client: CommercialMemoryClient) {
   ]);
 }
 
-function hasOpenStatus(client: CommercialMemoryClient) {
-  const status = getStatus(client);
+function hasOpenStatus(
+  relationship: CommercialMemoryRelationship,
+) {
+  const status = getStatus(relationship);
 
   return includesAny(status, [
     "nuevo",
@@ -250,20 +234,24 @@ function hasOpenStatus(client: CommercialMemoryClient) {
   ]);
 }
 
-function hasWonStatus(client: CommercialMemoryClient) {
-  const status = getStatus(client);
+function hasWonStatus(
+  relationship: CommercialMemoryRelationship,
+) {
+  const status = getStatus(relationship);
 
   return includesAny(status, [
     "cerrado",
     "ganado",
     "vendido",
     "pagado",
-    "cliente",
+    "relación",
   ]);
 }
 
-function hasLostStatus(client: CommercialMemoryClient) {
-  const status = getStatus(client);
+function hasLostStatus(
+  relationship: CommercialMemoryRelationship,
+) {
+  const status = getStatus(relationship);
 
   return includesAny(status, [
     "perdido",
@@ -274,134 +262,215 @@ function hasLostStatus(client: CommercialMemoryClient) {
   ]);
 }
 
-function hasUsefulMemory(client: CommercialMemoryClient) {
+function hasUsefulMemory(
+  relationship: CommercialMemoryRelationship,
+) {
   return (
-    normalizeText(client.notas).length >= 16 ||
-    normalizeText(client.recordatorio).length >= 12 ||
-    Boolean(client.proximo_contacto)
+    normalizeText(relationship.notas).length >= 16 ||
+    normalizeText(relationship.recordatorio).length >= 12 ||
+    Boolean(relationship.proximo_contacto)
   );
 }
 
-function getSignalForClient(
-  client: CommercialMemoryClient,
+function getSignalForRelationship(
+  relationship: CommercialMemoryRelationship,
   signals: CommercialMemorySignal[],
 ) {
-  return signals.find((signal) => signal.clientId === client.id) ?? null;
+  return (
+    signals.find(
+      (signal) =>
+        signal.relationshipId === relationship.id,
+    ) ?? null
+  );
 }
 
-function buildClusterClient(
-  client: CommercialMemoryClient,
+function buildClusterRelationship(
+  relationship: CommercialMemoryRelationship,
   reason: string,
   score: number,
   actionLabel: string,
-): MemoryPatternClusterClient {
+): MemoryPatternClusterRelationship {
   return {
-    id: client.id,
-    name: getClientName(client),
+    id: relationship.id,
+    name: getRelationshipName(relationship),
     reason,
     score: clamp(Math.round(score)),
     actionLabel,
   };
 }
 
-function averageScore(clients: MemoryPatternClusterClient[]) {
-  if (clients.length === 0) return 0;
+function averageScore(
+  relationships: MemoryPatternClusterRelationship[],
+) {
+  if (relationships.length === 0) return 0;
 
   return clamp(
     Math.round(
-      clients.reduce((total, client) => total + client.score, 0) /
-        clients.length,
+      relationships.reduce(
+        (total, relationship) =>
+          total + relationship.score,
+        0,
+      ) / relationships.length,
     ),
   );
 }
 
-function sortClusterClients(clients: MemoryPatternClusterClient[]) {
-  return [...clients].sort(
-    (a, b) => b.score - a.score || a.name.localeCompare(b.name),
+function sortClusterRelationships(
+  relationships: MemoryPatternClusterRelationship[],
+) {
+  return [...relationships].sort(
+    (a, b) =>
+      b.score - a.score ||
+      a.name.localeCompare(b.name),
   );
 }
 
-function buildHotClientsCluster(
-  clients: CommercialMemoryClient[],
+function buildHotRelationshipsCluster(
+  relationships: CommercialMemoryRelationship[],
   signals: CommercialMemorySignal[],
   now = new Date(),
 ): MemoryPatternCluster | null {
-  const clusterClients = clients
-    .map((client) => {
-      const signal = getSignalForClient(client, signals);
-      const updatedDays = daysBetween(safeDate(client.updated_at), now);
-      const until = daysUntil(safeDate(client.proximo_contacto), now);
-      const amount = Number(client.monto ?? 0);
-      const promise = hasPromiseSignal(client);
-      const open = hasOpenStatus(client);
+  const clusterRelationships = relationships
+    .map((relationship) => {
+      const signal = getSignalForRelationship(
+        relationship,
+        signals,
+      );
+
+      const updatedDays = daysBetween(
+        safeDate(relationship.updated_at),
+        now,
+      );
+
+      const until = daysUntil(
+        safeDate(relationship.proximo_contacto),
+        now,
+      );
+
+      const amount = Number(
+        relationship.monto ?? 0,
+      );
+
+      const promise =
+        hasPromiseSignal(relationship);
+
+      const open =
+        hasOpenStatus(relationship);
 
       let score = 35;
 
       if (promise) score += 25;
       if (open) score += 15;
-      if (updatedDays !== null && updatedDays <= 7) score += 20;
-      if (until !== null && until >= 0 && until <= 3) score += 15;
+
+      if (
+        updatedDays !== null &&
+        updatedDays <= 7
+      ) {
+        score += 20;
+      }
+
+      if (
+        until !== null &&
+        until >= 0 &&
+        until <= 3
+      ) {
+        score += 15;
+      }
+
       if (amount > 0) score += 10;
-      if (signal?.type === "opportunity") score += 20;
-      if (signal?.type === "followup" && signal.priority !== "low") score += 15;
+
+      if (signal?.type === "opportunity") {
+        score += 20;
+      }
+
+      if (
+        signal?.type === "followup" &&
+        signal.priority !== "low"
+      ) {
+        score += 15;
+      }
 
       score = clamp(score);
 
       if (score < 60) return null;
 
-      return buildClusterClient(
-        client,
+      return buildClusterRelationship(
+        relationship,
         promise
           ? "Muestra interés, promesa o conversación comercial activa."
           : updatedDays !== null && updatedDays <= 7
             ? "Tiene actividad reciente y puede avanzar pronto."
             : "Tiene señales suficientes para una acción comercial cercana.",
         score,
-        score >= 80 ? "Avanzar ahora" : "Confirmar interés",
+        score >= 80
+          ? "Avanzar ahora"
+          : "Confirmar interés",
       );
     })
-    .filter(Boolean) as MemoryPatternClusterClient[];
+    .filter(Boolean) as MemoryPatternClusterRelationship[];
 
-  if (clusterClients.length === 0) return null;
+  if (clusterRelationships.length === 0) {
+    return null;
+  }
 
-  const sortedClients = sortClusterClients(clusterClients);
-  const score = averageScore(sortedClients);
+  const sortedRelationships =
+    sortClusterRelationships(clusterRelationships);
+
+  const score =
+    averageScore(sortedRelationships);
 
   return {
-    id: "hot-clients",
-    type: "hot_clients",
-    title: "Clientes calientes",
-    subtitle: `${sortedClients.length} relación${
-      sortedClients.length === 1 ? "" : "es"
+    id: "hot-relationships",
+    type: "hot_relationships",
+    title: "Relaciones calientes",
+    subtitle: `${sortedRelationships.length} relación${
+      sortedRelationships.length === 1 ? "" : "es"
     } con señales de avance`,
     insight:
-      "ClienteYA detecta clientes con señales recientes de interés, conversación o próxima acción comercial.",
+      "ClienteYA detecta relaciones con señales recientes de interés, conversación o próxima acción comercial.",
     founderMeaning:
-      "Estos clientes pueden generar movimiento si el seguimiento se hace en el momento correcto.",
+      "Estas relaciones pueden generar movimiento si el seguimiento se hace en el momento correcto.",
     recommendation:
       "Priorizar mensajes concretos, simples y con una próxima acción clara.",
     actionLabel: "Avanzar oportunidades",
-    count: sortedClients.length,
+    count: sortedRelationships.length,
     score,
     priority: score >= 80 ? "high" : "medium",
     tone: "sky",
-    clients: sortedClients,
+    relationships: sortedRelationships,
   };
 }
 
-function buildLoyalClientsCluster(
-  clients: CommercialMemoryClient[],
+function buildLoyalRelationshipsCluster(
+  relationships: CommercialMemoryRelationship[],
   signals: CommercialMemorySignal[],
   now = new Date(),
 ): MemoryPatternCluster | null {
-  const clusterClients = clients
-    .map((client) => {
-      const signal = getSignalForClient(client, signals);
-      const paid = Boolean(client.pagado);
-      const amount = Number(client.monto ?? 0);
-      const updatedDays = daysBetween(safeDate(client.updated_at), now);
-      const loyalty = hasLoyaltyText(client);
-      const won = hasWonStatus(client);
+  const clusterRelationships = relationships
+    .map((relationship) => {
+      const signal = getSignalForRelationship(
+        relationship,
+        signals,
+      );
+
+      const paid = Boolean(
+        relationship.pagado,
+      );
+
+      const amount = Number(
+        relationship.monto ?? 0,
+      );
+
+      const updatedDays = daysBetween(
+        safeDate(relationship.updated_at),
+        now,
+      );
+
+      const loyalty =
+        hasLoyaltyText(relationship);
+
+      const won =
+        hasWonStatus(relationship);
 
       let score = 35;
 
@@ -409,38 +478,60 @@ function buildLoyalClientsCluster(
       if (amount > 0) score += 10;
       if (loyalty) score += 25;
       if (won) score += 15;
-      if (updatedDays !== null && updatedDays <= 30) score += 10;
-      if (signal?.type === "relationship") score += 15;
-      if (signal?.type === "payment" && signal.tone === "emerald") score += 15;
+
+      if (
+        updatedDays !== null &&
+        updatedDays <= 30
+      ) {
+        score += 10;
+      }
+
+      if (signal?.type === "relationship") {
+        score += 15;
+      }
+
+      if (
+        signal?.type === "payment" &&
+        signal.tone === "emerald"
+      ) {
+        score += 15;
+      }
 
       score = clamp(score);
 
       if (score < 60) return null;
 
-      return buildClusterClient(
-        client,
+      return buildClusterRelationship(
+        relationship,
         loyalty
           ? "Tiene señales de recurrencia, confianza o relación estable."
           : paid
             ? "Tiene pago registrado y relación comercial positiva."
             : "Muestra señales de continuidad comercial.",
         score,
-        score >= 80 ? "Cuidar relación" : "Mantener contacto",
+        score >= 80
+          ? "Cuidar relación"
+          : "Mantener contacto",
       );
     })
-    .filter(Boolean) as MemoryPatternClusterClient[];
+    .filter(Boolean) as MemoryPatternClusterRelationship[];
 
-  if (clusterClients.length === 0) return null;
+  if (clusterRelationships.length === 0) {
+    return null;
+  }
 
-  const sortedClients = sortClusterClients(clusterClients);
-  const score = averageScore(sortedClients);
+  const sortedRelationships =
+    sortClusterRelationships(clusterRelationships);
+
+  const score =
+    averageScore(sortedRelationships);
 
   return {
-    id: "loyal-clients",
-    type: "loyal_clients",
-    title: "Clientes leales",
-    subtitle: `${sortedClients.length} cliente${
-      sortedClients.length === 1 ? "" : "s"
+    id: "loyal-relationships",
+    type: "loyal_relationships",
+    title: "Relaciones leales",
+    subtitle: `${sortedRelationships.length} relación${
+      sortedRelationships.length === 1 ? "" : "es"
     } con valor relacional`,
     insight:
       "ClienteYA detecta relaciones con señales de continuidad, pago, recompra o confianza.",
@@ -449,36 +540,81 @@ function buildLoyalClientsCluster(
     recommendation:
       "Cuidar la relación, agradecer, mantener presencia y buscar recompra sin presión.",
     actionLabel: "Proteger relaciones",
-    count: sortedClients.length,
+    count: sortedRelationships.length,
     score,
     priority: score >= 80 ? "high" : "medium",
     tone: "emerald",
-    clients: sortedClients,
+    relationships: sortedRelationships,
   };
 }
 
-function buildSleepingClientsCluster(
-  clients: CommercialMemoryClient[],
+function buildSleepingRelationshipsCluster(
+  relationships: CommercialMemoryRelationship[],
   signals: CommercialMemorySignal[],
   now = new Date(),
 ): MemoryPatternCluster | null {
-  const clusterClients = clients
-    .map((client) => {
-      const signal = getSignalForClient(client, signals);
-      const updatedDays = daysBetween(safeDate(client.updated_at), now);
-      const createdDays = daysBetween(safeDate(client.created_at), now);
-      const lost = hasLostStatus(client);
-      const risk = hasRiskText(client);
-      const paid = Boolean(client.pagado);
-      const amount = Number(client.monto ?? 0);
+  const clusterRelationships = relationships
+    .map((relationship) => {
+      const signal = getSignalForRelationship(
+        relationship,
+        signals,
+      );
+
+      const updatedDays = daysBetween(
+        safeDate(relationship.updated_at),
+        now,
+      );
+
+      const createdDays = daysBetween(
+        safeDate(relationship.created_at),
+        now,
+      );
+
+      const lost =
+        hasLostStatus(relationship);
+
+      const risk =
+        hasRiskText(relationship);
+
+      const paid = Boolean(
+        relationship.pagado,
+      );
+
+      const amount = Number(
+        relationship.monto ?? 0,
+      );
 
       let score = 25;
 
-      if (updatedDays !== null && updatedDays >= 30) score += 25;
-      if (updatedDays !== null && updatedDays >= 60) score += 20;
-      if (createdDays !== null && createdDays >= 45) score += 10;
-      if (paid || amount > 0) score += 15;
-      if (signal?.type === "relationship") score += 10;
+      if (
+        updatedDays !== null &&
+        updatedDays >= 30
+      ) {
+        score += 25;
+      }
+
+      if (
+        updatedDays !== null &&
+        updatedDays >= 60
+      ) {
+        score += 20;
+      }
+
+      if (
+        createdDays !== null &&
+        createdDays >= 45
+      ) {
+        score += 10;
+      }
+
+      if (paid || amount > 0) {
+        score += 15;
+      }
+
+      if (signal?.type === "relationship") {
+        score += 10;
+      }
+
       if (risk) score -= 15;
       if (lost) score -= 30;
 
@@ -486,98 +622,147 @@ function buildSleepingClientsCluster(
 
       if (score < 55) return null;
 
-      return buildClusterClient(
-        client,
+      return buildClusterRelationship(
+        relationship,
         updatedDays !== null
           ? `Sin actualización fuerte hace ${updatedDays} día${
               updatedDays === 1 ? "" : "s"
             }.`
           : "Tiene poca actividad reciente registrada.",
         score,
-        score >= 75 ? "Reactivar relación" : "Enviar saludo",
+        score >= 75
+          ? "Reactivar relación"
+          : "Enviar saludo",
       );
     })
-    .filter(Boolean) as MemoryPatternClusterClient[];
+    .filter(Boolean) as MemoryPatternClusterRelationship[];
 
-  if (clusterClients.length === 0) return null;
+  if (clusterRelationships.length === 0) {
+    return null;
+  }
 
-  const sortedClients = sortClusterClients(clusterClients);
-  const score = averageScore(sortedClients);
+  const sortedRelationships =
+    sortClusterRelationships(clusterRelationships);
+
+  const score =
+    averageScore(sortedRelationships);
 
   return {
-    id: "sleeping-clients",
-    type: "sleeping_clients",
-    title: "Clientes dormidos",
-    subtitle: `${sortedClients.length} relación${
-      sortedClients.length === 1 ? "" : "es"
+    id: "sleeping-relationships",
+    type: "sleeping_relationships",
+    title: "Relaciones dormidas",
+    subtitle: `${sortedRelationships.length} relación${
+      sortedRelationships.length === 1 ? "" : "es"
     } con potencial de reactivación`,
     insight:
-      "ClienteYA detecta clientes que no parecen perdidos, pero llevan demasiado tiempo sin movimiento claro.",
+      "ClienteYA detecta relaciones que no parecen perdidas, pero llevan demasiado tiempo sin movimiento claro.",
     founderMeaning:
       "Aquí puede haber dinero dormido. No son urgencias, pero sí oportunidades olvidadas.",
     recommendation:
       "Reactivar con mensajes humanos, suaves y sin presión comercial directa.",
-    actionLabel: "Reactivar clientes",
-    count: sortedClients.length,
+    actionLabel: "Reactivar relaciones",
+    count: sortedRelationships.length,
     score,
     priority: score >= 80 ? "medium" : "low",
     tone: "slate",
-    clients: sortedClients,
+    relationships: sortedRelationships,
   };
 }
 
-function buildRiskClientsCluster(
-  clients: CommercialMemoryClient[],
+function buildRiskRelationshipsCluster(
+  relationships: CommercialMemoryRelationship[],
   signals: CommercialMemorySignal[],
   now = new Date(),
 ): MemoryPatternCluster | null {
-  const clusterClients = clients
-    .map((client) => {
-      const signal = getSignalForClient(client, signals);
-      const updatedDays = daysBetween(safeDate(client.updated_at), now);
-      const until = daysUntil(safeDate(client.proximo_contacto), now);
-      const risk = hasRiskText(client);
-      const lost = hasLostStatus(client);
+  const clusterRelationships = relationships
+    .map((relationship) => {
+      const signal = getSignalForRelationship(
+        relationship,
+        signals,
+      );
+
+      const updatedDays = daysBetween(
+        safeDate(relationship.updated_at),
+        now,
+      );
+
+      const until = daysUntil(
+        safeDate(relationship.proximo_contacto),
+        now,
+      );
+
+      const risk =
+        hasRiskText(relationship);
+
+      const lost =
+        hasLostStatus(relationship);
 
       let score = 30;
 
       if (risk) score += 25;
       if (lost) score += 25;
-      if (updatedDays !== null && updatedDays > 21) score += 20;
-      if (until !== null && until < 0) score += 20;
-      if (signal?.type === "risk") score += 25;
-      if (signal?.priority === "critical") score += 15;
+
+      if (
+        updatedDays !== null &&
+        updatedDays > 21
+      ) {
+        score += 20;
+      }
+
+      if (
+        until !== null &&
+        until < 0
+      ) {
+        score += 20;
+      }
+
+      if (signal?.type === "risk") {
+        score += 25;
+      }
+
+      if (signal?.priority === "critical") {
+        score += 15;
+      }
 
       score = clamp(score);
 
       if (score < 60) return null;
 
-      return buildClusterClient(
-        client,
+      return buildClusterRelationship(
+        relationship,
         lost
           ? "Tiene estado o notas con señal de pérdida o enfriamiento."
           : until !== null && until < 0
-            ? `Tiene seguimiento vencido hace ${Math.abs(until)} día${
+            ? `Tiene seguimiento vencido hace ${Math.abs(
+                until,
+              )} día${
                 Math.abs(until) === 1 ? "" : "s"
               }.`
             : "Muestra señales de riesgo comercial.",
         score,
-        score >= 80 ? "Recuperar urgente" : "Prevenir pérdida",
+        score >= 80
+          ? "Recuperar urgente"
+          : "Prevenir pérdida",
       );
     })
-    .filter(Boolean) as MemoryPatternClusterClient[];
+    .filter(Boolean) as MemoryPatternClusterRelationship[];
 
-  if (clusterClients.length === 0) return null;
+  if (clusterRelationships.length === 0) {
+    return null;
+  }
 
-  const sortedClients = sortClusterClients(clusterClients);
-  const score = averageScore(sortedClients);
+  const sortedRelationships =
+    sortClusterRelationships(clusterRelationships);
+
+  const score =
+    averageScore(sortedRelationships);
 
   return {
-    id: "risk-clients",
-    type: "risk_clients",
-    title: "Clientes en riesgo",
-    subtitle: `${sortedClients.length} relación${
-      sortedClients.length === 1 ? "" : "es"
+    id: "risk-relationships",
+    type: "risk_relationships",
+    title: "Relaciones en riesgo",
+    subtitle: `${sortedRelationships.length} relación${
+      sortedRelationships.length === 1 ? "" : "es"
     } pueden enfriarse o perderse`,
     insight:
       "ClienteYA detecta señales de atraso, silencio, duda o posible pérdida comercial.",
@@ -586,291 +771,478 @@ function buildRiskClientsCluster(
     recommendation:
       "Recuperar conversación con mensajes cortos, humanos y sin presión de venta.",
     actionLabel: "Recuperar relaciones",
-    count: sortedClients.length,
+    count: sortedRelationships.length,
     score,
     priority: score >= 80 ? "critical" : "high",
     tone: "red",
-    clients: sortedClients,
+    relationships: sortedRelationships,
   };
 }
 
-function buildVipClientsCluster(
-  clients: CommercialMemoryClient[],
+function buildVipRelationshipsCluster(
+  relationships: CommercialMemoryRelationship[],
   signals: CommercialMemorySignal[],
   now = new Date(),
 ): MemoryPatternCluster | null {
-  const paidAmounts = clients
-    .map((client) => Number(client.monto ?? 0))
+  const paidAmounts = relationships
+    .map((relationship) =>
+      Number(relationship.monto ?? 0),
+    )
     .filter((amount) => amount > 0)
     .sort((a, b) => a - b);
 
   const medianAmount =
     paidAmounts.length > 0
-      ? paidAmounts[Math.floor(paidAmounts.length / 2)]
+      ? paidAmounts[
+          Math.floor(paidAmounts.length / 2)
+        ]
       : 0;
 
-  const vipThreshold = Math.max(medianAmount * 1.5, 500000);
+  const vipThreshold =
+    Math.max(
+      medianAmount * 1.5,
+      500000,
+    );
 
-  const clusterClients = clients
-    .map((client) => {
-      const signal = getSignalForClient(client, signals);
-      const amount = Number(client.monto ?? 0);
-      const paid = Boolean(client.pagado);
-      const loyalty = hasLoyaltyText(client);
-      const updatedDays = daysBetween(safeDate(client.updated_at), now);
+  const clusterRelationships = relationships
+    .map((relationship) => {
+      const signal = getSignalForRelationship(
+        relationship,
+        signals,
+      );
+
+      const amount = Number(
+        relationship.monto ?? 0,
+      );
+
+      const paid = Boolean(
+        relationship.pagado,
+      );
+
+      const loyalty =
+        hasLoyaltyText(relationship);
+
+      const updatedDays = daysBetween(
+        safeDate(relationship.updated_at),
+        now,
+      );
 
       let score = 35;
 
-      if (amount >= vipThreshold) score += 30;
+      if (amount >= vipThreshold) {
+        score += 30;
+      }
+
       if (paid) score += 20;
       if (loyalty) score += 20;
-      if (updatedDays !== null && updatedDays <= 30) score += 10;
-      if (signal?.type === "relationship") score += 10;
-      if (signal?.tone === "emerald") score += 10;
+
+      if (
+        updatedDays !== null &&
+        updatedDays <= 30
+      ) {
+        score += 10;
+      }
+
+      if (signal?.type === "relationship") {
+        score += 10;
+      }
+
+      if (signal?.tone === "emerald") {
+        score += 10;
+      }
 
       score = clamp(score);
 
       if (score < 70) return null;
 
-      return buildClusterClient(
-        client,
+      return buildClusterRelationship(
+        relationship,
         amount > 0
-          ? `Valor registrado: ${formatCurrency(amount)}.`
+          ? `Valor registrado: ${formatCurrency(
+              amount,
+            )}.`
           : "Tiene señales de alto valor relacional.",
         score,
-        score >= 85 ? "Prioridad VIP" : "Cuidar valor",
+        score >= 85
+          ? "Prioridad VIP"
+          : "Cuidar valor",
       );
     })
-    .filter(Boolean) as MemoryPatternClusterClient[];
+    .filter(Boolean) as MemoryPatternClusterRelationship[];
 
-  if (clusterClients.length === 0) return null;
+  if (clusterRelationships.length === 0) {
+    return null;
+  }
 
-  const sortedClients = sortClusterClients(clusterClients);
-  const score = averageScore(sortedClients);
+  const sortedRelationships =
+    sortClusterRelationships(clusterRelationships);
+
+  const score =
+    averageScore(sortedRelationships);
 
   return {
-    id: "vip-clients",
-    type: "vip_clients",
-    title: "Clientes VIP",
-    subtitle: `${sortedClients.length} cliente${
-      sortedClients.length === 1 ? "" : "s"
+    id: "vip-relationships",
+    type: "vip_relationships",
+    title: "Relaciones VIP",
+    subtitle: `${sortedRelationships.length} relación${
+      sortedRelationships.length === 1 ? "" : "es"
     } de alto valor`,
     insight:
-      "ClienteYA detecta clientes con valor económico, pago, recurrencia o relación especialmente importante.",
+      "ClienteYA detecta relaciones con valor económico, pago, recurrencia o importancia comercial especial.",
     founderMeaning:
-      "Estos clientes merecen prioridad máxima de relación porque pueden sostener crecimiento y reputación.",
+      "Estas relaciones merecen prioridad máxima porque pueden sostener crecimiento y reputación.",
     recommendation:
-      "Dar seguimiento personalizado. No automatizar demasiado la relación con clientes VIP.",
+      "Dar seguimiento personalizado. No automatizar demasiado las relaciones VIP.",
     actionLabel: "Cuidar VIP",
-    count: sortedClients.length,
+    count: sortedRelationships.length,
     score,
     priority: "high",
     tone: "violet",
-    clients: sortedClients,
+    relationships: sortedRelationships,
   };
 }
 
 function buildPaymentAttentionCluster(
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[],
   signals: CommercialMemorySignal[],
 ): MemoryPatternCluster | null {
-  const clusterClients = clients
-    .map((client) => {
-      const signal = getSignalForClient(client, signals);
-      const amount = Number(client.monto ?? 0);
-      const paid = Boolean(client.pagado);
+  const clusterRelationships = relationships
+    .map((relationship) => {
+      const signal = getSignalForRelationship(
+        relationship,
+        signals,
+      );
+
+      const amount = Number(
+        relationship.monto ?? 0,
+      );
+
+      const paid = Boolean(
+        relationship.pagado,
+      );
 
       let score = 30;
 
-      if (amount > 0 && !paid) score += 45;
-      if (signal?.type === "payment" && signal.priority === "high") score += 20;
-      if (amount >= 1000000 && !paid) score += 15;
+      if (
+        amount > 0 &&
+        !paid
+      ) {
+        score += 45;
+      }
+
+      if (
+        signal?.type === "payment" &&
+        signal.priority === "high"
+      ) {
+        score += 20;
+      }
+
+      if (
+        amount >= 1000000 &&
+        !paid
+      ) {
+        score += 15;
+      }
 
       score = clamp(score);
 
       if (score < 60) return null;
 
-      return buildClusterClient(
-        client,
-        `Tiene ${formatCurrency(amount)} registrado sin pago confirmado.`,
+      return buildClusterRelationship(
+        relationship,
+        `Tiene ${formatCurrency(
+          amount,
+        )} registrado sin pago confirmado.`,
         score,
-        amount >= 1000000 ? "Cobro prioritario" : "Revisar pago",
+        amount >= 1000000
+          ? "Cobro prioritario"
+          : "Revisar pago",
       );
     })
-    .filter(Boolean) as MemoryPatternClusterClient[];
+    .filter(Boolean) as MemoryPatternClusterRelationship[];
 
-  if (clusterClients.length === 0) return null;
+  if (clusterRelationships.length === 0) {
+    return null;
+  }
 
-  const sortedClients = sortClusterClients(clusterClients);
-  const score = averageScore(sortedClients);
+  const sortedRelationships =
+    sortClusterRelationships(clusterRelationships);
+
+  const score =
+    averageScore(sortedRelationships);
 
   return {
     id: "payment-attention",
     type: "payment_attention",
     title: "Cobros pendientes",
-    subtitle: `${sortedClients.length} cliente${
-      sortedClients.length === 1 ? "" : "s"
+    subtitle: `${sortedRelationships.length} relación${
+      sortedRelationships.length === 1 ? "" : "es"
     } con valor por revisar`,
     insight:
-      "ClienteYA detecta clientes con monto registrado pero sin pago confirmado.",
+      "ClienteYA detecta relaciones con monto registrado pero sin pago confirmado.",
     founderMeaning:
       "Puede haber flujo de caja pendiente que merece atención antes de seguir abriendo nuevas oportunidades.",
     recommendation:
       "Revisar cobros con tono profesional y confirmar estado antes de insistir comercialmente.",
     actionLabel: "Revisar cobros",
-    count: sortedClients.length,
+    count: sortedRelationships.length,
     score,
     priority: score >= 80 ? "high" : "medium",
     tone: "amber",
-    clients: sortedClients,
+    relationships: sortedRelationships,
   };
 }
 
 function buildNewOpportunitiesCluster(
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[],
   signals: CommercialMemorySignal[],
   now = new Date(),
 ): MemoryPatternCluster | null {
-  const clusterClients = clients
-    .map((client) => {
-      const signal = getSignalForClient(client, signals);
-      const createdDays = daysBetween(safeDate(client.created_at), now);
-      const updatedDays = daysBetween(safeDate(client.updated_at), now);
-      const open = hasOpenStatus(client);
-      const promise = hasPromiseSignal(client);
+  const clusterRelationships = relationships
+    .map((relationship) => {
+      const signal = getSignalForRelationship(
+        relationship,
+        signals,
+      );
+
+      const createdDays = daysBetween(
+        safeDate(relationship.created_at),
+        now,
+      );
+
+      const updatedDays = daysBetween(
+        safeDate(relationship.updated_at),
+        now,
+      );
+
+      const open =
+        hasOpenStatus(relationship);
+
+      const promise =
+        hasPromiseSignal(relationship);
 
       let score = 35;
 
-      if (createdDays !== null && createdDays <= 14) score += 20;
-      if (updatedDays !== null && updatedDays <= 7) score += 15;
+      if (
+        createdDays !== null &&
+        createdDays <= 14
+      ) {
+        score += 20;
+      }
+
+      if (
+        updatedDays !== null &&
+        updatedDays <= 7
+      ) {
+        score += 15;
+      }
+
       if (open) score += 15;
       if (promise) score += 20;
-      if (signal?.type === "opportunity") score += 20;
+
+      if (signal?.type === "opportunity") {
+        score += 20;
+      }
 
       score = clamp(score);
 
       if (score < 60) return null;
 
-      return buildClusterClient(
-        client,
-        createdDays !== null && createdDays <= 14
-          ? `Nuevo en la base hace ${createdDays} día${
+      return buildClusterRelationship(
+        relationship,
+        createdDays !== null &&
+          createdDays <= 14
+          ? `Nueva en la base hace ${createdDays} día${
               createdDays === 1 ? "" : "s"
             }.`
           : "Muestra señal inicial de oportunidad.",
         score,
-        score >= 80 ? "Convertir pronto" : "Guiar avance",
+        score >= 80
+          ? "Convertir pronto"
+          : "Guiar avance",
       );
     })
-    .filter(Boolean) as MemoryPatternClusterClient[];
+    .filter(Boolean) as MemoryPatternClusterRelationship[];
 
-  if (clusterClients.length === 0) return null;
+  if (clusterRelationships.length === 0) {
+    return null;
+  }
 
-  const sortedClients = sortClusterClients(clusterClients);
-  const score = averageScore(sortedClients);
+  const sortedRelationships =
+    sortClusterRelationships(clusterRelationships);
+
+  const score =
+    averageScore(sortedRelationships);
 
   return {
     id: "new-opportunities",
     type: "new_opportunities",
     title: "Nuevas oportunidades",
-    subtitle: `${sortedClients.length} cliente${
-      sortedClients.length === 1 ? "" : "s"
+    subtitle: `${sortedRelationships.length} relación${
+      sortedRelationships.length === 1 ? "" : "es"
     } con potencial inicial`,
     insight:
-      "ClienteYA detecta contactos nuevos o recientes con señales comerciales que todavía necesitan dirección.",
+      "ClienteYA detecta relaciones nuevas o recientes con señales comerciales que todavía necesitan dirección.",
     founderMeaning:
       "Estas oportunidades están frescas. El timing puede ser más importante que la insistencia.",
     recommendation:
       "Guiar la conversación con una pregunta clara o una propuesta simple.",
     actionLabel: "Guiar oportunidades",
-    count: sortedClients.length,
+    count: sortedRelationships.length,
     score,
     priority: score >= 80 ? "high" : "medium",
     tone: "sky",
-    clients: sortedClients,
+    relationships: sortedRelationships,
   };
 }
 
 function buildNeedsMemoryCluster(
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[],
 ): MemoryPatternCluster | null {
-  const clusterClients = clients
-    .map((client) => {
+  const clusterRelationships = relationships
+    .map((relationship) => {
       let score = 40;
 
-      if (!normalizeText(client.notas)) score += 20;
-      if (!normalizeText(client.recordatorio)) score += 15;
-      if (!client.proximo_contacto) score += 15;
-      if (!client.estado) score += 10;
+      if (
+        !normalizeText(
+          relationship.notas,
+        )
+      ) {
+        score += 20;
+      }
+
+      if (
+        !normalizeText(
+          relationship.recordatorio,
+        )
+      ) {
+        score += 15;
+      }
+
+      if (
+        !relationship.proximo_contacto
+      ) {
+        score += 15;
+      }
+
+      if (!relationship.estado) {
+        score += 10;
+      }
 
       score = clamp(score);
 
-      if (score < 60 || hasUsefulMemory(client)) return null;
+      if (
+        score < 60 ||
+        hasUsefulMemory(relationship)
+      ) {
+        return null;
+      }
 
-      return buildClusterClient(
-        client,
+      return buildClusterRelationship(
+        relationship,
         "Faltan notas, recordatorio o próximo contacto para leer mejor la relación.",
         score,
         "Completar memoria",
       );
     })
-    .filter(Boolean) as MemoryPatternClusterClient[];
+    .filter(Boolean) as MemoryPatternClusterRelationship[];
 
-  if (clusterClients.length === 0) return null;
+  if (clusterRelationships.length === 0) {
+    return null;
+  }
 
-  const sortedClients = sortClusterClients(clusterClients);
-  const score = averageScore(sortedClients);
+  const sortedRelationships =
+    sortClusterRelationships(clusterRelationships);
+
+  const score =
+    averageScore(sortedRelationships);
 
   return {
     id: "needs-memory",
     type: "needs_memory",
     title: "Memoria incompleta",
-    subtitle: `${sortedClients.length} cliente${
-      sortedClients.length === 1 ? "" : "s"
+    subtitle: `${sortedRelationships.length} relación${
+      sortedRelationships.length === 1 ? "" : "es"
     } necesitan más contexto`,
     insight:
-      "ClienteYA detecta clientes con poca información para construir una memoria comercial confiable.",
+      "ClienteYA detecta relaciones con poca información para construir una memoria comercial confiable.",
     founderMeaning:
       "Sin memoria, la AI puede ver datos, pero no entender bien la relación.",
     recommendation:
       "Completar notas simples: qué quiere, qué pasó y cuál es el próximo paso.",
     actionLabel: "Completar contexto",
-    count: sortedClients.length,
+    count: sortedRelationships.length,
     score,
     priority: "low",
     tone: "slate",
-    clients: sortedClients,
+    relationships: sortedRelationships,
   };
 }
 
-function buildSummary(clusters: MemoryPatternCluster[]): MemoryPatternClusterSummary {
-  const totalClientsInClusters = clusters.reduce(
-    (total, cluster) => total + cluster.count,
-    0,
-  );
+function buildSummary(
+  clusters: MemoryPatternCluster[],
+): MemoryPatternClusterSummary {
+  const totalRelationshipsInClusters =
+    clusters.reduce(
+      (total, cluster) =>
+        total + cluster.count,
+      0,
+    );
 
-  const criticalClusters = clusters.filter(
-    (cluster) => cluster.priority === "critical",
-  ).length;
+  const criticalClusters =
+    clusters.filter(
+      (cluster) =>
+        cluster.priority === "critical",
+    ).length;
 
-  const highClusters = clusters.filter(
-    (cluster) => cluster.priority === "high",
-  ).length;
+  const highClusters =
+    clusters.filter(
+      (cluster) =>
+        cluster.priority === "high",
+    ).length;
 
   const strongest = [...clusters].sort(
     (a, b) =>
-      getPriorityWeight(b.priority) - getPriorityWeight(a.priority) ||
+      getPriorityWeight(b.priority) -
+        getPriorityWeight(a.priority) ||
       b.score - a.score ||
       b.count - a.count,
   )[0];
 
-  const riskCluster = clusters.find((cluster) => cluster.type === "risk_clients");
-  const vipCluster = clusters.find((cluster) => cluster.type === "vip_clients");
-  const hotCluster = clusters.find((cluster) => cluster.type === "hot_clients");
-  const paymentCluster = clusters.find(
-    (cluster) => cluster.type === "payment_attention",
-  );
-  const memoryCluster = clusters.find((cluster) => cluster.type === "needs_memory");
+  const riskCluster =
+    clusters.find(
+      (cluster) =>
+        cluster.type ===
+        "risk_relationships",
+    );
+
+  const vipCluster =
+    clusters.find(
+      (cluster) =>
+        cluster.type ===
+        "vip_relationships",
+    );
+
+  const hotCluster =
+    clusters.find(
+      (cluster) =>
+        cluster.type ===
+        "hot_relationships",
+    );
+
+  const paymentCluster =
+    clusters.find(
+      (cluster) =>
+        cluster.type ===
+        "payment_attention",
+    );
+
+  const memoryCluster =
+    clusters.find(
+      (cluster) =>
+        cluster.type ===
+        "needs_memory",
+    );
 
   const mainRisk = riskCluster
     ? `${riskCluster.count} relación${
@@ -881,15 +1253,15 @@ function buildSummary(clusters: MemoryPatternCluster[]): MemoryPatternClusterSum
           paymentCluster.count === 1 ? "" : "s"
         } necesitan revisión.`
       : memoryCluster
-        ? "La mayor debilidad actual es falta de memoria comercial en algunos clientes."
+        ? "La mayor debilidad actual es falta de memoria comercial en algunas relaciones."
         : "No hay un patrón fuerte de riesgo en este momento.";
 
   const bestAction = riskCluster
     ? "Recuperar primero las relaciones en riesgo."
     : hotCluster
-      ? "Avanzar primero los clientes calientes."
+      ? "Avanzar primero las relaciones calientes."
       : vipCluster
-        ? "Cuidar primero los clientes VIP."
+        ? "Cuidar primero las relaciones VIP."
         : paymentCluster
           ? "Revisar cobros pendientes."
           : memoryCluster
@@ -900,44 +1272,83 @@ function buildSummary(clusters: MemoryPatternCluster[]): MemoryPatternClusterSum
     title: "Patrones de memoria comercial",
     summary:
       clusters.length > 0
-        ? "ClienteYA agrupa clientes por patrones de relación, riesgo, oportunidad, pago y memoria para mostrar dónde actuar primero."
-        : "ClienteYA todavía necesita más datos para agrupar clientes en patrones comerciales útiles.",
+        ? "ClienteYA agrupa relaciones por patrones de riesgo, oportunidad, pago y memoria para mostrar dónde actuar primero."
+        : "ClienteYA todavía necesita más datos para agrupar relaciones en patrones comerciales útiles.",
     strongestCluster: strongest
-      ? `${strongest.title}: ${strongest.count} cliente${
-          strongest.count === 1 ? "" : "s"
+      ? `${strongest.title}: ${strongest.count} relación${
+          strongest.count === 1 ? "" : "es"
         }.`
       : "Todavía no hay un patrón dominante.",
     mainRisk,
     bestAction,
     totalClusters: clusters.length,
-    totalClientsInClusters,
+    totalRelationshipsInClusters,
     criticalClusters,
     highClusters,
   };
 }
 
 export function buildMemoryPatternClusters(
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[],
 ): MemoryPatternClusterResult {
   const now = new Date();
-  const commercialMemory = buildCommercialMemorySignals(clients);
-  const signals = commercialMemory.signals;
+
+  const commercialMemory =
+    buildCommercialMemorySignals(
+      relationships,
+    );
+
+  const signals =
+    commercialMemory.signals;
 
   const clusters = [
-    buildRiskClientsCluster(clients, signals, now),
-    buildHotClientsCluster(clients, signals, now),
-    buildVipClientsCluster(clients, signals, now),
-    buildLoyalClientsCluster(clients, signals, now),
-    buildPaymentAttentionCluster(clients, signals),
-    buildNewOpportunitiesCluster(clients, signals, now),
-    buildSleepingClientsCluster(clients, signals, now),
-    buildNeedsMemoryCluster(clients),
+    buildRiskRelationshipsCluster(
+      relationships,
+      signals,
+      now,
+    ),
+    buildHotRelationshipsCluster(
+      relationships,
+      signals,
+      now,
+    ),
+    buildVipRelationshipsCluster(
+      relationships,
+      signals,
+      now,
+    ),
+    buildLoyalRelationshipsCluster(
+      relationships,
+      signals,
+      now,
+    ),
+    buildPaymentAttentionCluster(
+      relationships,
+      signals,
+    ),
+    buildNewOpportunitiesCluster(
+      relationships,
+      signals,
+      now,
+    ),
+    buildSleepingRelationshipsCluster(
+      relationships,
+      signals,
+      now,
+    ),
+    buildNeedsMemoryCluster(
+      relationships,
+    ),
   ]
     .filter(Boolean)
-    .map((cluster) => cluster as MemoryPatternCluster)
+    .map(
+      (cluster) =>
+        cluster as MemoryPatternCluster,
+    )
     .sort((a, b) => {
       return (
-        getPriorityWeight(b.priority) - getPriorityWeight(a.priority) ||
+        getPriorityWeight(b.priority) -
+          getPriorityWeight(a.priority) ||
         b.score - a.score ||
         b.count - a.count ||
         a.title.localeCompare(b.title)
@@ -953,12 +1364,15 @@ export function buildMemoryPatternClusters(
 export function getMemoryPatternClusterTypeLabel(
   type: MemoryPatternClusterType,
 ) {
-  const map: Record<MemoryPatternClusterType, string> = {
-    hot_clients: "Clientes calientes",
-    loyal_clients: "Clientes leales",
-    sleeping_clients: "Clientes dormidos",
-    risk_clients: "Clientes en riesgo",
-    vip_clients: "Clientes VIP",
+  const map: Record<
+    MemoryPatternClusterType,
+    string
+  > = {
+    hot_relationships: "Relaciones calientes",
+    loyal_relationships: "Relaciones leales",
+    sleeping_relationships: "Relaciones dormidas",
+    risk_relationships: "Relaciones en riesgo",
+    vip_relationships: "Relaciones VIP",
     payment_attention: "Cobros pendientes",
     new_opportunities: "Nuevas oportunidades",
     needs_memory: "Memoria incompleta",
@@ -970,7 +1384,10 @@ export function getMemoryPatternClusterTypeLabel(
 export function getMemoryPatternClusterPriorityLabel(
   priority: MemoryPatternClusterPriority,
 ) {
-  const map: Record<MemoryPatternClusterPriority, string> = {
+  const map: Record<
+    MemoryPatternClusterPriority,
+    string
+  > = {
     critical: "Crítico",
     high: "Alta",
     medium: "Media",
@@ -983,13 +1400,22 @@ export function getMemoryPatternClusterPriorityLabel(
 export function getMemoryPatternClusterToneClasses(
   tone: MemoryPatternClusterTone,
 ) {
-  const map: Record<MemoryPatternClusterTone, string> = {
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-950",
-    sky: "border-sky-200 bg-sky-50 text-sky-950",
-    amber: "border-amber-200 bg-amber-50 text-amber-950",
-    red: "border-red-200 bg-red-50 text-red-950",
-    slate: "border-slate-200 bg-slate-50 text-slate-950",
-    violet: "border-violet-200 bg-violet-50 text-violet-950",
+  const map: Record<
+    MemoryPatternClusterTone,
+    string
+  > = {
+    emerald:
+      "border-emerald-200 bg-emerald-50 text-emerald-950",
+    sky:
+      "border-sky-200 bg-sky-50 text-sky-950",
+    amber:
+      "border-amber-200 bg-amber-50 text-amber-950",
+    red:
+      "border-red-200 bg-red-50 text-red-950",
+    slate:
+      "border-slate-200 bg-slate-50 text-slate-950",
+    violet:
+      "border-violet-200 bg-violet-50 text-violet-950",
   };
 
   return map[tone];
@@ -998,25 +1424,39 @@ export function getMemoryPatternClusterToneClasses(
 export function getMemoryPatternClusterBadgeClasses(
   tone: MemoryPatternClusterTone,
 ) {
-  const map: Record<MemoryPatternClusterTone, string> = {
-    emerald: "border-emerald-200 bg-emerald-100 text-emerald-800",
-    sky: "border-sky-200 bg-sky-100 text-sky-800",
-    amber: "border-amber-200 bg-amber-100 text-amber-800",
-    red: "border-red-200 bg-red-100 text-red-800",
-    slate: "border-slate-200 bg-slate-100 text-slate-700",
-    violet: "border-violet-200 bg-violet-100 text-violet-800",
+  const map: Record<
+    MemoryPatternClusterTone,
+    string
+  > = {
+    emerald:
+      "border-emerald-200 bg-emerald-100 text-emerald-800",
+    sky:
+      "border-sky-200 bg-sky-100 text-sky-800",
+    amber:
+      "border-amber-200 bg-amber-100 text-amber-800",
+    red:
+      "border-red-200 bg-red-100 text-red-800",
+    slate:
+      "border-slate-200 bg-slate-100 text-slate-700",
+    violet:
+      "border-violet-200 bg-violet-100 text-violet-800",
   };
 
   return map[tone];
 }
 
-export function getMemoryPatternClusterIcon(type: MemoryPatternClusterType) {
-  const map: Record<MemoryPatternClusterType, string> = {
-    hot_clients: "🔥",
-    loyal_clients: "🤝",
-    sleeping_clients: "😴",
-    risk_clients: "⚠️",
-    vip_clients: "💎",
+export function getMemoryPatternClusterIcon(
+  type: MemoryPatternClusterType,
+) {
+  const map: Record<
+    MemoryPatternClusterType,
+    string
+  > = {
+    hot_relationships: "🔥",
+    loyal_relationships: "🤝",
+    sleeping_relationships: "😴",
+    risk_relationships: "⚠️",
+    vip_relationships: "💎",
     payment_attention: "💰",
     new_opportunities: "🌱",
     needs_memory: "🧠",

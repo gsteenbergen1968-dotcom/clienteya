@@ -16,17 +16,8 @@ type Profile = {
   full_name: string | null;
   subscription_status: string | null;
   plan_type: string | null;
-  payment_amount: number | null;
-  payment_method: string | null;
-  payment_notes: string | null;
   created_at: string | null;
 };
-
-function formatGs(value: number | null) {
-  if (!value) return "—";
-
-  return `Gs. ${Number(value).toLocaleString("es-PY")}`;
-}
 
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -43,11 +34,11 @@ function statusBadge(status: string | null) {
     return "border border-emerald-200 bg-emerald-100 text-emerald-700";
   }
 
-  if (status === "pending_review") {
+  if (status === "pending") {
     return "border border-amber-200 bg-amber-100 text-amber-700";
   }
 
-  if (status === "canceled" || status === "expired") {
+  if (status === "paused" || status === "canceled") {
     return "border border-red-200 bg-red-100 text-red-700";
   }
 
@@ -122,38 +113,6 @@ export default async function AdminPage() {
     revalidatePath("/dashboard/admin");
   }
 
-  async function activateBasic(formData: FormData) {
-    "use server";
-
-    const supabase = await createAuthServerClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user || !isAdminEmail(user.email)) {
-      redirect("/dashboard");
-    }
-
-    const id = String(formData.get("profileId") || "");
-
-    if (!id) {
-      redirect("/dashboard/admin");
-    }
-
-    const admin = createAdminClient();
-
-    await admin
-      .from("profiles")
-      .update({
-        plan_type: "basic",
-        subscription_status: "active",
-      })
-      .eq("id", id);
-
-    revalidatePath("/dashboard/admin");
-  }
-
   async function pauseUser(formData: FormData) {
     "use server";
 
@@ -178,7 +137,7 @@ export default async function AdminPage() {
     await admin
       .from("profiles")
       .update({
-        subscription_status: "expired",
+        subscription_status: "paused",
       })
       .eq("id", id);
 
@@ -190,7 +149,7 @@ export default async function AdminPage() {
   const { data } = await admin
     .from("profiles")
     .select(
-      "id, email, full_name, subscription_status, plan_type, payment_amount, payment_method, payment_notes, created_at",
+      "id, email, full_name, subscription_status, plan_type, created_at",
     )
     .order("created_at", { ascending: false });
 
@@ -242,7 +201,7 @@ export default async function AdminPage() {
                               profile.plan_type,
                             )}`}
                           >
-                            {profile.plan_type || "basic"}
+                            {profile.plan_type || "Sin plan"}
                           </span>
 
                           <span
@@ -258,27 +217,7 @@ export default async function AdminPage() {
                           {profile.email || "Sin email"}
                         </p>
 
-                        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                              Monto
-                            </p>
-
-                            <p className="mt-2 text-sm font-semibold text-slate-950">
-                              {formatGs(profile.payment_amount)}
-                            </p>
-                          </div>
-
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                              Método
-                            </p>
-
-                            <p className="mt-2 text-sm font-semibold text-slate-950">
-                              {profile.payment_method || "—"}
-                            </p>
-                          </div>
-
+                        <div className="mt-5">
                           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                               Creado
@@ -286,16 +225,6 @@ export default async function AdminPage() {
 
                             <p className="mt-2 text-sm font-semibold text-slate-950">
                               {formatDate(profile.created_at)}
-                            </p>
-                          </div>
-
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2 xl:col-span-1">
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                              Nota
-                            </p>
-
-                            <p className="mt-2 break-words text-sm font-semibold text-slate-950">
-                              {profile.payment_notes || "—"}
                             </p>
                           </div>
                         </div>
@@ -311,18 +240,6 @@ export default async function AdminPage() {
 
                           <button className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
                             Activar Pro
-                          </button>
-                        </form>
-
-                        <form action={activateBasic}>
-                          <input
-                            type="hidden"
-                            name="profileId"
-                            value={profile.id}
-                          />
-
-                          <button className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
-                            Básico
                           </button>
                         </form>
 

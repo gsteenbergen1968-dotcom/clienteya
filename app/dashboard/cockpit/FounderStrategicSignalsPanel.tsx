@@ -9,7 +9,7 @@ type FounderStrategicSignalsPanelProps = {
   responseRate: number;
   conversionRate: number;
   followupRate: number;
-  activeClients: number;
+  activeRelationships: number;
   opportunities: number;
   revenue: number;
 };
@@ -19,7 +19,7 @@ const fallbackSignal: FounderStrategicSignal = {
   description:
     "ClienteYA todavía no detecta un patrón estratégico fuerte. La actividad comercial actual necesita más datos para generar una lectura más precisa.",
   recommendation:
-    "Seguir registrando clientes, seguimientos, pagos y oportunidades para activar señales estratégicas más claras.",
+    "Seguir registrando relaciones, seguimientos, pagos y oportunidades para activar señales estratégicas más claras.",
   priority: "low",
 };
 
@@ -27,7 +27,7 @@ export default function FounderStrategicSignalsPanel({
   responseRate,
   conversionRate,
   followupRate,
-  activeClients,
+  activeRelationships,
   opportunities,
   revenue,
 }: FounderStrategicSignalsPanelProps) {
@@ -35,7 +35,7 @@ export default function FounderStrategicSignalsPanel({
     responseRate,
     conversionRate,
     followupRate,
-    activeClients,
+    activeRelationships,
     opportunities,
     revenue,
   });
@@ -49,9 +49,6 @@ export default function FounderStrategicSignalsPanel({
 
   return (
     <section className="relative overflow-hidden rounded-[40px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.10),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.12),transparent_30%)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-600 via-emerald-500 to-slate-950" />
-
       <div className="relative grid gap-0 xl:grid-cols-[0.82fr_1.18fr]">
         <div className="border-b border-slate-200 bg-gradient-to-br from-white via-blue-50/60 to-slate-50 p-5 sm:p-7 xl:border-b-0 xl:border-r xl:p-8">
           <div className="mb-5 flex flex-wrap items-center gap-2">
@@ -92,11 +89,11 @@ export default function FounderStrategicSignalsPanel({
 
               <span
                 className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${getFounderStrategicSignalPriorityClasses(
-                  primarySignal.priority,
+                  primarySignal.priority
                 )}`}
               >
                 {getFounderStrategicSignalPriorityLabel(
-                  primarySignal.priority,
+                  primarySignal.priority
                 )}
               </span>
             </div>
@@ -167,7 +164,7 @@ export default function FounderStrategicSignalsPanel({
 
                   <span
                     className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${getFounderStrategicSignalPriorityClasses(
-                      signal.priority,
+                      signal.priority
                     )}`}
                   >
                     {getFounderStrategicSignalPriorityLabel(signal.priority)}

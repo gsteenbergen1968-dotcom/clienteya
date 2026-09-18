@@ -2,10 +2,14 @@
 
 import { createAuthServerClient } from "@/lib/supabase/auth-server";
 
-export async function updateClientStatus(id: string, estado: string) {
+export async function updateRelationshipStatus(
+  id: string,
+  status: string
+) {
   const supabase = await createAuthServerClient();
+
   await supabase
-    .from("clientes")
-    .update({ estado })
+    .from("relationships")
+    .update({ status })
     .eq("id", id);
 }

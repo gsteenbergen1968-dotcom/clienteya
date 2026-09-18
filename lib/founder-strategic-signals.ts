@@ -15,22 +15,23 @@ export type FounderStrategicSignalInput = {
   responseRate: number;
   conversionRate: number;
   followupRate: number;
-  activeClients: number;
+  activeRelationships: number;
   opportunities: number;
   revenue: number;
 };
 
 export function getFounderStrategicSignalPriorityLabel(
-  priority: FounderStrategicSignalPriority,
+  priority: FounderStrategicSignalPriority
 ) {
   if (priority === "critical") return "Crítico";
   if (priority === "high") return "Alto";
   if (priority === "medium") return "Medio";
+
   return "Bajo";
 }
 
 export function getFounderStrategicSignalPriorityClasses(
-  priority: FounderStrategicSignalPriority,
+  priority: FounderStrategicSignalPriority
 ) {
   if (priority === "critical") {
     return "bg-red-50 text-red-700 ring-1 ring-red-200";
@@ -48,7 +49,7 @@ export function getFounderStrategicSignalPriorityClasses(
 }
 
 export function buildFounderStrategicSignals(
-  input: FounderStrategicSignalInput,
+  input: FounderStrategicSignalInput
 ): FounderStrategicSignal[] {
   const signals: FounderStrategicSignal[] = [];
 
@@ -61,7 +62,7 @@ export function buildFounderStrategicSignals(
       description:
         "El negocio está generando oportunidades, pero la conversión está limitando el crecimiento.",
       recommendation:
-        "Revisar proceso comercial y priorizar clientes con mayor intención de compra.",
+        "Revisar proceso comercial y priorizar relaciones con mayor intención de compra.",
       priority: "high",
     });
   }
@@ -73,7 +74,7 @@ export function buildFounderStrategicSignals(
     signals.push({
       title: "Relaciones saludables",
       description:
-        "Los clientes responden y reciben seguimiento constante. Existe una base comercial sólida.",
+        "Las relaciones responden y reciben seguimiento constante. Existe una base comercial sólida.",
       recommendation:
         "Aumentar captación para aprovechar la capacidad comercial existente.",
       priority: "low",
@@ -89,13 +90,13 @@ export function buildFounderStrategicSignals(
       description:
         "Las relaciones comerciales muestran baja interacción y poco seguimiento.",
       recommendation:
-        "Contactar clientes pendientes esta semana y recuperar conversaciones activas.",
+        "Contactar relaciones pendientes esta semana y recuperar conversaciones activas.",
       priority: "critical",
     });
   }
 
   if (
-    input.activeClients < 5 &&
+    input.activeRelationships < 5 &&
     input.opportunities < 5
   ) {
     signals.push({

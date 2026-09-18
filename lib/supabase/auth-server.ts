@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+
 import { cookies } from "next/headers";
 
 export async function createAuthServerClient() {
@@ -12,6 +13,7 @@ export async function createAuthServerClient() {
         getAll() {
           return cookieStore.getAll();
         },
+
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
@@ -22,6 +24,6 @@ export async function createAuthServerClient() {
           }
         },
       },
-    }
+    },
   );
 }

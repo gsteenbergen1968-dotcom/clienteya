@@ -1,4 +1,7 @@
-import { getClientStatusLabel, getPriorityLabel } from "../../lib/ui-format";
+import {
+  getPriorityLabel,
+  getRelationshipStatusLabel,
+} from "../../lib/ui-format";
 
 type BadgeTone =
   | "default"
@@ -33,25 +36,44 @@ function inferStatusTone(label?: string | null): BadgeTone {
   if (!normalized) return "muted";
 
   if (
-    ["active", "activo", "completed", "completado", "done", "won", "ganado"].includes(
-      normalized
-    )
+    [
+      "active",
+      "activo",
+      "completed",
+      "completado",
+      "done",
+      "won",
+      "ganado",
+    ].includes(normalized)
   ) {
     return "success";
   }
 
   if (
-    ["pending", "pendiente", "medium", "media", "prospect", "prospecto", "lead"].includes(
-      normalized
-    )
+    [
+      "pending",
+      "pendiente",
+      "medium",
+      "media",
+      "prospect",
+      "prospecto",
+      "lead",
+    ].includes(normalized)
   ) {
     return "warning";
   }
 
   if (
-    ["urgent", "urgente", "high", "alta", "overdue", "vencido", "lost", "perdido"].includes(
-      normalized
-    )
+    [
+      "urgent",
+      "urgente",
+      "high",
+      "alta",
+      "overdue",
+      "vencido",
+      "lost",
+      "perdido",
+    ].includes(normalized)
   ) {
     return "danger";
   }
@@ -70,7 +92,7 @@ export default function StatusBadge({
 }: StatusBadgeProps) {
   const displayLabel =
     type === "status"
-      ? getClientStatusLabel(label)
+      ? getRelationshipStatusLabel(label)
       : type === "priority"
         ? getPriorityLabel(label)
         : label || "Sin estado";

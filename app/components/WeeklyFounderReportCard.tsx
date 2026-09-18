@@ -5,7 +5,7 @@ import {
   type WeeklyReportTone,
 } from "../../lib/founder-weekly-report";
 
-import type { FounderBriefingClient } from "../../lib/founder-briefing";
+import type { FounderBriefingRelationship } from "../../lib/founder-briefing";
 
 function formatGs(value: number) {
   return `Gs. ${value.toLocaleString("es-ES")}`;
@@ -14,7 +14,8 @@ function formatGs(value: number) {
 function toneClasses(tone: WeeklyReportTone) {
   if (tone === "critical") {
     return {
-      shell: "border-red-200 bg-gradient-to-br from-white via-red-50/30 to-white",
+      shell:
+        "border-red-200 bg-gradient-to-br from-white via-red-50/30 to-white",
       text: "text-red-700",
       badge: "border-red-200 bg-red-100 text-red-700",
       dot: "bg-red-500",
@@ -48,8 +49,8 @@ function ItemList({
   items: WeeklyReportItem[];
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-3 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+    <div>
+      <h3 className="mb-3 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
         {title}
       </h3>
 
@@ -88,8 +89,8 @@ function Metric({
   value: string | number;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
         {label}
       </p>
 
@@ -99,11 +100,11 @@ function Metric({
 }
 
 export default function WeeklyFounderReportCard({
-  clients,
+  relationships,
 }: {
-  clients: FounderBriefingClient[];
+  relationships: FounderBriefingRelationship[];
 }) {
-  const report: WeeklyFounderReport = buildWeeklyFounderReport(clients);
+  const report: WeeklyFounderReport = buildWeeklyFounderReport(relationships);
   const classes = toneClasses(report.tone);
 
   return (
@@ -111,7 +112,7 @@ export default function WeeklyFounderReportCard({
       className={`mb-6 overflow-hidden rounded-3xl border ${classes.shell} shadow-sm`}
     >
       <div className="border-b border-slate-200 px-5 py-5 sm:px-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div className="grid gap-4 lg:grid-cols-[1fr_180px] lg:items-start">
           <div>
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <span
@@ -178,15 +179,15 @@ export default function WeeklyFounderReportCard({
       <div className="grid gap-4 border-b border-slate-200 bg-white px-5 py-5 sm:px-6 lg:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
-            Clientes activos
+            Relaciones activas
           </p>
 
           <p className="mt-2 text-3xl font-black text-slate-950">
-            {report.activeClients}
+            {report.activeRelationships}
           </p>
 
           <p className="mt-1 text-xs text-slate-500">
-            {report.totalClients} clientes en total
+            {report.totalRelationships} relaciones en total
           </p>
         </div>
 
@@ -200,7 +201,7 @@ export default function WeeklyFounderReportCard({
           </p>
 
           <p className="mt-1 text-xs text-slate-500">
-            clientes perdiendo momentum
+            relaciones perdiendo momentum
           </p>
         </div>
 

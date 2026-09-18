@@ -11,7 +11,7 @@ export type WhatsAppSectorTone =
   | "directo"
   | "calido";
 
-export type WhatsAppSectorClient = {
+export type WhatsAppSectorRelationship = {
   id?: string | null;
   nombre?: string | null;
   telefono?: string | null;
@@ -32,7 +32,7 @@ export type WhatsAppSectorBusiness = {
 };
 
 export type WhatsAppSectorInput = {
-  cliente: WhatsAppSectorClient;
+  relationship: WhatsAppSectorRelationship;
   business?: WhatsAppSectorBusiness | null;
   decisionLabel?: string | null;
   reason?: string | null;
@@ -54,8 +54,8 @@ function normalizeText(value: string | null | undefined) {
   return (value || "").toLowerCase().trim();
 }
 
-function getClienteName(cliente: WhatsAppSectorClient) {
-  return cliente.nombre?.trim() || "cliente";
+function getRelationshipName(relationship: WhatsAppSectorRelationship) {
+  return relationship.nombre?.trim() || "relación";
 }
 
 function getCompanyName(business?: WhatsAppSectorBusiness | null) {
@@ -73,8 +73,11 @@ function normalizeTone(value: string | null | undefined): WhatsAppSectorTone {
   return "amigable";
 }
 
-function buildGreeting(cliente: WhatsAppSectorClient, tone: WhatsAppSectorTone) {
-  const name = getClienteName(cliente);
+function buildGreeting(
+  relationship: WhatsAppSectorRelationship,
+  tone: WhatsAppSectorTone
+) {
+  const name = getRelationshipName(relationship);
 
   if (tone === "profesional") return `Hola ${name}, buen día.`;
   if (tone === "directo") return `Hola ${name}.`;
@@ -250,7 +253,7 @@ function buildRetailMessage(input: {
 
   if (decision.includes("actuar") || decision.includes("reactivar")) {
     return {
-      actionLabel: "Recuperar cliente",
+      actionLabel: "Recuperar relación",
       context: "Hace tiempo que no tenemos noticias tuyas.",
       action:
         "¿Te gustaría que te muestre algunas opciones nuevas?",
@@ -293,7 +296,7 @@ function buildGenericMessage(input: {
 
   if (decision.includes("actuar") || decision.includes("reactivar")) {
     return {
-      actionLabel: "Reactivar cliente",
+      actionLabel: "Reactivar relación",
       context: "Hace tiempo que no hablamos.",
       action:
         "¿Te gustaría que retomemos el tema esta semana?",
@@ -324,17 +327,19 @@ export function buildWhatsAppSectorMessage(
   const tone = normalizeTone(input.business?.business_tone);
   const companyName = getCompanyName(input.business);
   const decisionLabel = input.decisionLabel || "Dar seguimiento";
-  const reason = input.reason || "Cliente necesita seguimiento.";
-  const isPaid = Boolean(input.cliente.pagado);
-  const hasValue = Boolean(input.cliente.monto && input.cliente.monto > 0);
+  const reason = input.reason || "Relación necesita seguimiento.";
+  const isPaid = Boolean(input.relationship.pagado);
+  const hasValue = Boolean(
+    input.relationship.monto && input.relationship.monto > 0
+  );
 
   const sectorDecision = buildSectorDecisionCopy({
     businessType,
     decisionLabel,
     reason,
-    estado: input.cliente.estado,
+    estado: input.relationship.estado,
     daysOverdue: input.daysOverdue || null,
-    hasWhatsapp: Boolean(input.cliente.telefono),
+    hasWhatsapp: Boolean(input.relationship.telefono),
     isPaid,
     hasValue,
   });
@@ -383,7 +388,7 @@ export function buildWhatsAppSectorMessage(
     });
   }
 
-  const greeting = buildGreeting(input.cliente, tone);
+  const greeting = buildGreeting(input.relationship, tone);
   const closing = buildClosing(tone);
 
   const message = [

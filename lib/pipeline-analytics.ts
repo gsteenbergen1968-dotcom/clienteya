@@ -1,9 +1,9 @@
 import {
-  detectClientPhase,
-  type ClientPhase,
+  detectRelationshipPhase,
+  type RelationshipPhase,
 } from "./phase-detection";
 
-type Cliente = {
+type Relationship = {
   id: string;
   nombre: string;
   estado?: string | null;
@@ -24,10 +24,10 @@ export type PipelineAnalytics = {
 };
 
 export function buildPipelineAnalytics(
-  clientes: Cliente[]
+  relationships: Relationship[]
 ): PipelineAnalytics {
   const analytics: PipelineAnalytics = {
-    total: clientes.length,
+    total: relationships.length,
     nuevo_lead: 0,
     interesado: 0,
     negociacion: 0,
@@ -37,8 +37,8 @@ export function buildPipelineAnalytics(
     sin_respuesta: 0,
   };
 
-  for (const cliente of clientes) {
-    const phase = detectClientPhase(cliente);
+  for (const relationship of relationships) {
+    const phase = detectRelationshipPhase(relationship);
 
     analytics[phase.phase]++;
   }

@@ -1,8 +1,8 @@
 export const labels = {
   aiScore: "Score AI",
   aiRecommendation: "Recomendación AI",
-  aiSummary: "Resumen AI del cliente",
-  aiClientMemory: "Memoria comercial",
+  aiSummary: "Resumen AI de la relación",
+  aiRelationshipMemory: "Memoria comercial",
   aiNextBestStep: "Próximo mejor paso",
 
   businessHealth: "Salud comercial",

@@ -11,7 +11,7 @@ export type KPIImpactInput = {
   responseRate: number;
   conversionRate: number;
   followupRate: number;
-  activeClients: number;
+  activeRelationships: number;
   opportunities: number;
 };
 
@@ -24,14 +24,19 @@ function clamp(value: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
 }
 
-export function getKPIImpactPriorityLabel(priority: KPIImpactPriority) {
+export function getKPIImpactPriorityLabel(
+  priority: KPIImpactPriority
+) {
   if (priority === "critical") return "Crítico";
   if (priority === "high") return "Alto";
   if (priority === "medium") return "Medio";
+
   return "Bajo";
 }
 
-export function getKPIImpactPriorityClasses(priority: KPIImpactPriority) {
+export function getKPIImpactPriorityClasses(
+  priority: KPIImpactPriority
+) {
   if (priority === "critical") {
     return "bg-red-50 text-red-700 ring-1 ring-red-200";
   }
@@ -48,7 +53,7 @@ export function getKPIImpactPriorityClasses(priority: KPIImpactPriority) {
 }
 
 export function buildKPIImpactSignals(
-  input: KPIImpactInput,
+  input: KPIImpactInput
 ): KPIImpactResult {
   const signals: KPIImpactSignal[] = [];
 
@@ -58,7 +63,7 @@ export function buildKPIImpactSignals(
       impact:
         "Las oportunidades están entrando al sistema, pero no se están convirtiendo al ritmo necesario.",
       recommendation:
-        "Revisar propuesta comercial, seguimiento y próximos pasos con clientes calientes.",
+        "Revisar propuesta comercial, seguimiento y próximos pasos con relaciones calientes.",
       priority: "high",
     });
   } else if (input.conversionRate >= 60) {
@@ -76,7 +81,7 @@ export function buildKPIImpactSignals(
     signals.push({
       title: "Respuesta débil",
       impact:
-        "Los clientes están respondiendo menos de lo esperado, lo que puede enfriar relaciones comerciales.",
+        "Las relaciones están respondiendo menos de lo esperado, lo que puede enfriar oportunidades comerciales.",
       recommendation:
         "Priorizar contactos pendientes hoy y usar mensajes más directos por WhatsApp.",
       priority: "high",
@@ -98,7 +103,7 @@ export function buildKPIImpactSignals(
       impact:
         "Las oportunidades pueden enfriarse porque no reciben seguimiento constante.",
       recommendation:
-        "Crear acciones inmediatas de seguimiento para los clientes con mayor valor.",
+        "Crear acciones inmediatas de seguimiento para las relaciones con mayor valor.",
       priority: "critical",
     });
   } else if (input.followupRate >= 80) {
@@ -112,18 +117,24 @@ export function buildKPIImpactSignals(
     });
   }
 
-  if (input.opportunities >= 10 && input.conversionRate < 35) {
+  if (
+    input.opportunities >= 10 &&
+    input.conversionRate < 35
+  ) {
     signals.push({
       title: "Demanda sin cierre suficiente",
       impact:
         "Hay oportunidades disponibles, pero el negocio no está capturando todo el potencial comercial.",
       recommendation:
-        "Optimizar proceso de cierre y revisar clientes con alta probabilidad.",
+        "Optimizar proceso de cierre y revisar relaciones con alta probabilidad.",
       priority: "high",
     });
   }
 
-  if (input.activeClients < 5 && input.opportunities < 5) {
+  if (
+    input.activeRelationships < 5 &&
+    input.opportunities < 5
+  ) {
     signals.push({
       title: "Base comercial limitada",
       impact:
@@ -139,9 +150,9 @@ export function buildKPIImpactSignals(
       input.responseRate * 0.25 +
         input.conversionRate * 0.3 +
         input.followupRate * 0.3 +
-        Math.min(input.activeClients * 2, 10) +
-        Math.min(input.opportunities * 1.5, 10),
-    ),
+        Math.min(input.activeRelationships * 2, 10) +
+        Math.min(input.opportunities * 1.5, 10)
+    )
   );
 
   return {

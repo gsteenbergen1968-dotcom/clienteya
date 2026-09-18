@@ -1,48 +1,58 @@
 "use client";
 
-import { useState } from "react";
+type BancardPlan = "pro";
 
-type BancardPlan = "starter" | "pro";
+export type BancardBillingCycle =
+  | "monthly"
+  | "yearly";
 
 export default function BancardCheckoutButton({
   plan,
-  label = "Pagar con Bancard",
+  billingCycle = "monthly",
+  label,
+  available = false,
 }: {
   plan: BancardPlan;
-  label?: string;
+  billingCycle?: BancardBillingCycle;
+  label: string;
+  available?: boolean;
 }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
   async function startCheckout() {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch("/api/bancard/create-checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ plan }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.checkoutUrl) {
-        throw new Error(data.error || "No se pudo iniciar el pago.");
-      }
-
-      window.location.href = data.checkoutUrl;
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "No se pudo iniciar el pago."
-      );
-    } finally {
-      setLoading(false);
+    if (!available) {
+      return;
     }
+
+    const response =
+      await fetch(
+        "/api/bancard/create-checkout",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            plan,
+            billingCycle,
+          }),
+        },
+      );
+
+    const data =
+      await response.json();
+
+    if (
+      !response.ok ||
+      !data.checkoutUrl
+    ) {
+      throw new Error(
+        data.error ||
+          "No se pudo iniciar el pago en este momento.",
+      );
+    }
+
+    window.location.href =
+      data.checkoutUrl;
   }
 
   return (
@@ -50,15 +60,22 @@ export default function BancardCheckoutButton({
       <button
         type="button"
         onClick={startCheckout}
-        disabled={loading}
-        className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={!available}
+        className={`w-full rounded-2xl px-4 py-3 text-sm font-black shadow-sm transition ${
+          available
+            ? "bg-blue-700 text-white hover:bg-blue-800"
+            : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-500"
+        }`}
       >
-        {loading ? "Conectando con Bancard..." : label}
+        {available
+          ? label
+          : "Pago disponible próximamente"}
       </button>
 
-      {error && (
-        <p className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
-          {error}
+      {!available && (
+        <p className="mt-3 text-center text-xs font-semibold leading-5 text-slate-500">
+          La activación con Bancard estará disponible cuando finalice la
+          configuración bancaria.
         </p>
       )}
     </div>

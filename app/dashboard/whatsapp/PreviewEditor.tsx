@@ -9,7 +9,7 @@ type Variant = {
   message: string;
 };
 
-type Cliente = {
+type Relationship = {
   id: string;
   nombre: string;
   telefono: string;
@@ -27,13 +27,13 @@ function createWhatsAppUrl(phone: string, text: string) {
 }
 
 export default function PreviewEditor({
-  cliente,
+  relationship,
   initialMessage,
   variants = [],
   isPro = true,
   usage = null,
 }: {
-  cliente: Cliente;
+  relationship: Relationship;
   initialMessage: string;
   variants?: Variant[];
   isPro?: boolean;
@@ -50,8 +50,8 @@ export default function PreviewEditor({
   );
 
   const url = useMemo(() => {
-    return createWhatsAppUrl(cliente.telefono, message);
-  }, [cliente.telefono, message]);
+    return createWhatsAppUrl(relationship.telefono, message);
+  }, [relationship.telefono, message]);
 
   function applyVariant(v: Variant, index: number) {
     if (!isPro && index > 0) return;
@@ -80,7 +80,7 @@ export default function PreviewEditor({
         },
         body: JSON.stringify({
           type: "whatsapp_opened",
-          clienteId: cliente.id,
+          relationshipId: relationship.id,
         }),
       });
     } catch {
@@ -93,12 +93,12 @@ export default function PreviewEditor({
   }
 
   return (
-    <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">
+          <h1 className="text-xl font-semibold text-slate-900">
             Editar mensaje antes de enviar
-          </h2>
+          </h1>
 
           <p className="mt-2 text-sm leading-6 text-slate-500">
             Ajusta el mensaje, cambia el tono y abre WhatsApp cuando esté listo.
@@ -142,8 +142,8 @@ export default function PreviewEditor({
                   locked
                     ? "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"
                     : active
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                      ? "bg-slate-900 text-white"
+                      : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
                 }`}
               >
                 {locked ? "🔒 " : ""}

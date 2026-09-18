@@ -4,23 +4,23 @@ import {
   getFounderGrowthPriorityLabel,
 } from "../../../lib/founder-growth-engine";
 
-import type { CommercialMemoryClient } from "../../../lib/commercial-memory-signals";
+import type { CommercialMemoryRelationship } from "../../../lib/commercial-memory-signals";
 
 type FounderGrowthEnginePanelProps = {
-  clients: CommercialMemoryClient[];
+  relationships: CommercialMemoryRelationship[];
 };
 
 function formatGs(value: number) {
   return new Intl.NumberFormat("es-PY").format(
-    Math.max(0, value),
+    Math.max(0, value)
   );
 }
 
 export default function FounderGrowthEnginePanel({
-  clients,
+  relationships,
 }: FounderGrowthEnginePanelProps) {
   const opportunities =
-    buildFounderGrowthEngine(clients);
+    buildFounderGrowthEngine(relationships);
 
   const topOpportunities =
     opportunities.slice(0, 5);
@@ -28,8 +28,8 @@ export default function FounderGrowthEnginePanel({
   if (topOpportunities.length === 0) {
     return (
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
             Founder Growth Engine
           </p>
 
@@ -38,7 +38,7 @@ export default function FounderGrowthEnginePanel({
           </h2>
 
           <p className="text-sm leading-6 text-slate-600">
-            Cuando existan clientes con señales claras de
+            Cuando existan relaciones con señales claras de
             expansión, ClienteYA mostrará dónde puede crecer
             el ingreso de forma más inteligente.
           </p>
@@ -50,7 +50,7 @@ export default function FounderGrowthEnginePanel({
   const totalGrowth = topOpportunities.reduce(
     (sum, opportunity) =>
       sum + opportunity.growthPotential,
-    0,
+    0
   );
 
   const primaryOpportunity =
@@ -59,8 +59,8 @@ export default function FounderGrowthEnginePanel({
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
             Founder Growth Engine
           </p>
 
@@ -69,7 +69,7 @@ export default function FounderGrowthEnginePanel({
           </h2>
 
           <p className="max-w-2xl text-sm leading-6 text-slate-600">
-            ClienteYA detecta clientes donde la relación,
+            ClienteYA detecta relaciones donde la memoria,
             el historial y el valor comercial abren una
             oportunidad real de expansión.
           </p>
@@ -98,7 +98,7 @@ export default function FounderGrowthEnginePanel({
             </h3>
 
             <p className="text-sm font-medium text-slate-700">
-              {primaryOpportunity.clienteNombre}
+              {primaryOpportunity.relationshipName}
             </p>
 
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
@@ -125,7 +125,7 @@ export default function FounderGrowthEnginePanel({
       <div className="grid gap-3">
         {topOpportunities.map((opportunity, index) => (
           <article
-            key={opportunity.clienteId}
+            key={opportunity.relationshipId}
             className="rounded-2xl border border-slate-200 bg-white p-4"
           >
             <div className="flex items-start justify-between gap-3">
@@ -136,16 +136,16 @@ export default function FounderGrowthEnginePanel({
                   </span>
 
                   <h3 className="text-sm font-semibold text-slate-950">
-                    {opportunity.clienteNombre}
+                    {opportunity.relationshipName}
                   </h3>
 
                   <span
                     className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getFounderGrowthPriorityClasses(
-                      opportunity.priority,
+                      opportunity.priority
                     )}`}
                   >
                     {getFounderGrowthPriorityLabel(
-                      opportunity.priority,
+                      opportunity.priority
                     )}
                   </span>
                 </div>

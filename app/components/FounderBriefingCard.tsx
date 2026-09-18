@@ -1,6 +1,6 @@
 import {
   buildFounderBriefing,
-  type FounderBriefingClient,
+  type FounderBriefingRelationship,
   type FounderBriefingItem,
   type FounderBriefingTone,
   type PipelineRiskItem,
@@ -118,6 +118,7 @@ function MetricPill({
       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
         {label}
       </p>
+
       <p className={`mt-0.5 text-xs font-black ${classes.text}`}>{value}</p>
     </div>
   );
@@ -136,7 +137,9 @@ function SignalList({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className={`text-[10px] font-black uppercase tracking-[0.14em] ${classes.text}`}>
+      <h3
+        className={`text-[10px] font-black uppercase tracking-[0.14em] ${classes.text}`}
+      >
         {title}
       </h3>
 
@@ -149,10 +152,12 @@ function SignalList({
               <span
                 className={`mt-1.5 h-1.5 w-1.5 flex-none rounded-full ${itemTone.dot}`}
               />
+
               <div>
                 <p className="text-xs font-black text-slate-950">
                   {item.title}
                 </p>
+
                 <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">
                   {item.description}
                 </p>
@@ -169,6 +174,7 @@ function forecastLabel(category: RevenueForecastItem["category"]) {
   if (category === "hot") return "Alta intención";
   if (category === "likely") return "Probable";
   if (category === "delayed") return "Retrasado";
+
   return "En riesgo";
 }
 
@@ -176,6 +182,7 @@ function riskLabel(type: PipelineRiskItem["riskType"]) {
   if (type === "ghosting") return "Pérdida de contacto";
   if (type === "stalled") return "Detenida";
   if (type === "hot") return "Caliente";
+
   return "Ingreso";
 }
 
@@ -199,8 +206,9 @@ function ForecastRow({ item }: { item: RevenueForecastItem }) {
           </div>
 
           <p className="mt-2 truncate text-xs font-black text-slate-950">
-            {item.clientName}
+            {item.relationshipName}
           </p>
+
           <p className="mt-0.5 line-clamp-1 text-xs text-slate-600">
             {item.title}
           </p>
@@ -210,6 +218,7 @@ function ForecastRow({ item }: { item: RevenueForecastItem }) {
           <p className="text-[9px] font-black uppercase tracking-wide text-slate-500">
             Esperado
           </p>
+
           <p className="text-xs font-black text-slate-950">
             {formatGs(item.expectedValue)}
           </p>
@@ -233,8 +242,9 @@ function RiskRow({ item }: { item: PipelineRiskItem }) {
           </span>
 
           <p className="mt-2 truncate text-xs font-black text-slate-950">
-            {item.clientName}
+            {item.relationshipName}
           </p>
+
           <p className="mt-0.5 line-clamp-1 text-xs text-slate-600">
             {item.title}
           </p>
@@ -245,6 +255,7 @@ function RiskRow({ item }: { item: PipelineRiskItem }) {
             <p className="text-[9px] font-black uppercase tracking-wide text-slate-500">
               Valor
             </p>
+
             <p className="text-xs font-black text-slate-950">
               {formatGs(item.value)}
             </p>
@@ -264,11 +275,11 @@ function EmptyCompactState({ text }: { text: string }) {
 }
 
 export default function FounderBriefingCard({
-  clients,
+  relationships,
 }: {
-  clients: FounderBriefingClient[];
+  relationships: FounderBriefingRelationship[];
 }) {
-  const briefing = buildFounderBriefing(clients);
+  const briefing = buildFounderBriefing(relationships);
   const classes = toneClasses(briefing.tone);
 
   return (
@@ -308,10 +319,13 @@ export default function FounderBriefingCard({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className={`rounded-2xl border bg-white p-3 shadow-sm ${classes.soft}`}>
+            <div
+              className={`rounded-2xl border bg-white p-3 shadow-sm ${classes.soft}`}
+            >
               <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
                 Puntaje
               </p>
+
               <p className={`mt-1 text-3xl font-black ${classes.text}`}>
                 {briefing.score}
                 <span className="ml-1 text-xs text-slate-500">/100</span>
@@ -322,8 +336,10 @@ export default function FounderBriefingCard({
               <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
                 Estado
               </p>
+
               <div className="mt-2 flex items-center gap-2">
                 <span className={`h-2 w-2 rounded-full ${classes.dot}`} />
+
                 <span className={`text-xs font-black ${classes.text}`}>
                   {briefing.statusLabel}
                 </span>
@@ -438,6 +454,7 @@ export default function FounderBriefingCard({
           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
             Insight del día
           </p>
+
           <p className="mt-2 text-xs leading-5 text-slate-700">
             {briefing.insight}
           </p>
@@ -447,9 +464,11 @@ export default function FounderBriefingCard({
           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-blue-700">
             Foco del founder
           </p>
+
           <p className="mt-2 text-sm font-black text-slate-950">
             {briefing.founderFocus}
           </p>
+
           <p className="mt-1 text-xs leading-5 text-slate-600">
             Ejecuta primero acciones que protegen conversión, seguimiento y
             control comercial.
@@ -464,6 +483,7 @@ export default function FounderBriefingCard({
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
                 Forecast comercial
               </p>
+
               <h3 className="mt-0.5 text-sm font-black text-slate-950">
                 Proyección
               </h3>
@@ -491,6 +511,7 @@ export default function FounderBriefingCard({
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
                 Riesgo del pipeline
               </p>
+
               <h3 className="mt-0.5 text-sm font-black text-slate-950">
                 Señales comerciales
               </h3>
@@ -526,7 +547,11 @@ export default function FounderBriefingCard({
           tone="good"
         />
 
-        <SignalList title="Riesgos" items={briefing.risks} tone="critical" />
+        <SignalList
+          title="Riesgos"
+          items={briefing.risks}
+          tone="critical"
+        />
 
         <SignalList
           title="Recomendaciones"

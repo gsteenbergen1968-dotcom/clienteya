@@ -20,7 +20,7 @@ export type CommercialMemorySignalType =
   | "loyalty"
   | "reactivation";
 
-export type CommercialMemoryClient = {
+export type CommercialMemoryRelationship = {
   id: string;
   nombre?: string | null;
   estado?: string | null;
@@ -37,8 +37,8 @@ export type CommercialMemoryClient = {
 
 export type CommercialMemorySignal = {
   id: string;
-  clientId: string;
-  clientName: string;
+  relationshipId: string;
+  relationshipName: string;
   type: CommercialMemorySignalType;
   title: string;
   insight: string;
@@ -89,7 +89,7 @@ function daysBetween(date: Date | null, now = new Date()) {
 
   return Math.max(
     0,
-    Math.floor((now.getTime() - date.getTime()) / DAY_IN_MS),
+    Math.floor((now.getTime() - date.getTime()) / DAY_IN_MS)
   );
 }
 
@@ -105,17 +105,23 @@ function normalizeText(value?: string | null) {
     .toLowerCase();
 }
 
-function getClientName(client: CommercialMemoryClient) {
-  return client.nombre?.trim() || "Cliente sin nombre";
+function getRelationshipName(
+  relationship: CommercialMemoryRelationship
+) {
+  return relationship.nombre?.trim() || "Relación sin nombre";
 }
 
 function includesAny(value: string, terms: string[]) {
   return terms.some((term) => value.includes(term));
 }
 
-function hasPromiseSignal(client: CommercialMemoryClient) {
+function hasPromiseSignal(
+  relationship: CommercialMemoryRelationship
+) {
   const text = normalizeText(
-    `${client.notas ?? ""} ${client.recordatorio ?? ""} ${client.estado ?? ""}`,
+    `${relationship.notas ?? ""} ${
+      relationship.recordatorio ?? ""
+    } ${relationship.estado ?? ""}`
   );
 
   return includesAny(text, [
@@ -136,9 +142,13 @@ function hasPromiseSignal(client: CommercialMemoryClient) {
   ]);
 }
 
-function hasRiskSignal(client: CommercialMemoryClient) {
+function hasRiskSignal(
+  relationship: CommercialMemoryRelationship
+) {
   const text = normalizeText(
-    `${client.notas ?? ""} ${client.recordatorio ?? ""} ${client.estado ?? ""}`,
+    `${relationship.notas ?? ""} ${
+      relationship.recordatorio ?? ""
+    } ${relationship.estado ?? ""}`
   );
 
   return includesAny(text, [
@@ -158,9 +168,13 @@ function hasRiskSignal(client: CommercialMemoryClient) {
   ]);
 }
 
-function hasLoyaltySignal(client: CommercialMemoryClient) {
+function hasLoyaltySignal(
+  relationship: CommercialMemoryRelationship
+) {
   const text = normalizeText(
-    `${client.notas ?? ""} ${client.recordatorio ?? ""} ${client.estado ?? ""}`,
+    `${relationship.notas ?? ""} ${
+      relationship.recordatorio ?? ""
+    } ${relationship.estado ?? ""}`
   );
 
   return includesAny(text, [
@@ -176,8 +190,10 @@ function hasLoyaltySignal(client: CommercialMemoryClient) {
   ]);
 }
 
-function getStatusSignal(client: CommercialMemoryClient) {
-  const status = normalizeText(client.estado);
+function getStatusSignal(
+  relationship: CommercialMemoryRelationship
+) {
+  const status = normalizeText(relationship.estado);
 
   if (
     includesAny(status, [
@@ -185,7 +201,7 @@ function getStatusSignal(client: CommercialMemoryClient) {
       "ganado",
       "vendido",
       "pagado",
-      "cliente",
+      "convertido",
     ])
   ) {
     return "won";
@@ -220,22 +236,28 @@ function getStatusSignal(client: CommercialMemoryClient) {
 }
 
 function buildSignalId(
-  client: CommercialMemoryClient,
-  type: CommercialMemorySignalType,
+  relationship: CommercialMemoryRelationship,
+  type: CommercialMemorySignalType
 ) {
-  return `${client.id}-${type}`;
+  return `${relationship.id}-${type}`;
 }
 
 function buildRelationshipSignal(
-  client: CommercialMemoryClient,
-  now = new Date(),
+  relationship: CommercialMemoryRelationship,
+  now = new Date()
 ): CommercialMemorySignal {
-  const clientName = getClientName(client);
-  const createdDays = daysBetween(safeDate(client.created_at), now);
-  const updatedDays = daysBetween(safeDate(client.updated_at), now);
-  const hasNotes = normalizeText(client.notas).length > 12;
-  const loyalty = hasLoyaltySignal(client);
-  const promise = hasPromiseSignal(client);
+  const relationshipName = getRelationshipName(relationship);
+  const createdDays = daysBetween(
+    safeDate(relationship.created_at),
+    now
+  );
+  const updatedDays = daysBetween(
+    safeDate(relationship.updated_at),
+    now
+  );
+  const hasNotes = normalizeText(relationship.notas).length > 12;
+  const loyalty = hasLoyaltySignal(relationship);
+  const promise = hasPromiseSignal(relationship);
 
   let score = 45;
 
@@ -248,9 +270,9 @@ function buildRelationshipSignal(
   score = clamp(score);
 
   return {
-    id: buildSignalId(client, "relationship"),
-    clientId: client.id,
-    clientName,
+    id: buildSignalId(relationship, "relationship"),
+    relationshipId: relationship.id,
+    relationshipName,
     type: "relationship",
     title:
       score >= 75
@@ -266,11 +288,13 @@ function buildRelationshipSignal(
           : "ClienteYA todavía no detecta suficiente memoria comercial para considerar esta relación fuerte.",
     evidence:
       updatedDays !== null
-        ? `Última actualización hace ${updatedDays} día${updatedDays === 1 ? "" : "s"}.`
+        ? `Última actualización hace ${updatedDays} día${
+            updatedDays === 1 ? "" : "s"
+          }.`
         : "No hay una actualización reciente clara en el historial.",
     recommendation:
       score >= 75
-        ? "Cuidar la relación antes de vender más. Un cliente fuerte necesita continuidad, no presión."
+        ? "Cuidar la relación antes de vender más. Una relación fuerte necesita continuidad, no presión."
         : score >= 55
           ? "Mantener contacto simple y registrar mejor cada conversación."
           : "Crear contexto: agregar nota, próximo contacto y una acción clara.",
@@ -280,22 +304,30 @@ function buildRelationshipSignal(
         : score >= 55
           ? "Dar seguimiento"
           : "Completar memoria",
-    priority: score >= 75 ? "medium" : score >= 55 ? "medium" : "low",
-    tone: score >= 75 ? "emerald" : score >= 55 ? "sky" : "slate",
+    priority: score >= 55 ? "medium" : "low",
+    tone:
+      score >= 75
+        ? "emerald"
+        : score >= 55
+          ? "sky"
+          : "slate",
     score,
   };
 }
 
 function buildFollowupSignal(
-  client: CommercialMemoryClient,
-  now = new Date(),
+  relationship: CommercialMemoryRelationship,
+  now = new Date()
 ): CommercialMemorySignal {
-  const clientName = getClientName(client);
-  const nextContact = safeDate(client.proximo_contacto);
+  const relationshipName = getRelationshipName(relationship);
+  const nextContact = safeDate(relationship.proximo_contacto);
   const until = daysUntil(nextContact, now);
-  const updatedDays = daysBetween(safeDate(client.updated_at), now);
-  const risk = hasRiskSignal(client);
-  const promise = hasPromiseSignal(client);
+  const updatedDays = daysBetween(
+    safeDate(relationship.updated_at),
+    now
+  );
+  const risk = hasRiskSignal(relationship);
+  const promise = hasPromiseSignal(relationship);
 
   let score = 50;
 
@@ -311,9 +343,9 @@ function buildFollowupSignal(
   const today = until === 0;
 
   return {
-    id: buildSignalId(client, "followup"),
-    clientId: client.id,
-    clientName,
+    id: buildSignalId(relationship, "followup"),
+    relationshipId: relationship.id,
+    relationshipName,
     type: "followup",
     title: overdue
       ? "Seguimiento atrasado"
@@ -333,13 +365,15 @@ function buildFollowupSignal(
             }.`
           : today
             ? "El próximo contacto está programado para hoy."
-            : `Faltan ${until} día${until === 1 ? "" : "s"} para el próximo contacto.`
+            : `Faltan ${until} día${
+                until === 1 ? "" : "s"
+              } para el próximo contacto.`
         : "No hay próximo contacto definido.",
     recommendation: overdue
       ? "Enviar un mensaje corto de recuperación. No vender primero; recuperar conversación."
       : today
         ? "Enviar ahora un mensaje claro con una próxima acción concreta."
-        : "Mantener la fecha de seguimiento y no saturar al cliente.",
+        : "Mantener la fecha de seguimiento y no saturar la relación.",
     actionLabel: overdue
       ? "Recuperar contacto"
       : today
@@ -352,13 +386,16 @@ function buildFollowupSignal(
 }
 
 function buildPaymentSignal(
-  client: CommercialMemoryClient,
-  now = new Date(),
+  relationship: CommercialMemoryRelationship,
+  now = new Date()
 ): CommercialMemorySignal {
-  const clientName = getClientName(client);
-  const paid = Boolean(client.pagado);
-  const amount = Number(client.monto ?? 0);
-  const paymentDays = daysBetween(safeDate(client.fecha_pago), now);
+  const relationshipName = getRelationshipName(relationship);
+  const paid = Boolean(relationship.pagado);
+  const amount = Number(relationship.monto ?? 0);
+  const paymentDays = daysBetween(
+    safeDate(relationship.fecha_pago),
+    now
+  );
 
   let score = 45;
 
@@ -370,9 +407,9 @@ function buildPaymentSignal(
   score = clamp(score);
 
   return {
-    id: buildSignalId(client, "payment"),
-    clientId: client.id,
-    clientName,
+    id: buildSignalId(relationship, "payment"),
+    relationshipId: relationship.id,
+    relationshipName,
     type: "payment",
     title: paid
       ? "Comportamiento de pago positivo"
@@ -380,10 +417,10 @@ function buildPaymentSignal(
         ? "Pago pendiente con valor registrado"
         : "Sin señal fuerte de pago",
     insight: paid
-      ? "ClienteYA detecta una señal positiva: este cliente tiene pago registrado."
+      ? "ClienteYA detecta una señal positiva: esta relación tiene pago registrado."
       : amount > 0
         ? "ClienteYA detecta valor comercial pendiente de control o cobro."
-        : "ClienteYA todavía no tiene suficiente información financiera de este cliente.",
+        : "ClienteYA todavía no tiene suficiente información financiera de esta relación.",
     evidence:
       amount > 0
         ? `Monto registrado: ${new Intl.NumberFormat("es-PY", {
@@ -393,7 +430,7 @@ function buildPaymentSignal(
           }).format(amount)}.`
         : "No hay monto comercial registrado.",
     recommendation: paid
-      ? "Usar este cliente como referencia de relación sana y buscar recompra o continuidad."
+      ? "Usar esta relación como referencia de relación sana y buscar recompra o continuidad."
       : amount > 0
         ? "Asegurar seguimiento de cobro antes de abrir nuevas promesas comerciales."
         : "Registrar monto o estado de pago para mejorar la memoria comercial.",
@@ -402,20 +439,30 @@ function buildPaymentSignal(
       : amount > 0
         ? "Revisar cobro"
         : "Registrar valor",
-    priority: !paid && amount > 0 ? "high" : paid ? "medium" : "low",
-    tone: paid ? "emerald" : amount > 0 ? "amber" : "slate",
+    priority:
+      !paid && amount > 0
+        ? "high"
+        : paid
+          ? "medium"
+          : "low",
+    tone:
+      paid
+        ? "emerald"
+        : amount > 0
+          ? "amber"
+          : "slate",
     score,
   };
 }
 
 function buildOpportunitySignal(
-  client: CommercialMemoryClient,
+  relationship: CommercialMemoryRelationship
 ): CommercialMemorySignal {
-  const clientName = getClientName(client);
-  const promise = hasPromiseSignal(client);
-  const loyalty = hasLoyaltySignal(client);
-  const status = getStatusSignal(client);
-  const amount = Number(client.monto ?? 0);
+  const relationshipName = getRelationshipName(relationship);
+  const promise = hasPromiseSignal(relationship);
+  const loyalty = hasLoyaltySignal(relationship);
+  const status = getStatusSignal(relationship);
+  const amount = Number(relationship.monto ?? 0);
 
   let score = 40;
 
@@ -428,9 +475,9 @@ function buildOpportunitySignal(
   score = clamp(score);
 
   return {
-    id: buildSignalId(client, "opportunity"),
-    clientId: client.id,
-    clientName,
+    id: buildSignalId(relationship, "opportunity"),
+    relationshipId: relationship.id,
+    relationshipName,
     type: "opportunity",
     title:
       score >= 75
@@ -461,22 +508,35 @@ function buildOpportunitySignal(
         : score >= 55
           ? "Confirmar interés"
           : "Crear contexto",
-    priority: score >= 75 ? "high" : score >= 55 ? "medium" : "low",
-    tone: score >= 75 ? "emerald" : score >= 55 ? "sky" : "slate",
+    priority:
+      score >= 75
+        ? "high"
+        : score >= 55
+          ? "medium"
+          : "low",
+    tone:
+      score >= 75
+        ? "emerald"
+        : score >= 55
+          ? "sky"
+          : "slate",
     score,
   };
 }
 
 function buildRiskSignal(
-  client: CommercialMemoryClient,
-  now = new Date(),
+  relationship: CommercialMemoryRelationship,
+  now = new Date()
 ): CommercialMemorySignal {
-  const clientName = getClientName(client);
-  const risk = hasRiskSignal(client);
-  const updatedDays = daysBetween(safeDate(client.updated_at), now);
-  const nextContact = safeDate(client.proximo_contacto);
+  const relationshipName = getRelationshipName(relationship);
+  const risk = hasRiskSignal(relationship);
+  const updatedDays = daysBetween(
+    safeDate(relationship.updated_at),
+    now
+  );
+  const nextContact = safeDate(relationship.proximo_contacto);
   const until = daysUntil(nextContact, now);
-  const status = getStatusSignal(client);
+  const status = getStatusSignal(relationship);
 
   let score = 35;
 
@@ -488,9 +548,9 @@ function buildRiskSignal(
   score = clamp(score);
 
   return {
-    id: buildSignalId(client, "risk"),
-    clientId: client.id,
-    clientName,
+    id: buildSignalId(relationship, "risk"),
+    relationshipId: relationship.id,
+    relationshipName,
     type: "risk",
     title:
       score >= 75
@@ -502,11 +562,13 @@ function buildRiskSignal(
       score >= 75
         ? "ClienteYA detecta señales de enfriamiento, atraso o posible pérdida de relación."
         : score >= 55
-          ? "ClienteYA detecta algunas señales que conviene revisar antes de que el cliente se enfríe."
+          ? "ClienteYA detecta algunas señales que conviene revisar antes de que la relación se enfríe."
           : "ClienteYA no detecta señales fuertes de pérdida en este momento.",
     evidence:
       updatedDays !== null
-        ? `Última actualización hace ${updatedDays} día${updatedDays === 1 ? "" : "s"}.`
+        ? `Última actualización hace ${updatedDays} día${
+            updatedDays === 1 ? "" : "s"
+          }.`
         : "No hay historial suficiente para medir riesgo.",
     recommendation:
       score >= 75
@@ -520,26 +582,39 @@ function buildRiskSignal(
         : score >= 55
           ? "Prevenir pérdida"
           : "Mantener control",
-    priority: score >= 75 ? "critical" : score >= 55 ? "high" : "low",
-    tone: score >= 75 ? "red" : score >= 55 ? "amber" : "emerald",
+    priority:
+      score >= 75
+        ? "critical"
+        : score >= 55
+          ? "high"
+          : "low",
+    tone:
+      score >= 75
+        ? "red"
+        : score >= 55
+          ? "amber"
+          : "emerald",
     score,
   };
 }
 
-function buildBestSignalForClient(
-  client: CommercialMemoryClient,
-  now = new Date(),
+function buildBestSignalForRelationship(
+  relationship: CommercialMemoryRelationship,
+  now = new Date()
 ): CommercialMemorySignal {
   const signals = [
-    buildRiskSignal(client, now),
-    buildFollowupSignal(client, now),
-    buildOpportunitySignal(client),
-    buildPaymentSignal(client, now),
-    buildRelationshipSignal(client, now),
+    buildRiskSignal(relationship, now),
+    buildFollowupSignal(relationship, now),
+    buildOpportunitySignal(relationship),
+    buildPaymentSignal(relationship, now),
+    buildRelationshipSignal(relationship, now),
   ];
 
   return signals.sort((a, b) => {
-    const priorityWeight: Record<CommercialMemorySignalPriority, number> = {
+    const priorityWeight: Record<
+      CommercialMemorySignalPriority,
+      number
+    > = {
       critical: 4,
       high: 3,
       medium: 2,
@@ -547,27 +622,34 @@ function buildBestSignalForClient(
     };
 
     return (
-      priorityWeight[b.priority] - priorityWeight[a.priority] ||
+      priorityWeight[b.priority] -
+        priorityWeight[a.priority] ||
       b.score - a.score
     );
   })[0];
 }
 
-function buildSummary(signals: CommercialMemorySignal[]): CommercialMemorySummary {
+function buildSummary(
+  signals: CommercialMemorySignal[]
+): CommercialMemorySummary {
   const criticalSignals = signals.filter(
-    (signal) => signal.priority === "critical",
+    (signal) => signal.priority === "critical"
   ).length;
 
   const highSignals = signals.filter(
-    (signal) => signal.priority === "high",
+    (signal) => signal.priority === "high"
   ).length;
 
-  const riskSignals = signals.filter((signal) => signal.type === "risk");
-  const opportunitySignals = signals.filter(
-    (signal) => signal.type === "opportunity",
+  const riskSignals = signals.filter(
+    (signal) => signal.type === "risk"
   );
+
+  const opportunitySignals = signals.filter(
+    (signal) => signal.type === "opportunity"
+  );
+
   const followupSignals = signals.filter(
-    (signal) => signal.type === "followup",
+    (signal) => signal.type === "followup"
   );
 
   const strongestPattern =
@@ -596,7 +678,7 @@ function buildSummary(signals: CommercialMemorySignal[]): CommercialMemorySummar
     summary:
       signals.length > 0
         ? "ClienteYA analiza patrones de relación, seguimiento, pago, riesgo y oportunidad para convertir datos en memoria útil."
-        : "ClienteYA todavía necesita más clientes o actividad para construir memoria comercial.",
+        : "ClienteYA todavía necesita más relaciones o actividad para construir memoria comercial.",
     strongestPattern,
     mainRisk,
     bestAction,
@@ -607,15 +689,20 @@ function buildSummary(signals: CommercialMemorySignal[]): CommercialMemorySummar
 }
 
 export function buildCommercialMemorySignals(
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[]
 ): CommercialMemoryResult {
   const now = new Date();
 
-  const signals = clients
-    .filter((client) => client.id)
-    .map((client) => buildBestSignalForClient(client, now))
+  const signals = relationships
+    .filter((relationship) => relationship.id)
+    .map((relationship) =>
+      buildBestSignalForRelationship(relationship, now)
+    )
     .sort((a, b) => {
-      const priorityWeight: Record<CommercialMemorySignalPriority, number> = {
+      const priorityWeight: Record<
+        CommercialMemorySignalPriority,
+        number
+      > = {
         critical: 4,
         high: 3,
         medium: 2,
@@ -623,9 +710,10 @@ export function buildCommercialMemorySignals(
       };
 
       return (
-        priorityWeight[b.priority] - priorityWeight[a.priority] ||
+        priorityWeight[b.priority] -
+          priorityWeight[a.priority] ||
         b.score - a.score ||
-        a.clientName.localeCompare(b.clientName)
+        a.relationshipName.localeCompare(b.relationshipName)
       );
     });
 
@@ -636,9 +724,12 @@ export function buildCommercialMemorySignals(
 }
 
 export function getCommercialMemorySignalPriorityLabel(
-  priority: CommercialMemorySignalPriority,
+  priority: CommercialMemorySignalPriority
 ) {
-  const map: Record<CommercialMemorySignalPriority, string> = {
+  const map: Record<
+    CommercialMemorySignalPriority,
+    string
+  > = {
     critical: "Crítico",
     high: "Alta",
     medium: "Media",
@@ -649,7 +740,7 @@ export function getCommercialMemorySignalPriorityLabel(
 }
 
 export function getCommercialMemorySignalTypeLabel(
-  type: CommercialMemorySignalType,
+  type: CommercialMemorySignalType
 ) {
   const map: Record<CommercialMemorySignalType, string> = {
     relationship: "Relación",
@@ -665,28 +756,44 @@ export function getCommercialMemorySignalTypeLabel(
 }
 
 export function getCommercialMemorySignalToneClasses(
-  tone: CommercialMemorySignalTone,
+  tone: CommercialMemorySignalTone
 ) {
-  const map: Record<CommercialMemorySignalTone, string> = {
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-950",
-    sky: "border-sky-200 bg-sky-50 text-sky-950",
-    amber: "border-amber-200 bg-amber-50 text-amber-950",
-    red: "border-red-200 bg-red-50 text-red-950",
-    slate: "border-slate-200 bg-slate-50 text-slate-950",
+  const map: Record<
+    CommercialMemorySignalTone,
+    string
+  > = {
+    emerald:
+      "border-emerald-200 bg-emerald-50 text-emerald-950",
+    sky:
+      "border-sky-200 bg-sky-50 text-sky-950",
+    amber:
+      "border-amber-200 bg-amber-50 text-amber-950",
+    red:
+      "border-red-200 bg-red-50 text-red-950",
+    slate:
+      "border-slate-200 bg-slate-50 text-slate-950",
   };
 
   return map[tone];
 }
 
 export function getCommercialMemorySignalBadgeClasses(
-  tone: CommercialMemorySignalTone,
+  tone: CommercialMemorySignalTone
 ) {
-  const map: Record<CommercialMemorySignalTone, string> = {
-    emerald: "border-emerald-200 bg-emerald-100 text-emerald-800",
-    sky: "border-sky-200 bg-sky-100 text-sky-800",
-    amber: "border-amber-200 bg-amber-100 text-amber-800",
-    red: "border-red-200 bg-red-100 text-red-800",
-    slate: "border-slate-200 bg-slate-100 text-slate-700",
+  const map: Record<
+    CommercialMemorySignalTone,
+    string
+  > = {
+    emerald:
+      "border-emerald-200 bg-emerald-100 text-emerald-800",
+    sky:
+      "border-sky-200 bg-sky-100 text-sky-800",
+    amber:
+      "border-amber-200 bg-amber-100 text-amber-800",
+    red:
+      "border-red-200 bg-red-100 text-red-800",
+    slate:
+      "border-slate-200 bg-slate-100 text-slate-700",
   };
 
   return map[tone];

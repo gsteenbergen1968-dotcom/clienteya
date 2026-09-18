@@ -48,7 +48,7 @@ export function formatPercentage(value?: number | null) {
   return `${Math.round(value)}%`;
 }
 
-export function getClientStatusLabel(status?: string | null) {
+export function getRelationshipStatusLabel(status?: string | null) {
   const normalized = status?.toLowerCase().trim();
 
   if (!normalized) return "Sin estado";

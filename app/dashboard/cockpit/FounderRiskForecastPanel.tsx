@@ -4,31 +4,31 @@ import {
   getFounderRiskForecastPriorityLabel,
 } from "../../../lib/founder-risk-forecast";
 
-import type { CommercialMemoryClient } from "../../../lib/commercial-memory-signals";
+import type { CommercialMemoryRelationship } from "../../../lib/commercial-memory-signals";
 
 type FounderRiskForecastPanelProps = {
-  clients: CommercialMemoryClient[];
+  relationships: CommercialMemoryRelationship[];
 };
 
 function formatGs(value: number) {
   return new Intl.NumberFormat("es-PY").format(
-    Math.max(0, value),
+    Math.max(0, value)
   );
 }
 
 export default function FounderRiskForecastPanel({
-  clients,
+  relationships,
 }: FounderRiskForecastPanelProps) {
   const forecasts =
-    buildFounderRiskForecast(clients);
+    buildFounderRiskForecast(relationships);
 
   const topForecasts = forecasts.slice(0, 5);
 
   if (topForecasts.length === 0) {
     return (
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
             Founder Risk Forecast
           </p>
 
@@ -37,7 +37,7 @@ export default function FounderRiskForecastPanel({
           </h2>
 
           <p className="text-sm leading-6 text-slate-600">
-            Cuando existan clientes con ingreso en riesgo,
+            Cuando existan relaciones con ingreso en riesgo,
             ClienteYA mostrará dónde puede escaparse valor
             si no se actúa a tiempo.
           </p>
@@ -48,7 +48,7 @@ export default function FounderRiskForecastPanel({
 
   const totalRisk = topForecasts.reduce(
     (sum, forecast) => sum + forecast.riskAmount,
-    0,
+    0
   );
 
   const primaryForecast = topForecasts[0];
@@ -56,8 +56,8 @@ export default function FounderRiskForecastPanel({
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
             Founder Risk Forecast
           </p>
 
@@ -95,7 +95,7 @@ export default function FounderRiskForecastPanel({
             </h3>
 
             <p className="text-sm font-medium text-slate-700">
-              {primaryForecast.clienteNombre}
+              {primaryForecast.relationshipName}
             </p>
 
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
@@ -122,7 +122,7 @@ export default function FounderRiskForecastPanel({
       <div className="grid gap-3">
         {topForecasts.map((forecast, index) => (
           <article
-            key={forecast.clienteId}
+            key={forecast.relationshipId}
             className="rounded-2xl border border-slate-200 bg-white p-4"
           >
             <div className="flex items-start justify-between gap-3">
@@ -133,16 +133,16 @@ export default function FounderRiskForecastPanel({
                   </span>
 
                   <h3 className="text-sm font-semibold text-slate-950">
-                    {forecast.clienteNombre}
+                    {forecast.relationshipName}
                   </h3>
 
                   <span
                     className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getFounderRiskForecastPriorityClasses(
-                      forecast.priority,
+                      forecast.priority
                     )}`}
                   >
                     {getFounderRiskForecastPriorityLabel(
-                      forecast.priority,
+                      forecast.priority
                     )}
                   </span>
                 </div>

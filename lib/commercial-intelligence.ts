@@ -7,7 +7,10 @@ export type CommercialIntelligenceInput = {
   hasRecentResponse: boolean;
 };
 
-export type CommercialRiskLevel = "low" | "medium" | "high";
+export type CommercialRiskLevel =
+  | "low"
+  | "medium"
+  | "high";
 
 export type CommercialIntelligenceResult = {
   responseProbability: number;
@@ -18,8 +21,15 @@ export type CommercialIntelligenceResult = {
   reasoning: string;
 };
 
-function clamp(value: number, min = 0, max = 100) {
-  return Math.max(min, Math.min(max, value));
+function clamp(
+  value: number,
+  min = 0,
+  max = 100,
+) {
+  return Math.max(
+    min,
+    Math.min(max, value),
+  );
 }
 
 export function buildCommercialIntelligence(
@@ -27,69 +37,127 @@ export function buildCommercialIntelligence(
 ): CommercialIntelligenceResult {
   let responseProbability = 50;
 
-  responseProbability += input.memoryScore * 0.22;
-  responseProbability += input.relationshipScore * 0.18;
+  responseProbability +=
+    input.memoryScore * 0.22;
 
-  responseProbability -= input.daysSinceLastContact * 1.15;
-  responseProbability -= input.followupCount * 3.5;
+  responseProbability +=
+    input.relationshipScore * 0.18;
 
-  if (input.hasPromise) {
+  responseProbability -=
+    input.daysSinceLastContact * 1.15;
+
+  responseProbability -=
+    input.followupCount * 3.5;
+
+  if (
+    input.hasPromise
+  ) {
     responseProbability += 14;
   }
 
-  if (input.hasRecentResponse) {
+  if (
+    input.hasRecentResponse
+  ) {
     responseProbability += 18;
   }
 
-  responseProbability = clamp(Math.round(responseProbability));
-
-  let closeProbability = Math.round(
-    responseProbability * 0.62 +
-      input.relationshipScore * 0.23 +
-      input.memoryScore * 0.15,
+  responseProbability = clamp(
+    Math.round(
+      responseProbability,
+    ),
   );
 
-  closeProbability = clamp(closeProbability);
+  let closeProbability =
+    Math.round(
+      responseProbability * 0.62 +
+        input.relationshipScore * 0.23 +
+        input.memoryScore * 0.15,
+    );
 
-  let abandonmentRisk = 100 - responseProbability;
+  closeProbability =
+    clamp(
+      closeProbability,
+    );
 
-  abandonmentRisk += input.daysSinceLastContact * 0.8;
-  abandonmentRisk += input.followupCount * 2.5;
+  let abandonmentRisk =
+    100 -
+    responseProbability;
 
-  if (input.hasRecentResponse) {
+  abandonmentRisk +=
+    input.daysSinceLastContact * 0.8;
+
+  abandonmentRisk +=
+    input.followupCount * 2.5;
+
+  if (
+    input.hasRecentResponse
+  ) {
     abandonmentRisk -= 18;
   }
 
-  if (input.hasPromise) {
+  if (
+    input.hasPromise
+  ) {
     abandonmentRisk -= 10;
   }
 
-  abandonmentRisk = clamp(Math.round(abandonmentRisk));
+  abandonmentRisk = clamp(
+    Math.round(
+      abandonmentRisk,
+    ),
+  );
 
-  let riskLevel: CommercialRiskLevel = "low";
+  let riskLevel:
+    CommercialRiskLevel =
+      "low";
 
-  if (abandonmentRisk >= 55 || responseProbability < 40) {
+  if (
+    abandonmentRisk >= 55 ||
+    responseProbability < 40
+  ) {
     riskLevel = "high";
-  } else if (abandonmentRisk >= 30 || responseProbability < 70) {
+  } else if (
+    abandonmentRisk >= 30 ||
+    responseProbability < 70
+  ) {
     riskLevel = "medium";
   }
 
-  let recommendation = "Mantener seguimiento normal.";
-  let reasoning = "Cliente estable. No requiere acción urgente.";
+  let recommendation =
+    "Mantener seguimiento normal.";
 
-  if (riskLevel === "high") {
-    recommendation = "Enviar WhatsApp hoy.";
-    reasoning = "Cliente muestra señales de enfriamiento comercial.";
+  let reasoning =
+    "Relación estable. No requiere acción urgente.";
+
+  if (
+    riskLevel === "high"
+  ) {
+    recommendation =
+      "Enviar WhatsApp hoy.";
+
+    reasoning =
+      "La relación muestra señales de enfriamiento comercial.";
   }
 
-  if (riskLevel === "medium") {
-    recommendation = "Hacer seguimiento breve.";
-    reasoning = "Cliente necesita contacto para mantener momentum.";
+  if (
+    riskLevel === "medium"
+  ) {
+    recommendation =
+      "Hacer seguimiento breve.";
+
+    reasoning =
+      "La relación necesita contacto para mantener momentum.";
   }
 
-  if (responseProbability >= 75 && closeProbability >= 60) {
-    recommendation = "Enviar WhatsApp hoy.";
-    reasoning = "Cliente muestra intención activa.";
+  if (
+    responseProbability >= 75 &&
+    closeProbability >= 60
+  ) {
+    recommendation =
+      "Enviar WhatsApp hoy.";
+
+    reasoning =
+      "La relación muestra intención activa.";
   }
 
   return {

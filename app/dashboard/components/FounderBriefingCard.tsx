@@ -1,60 +1,60 @@
 import {
-  buildRevenueAnalytics,
-  formatGuarani,
-} from "../../../lib/revenue-analytics";
-
-type Cliente = {
-  id: string;
-  nombre: string;
-  estado?: string | null;
-  monto?: number | null;
-  pagado?: boolean | null;
-  proximo_contacto?: string | null;
-};
+  buildRevenueAnalyticsV2,
+  formatGuaraniV2,
+} from "../../../lib/revenue-analytics-v2";
+import type { RelationshipRecord } from "../../../lib/relationship-repository";
 
 type FounderBriefingCardProps = {
-  clientes: Cliente[];
+  relationships: RelationshipRecord[];
 };
 
-function getCriticalClients(clientes: Cliente[]) {
-  return clientes.filter((cliente) => {
-    const estado = cliente.estado?.toLowerCase() || "";
+function normalize(value: string | null | undefined): string {
+  return value?.toLowerCase().trim() || "";
+}
+
+function getCriticalRelationships(
+  relationships: RelationshipRecord[],
+): RelationshipRecord[] {
+  return relationships.filter((relationship) => {
+    const status = normalize(relationship.status);
 
     return (
-      estado.includes("sin") ||
-      estado.includes("cerr") ||
-      estado.includes("riesgo")
+      status.includes("sin") ||
+      status.includes("cerr") ||
+      status.includes("riesgo")
     );
   });
 }
 
-function getHotLeads(clientes: Cliente[]) {
-  return clientes.filter((cliente) => {
-    const estado = cliente.estado?.toLowerCase() || "";
+function getHotRelationships(
+  relationships: RelationshipRecord[],
+): RelationshipRecord[] {
+  return relationships.filter((relationship) => {
+    const status = normalize(relationship.status);
 
     return (
-      estado.includes("interes") ||
-      estado.includes("caliente") ||
-      estado.includes("hot")
+      status.includes("interes") ||
+      status.includes("caliente") ||
+      status.includes("hot")
     );
   });
 }
 
 function getTodayFocus(
   criticalCount: number,
-  hotLeadCount: number,
-  expectedRevenue: number
+  hotRelationshipCount: number,
+  expectedRevenue: number,
 ) {
   if (criticalCount >= 3) {
     return {
       title: "Riesgo operativo detectado",
       description:
-        "Existen múltiples clientes con señales de enfriamiento o seguimiento atrasado.",
+        "Existen múltiples relaciones con señales de enfriamiento o seguimiento atrasado.",
       tone: "red",
     };
   }
 
-  if (hotLeadCount >= 3) {
+  if (hotRelationshipCount >= 3) {
     return {
       title: "Momentum comercial positivo",
       description:
@@ -80,7 +80,7 @@ function getTodayFocus(
   };
 }
 
-function getToneClasses(tone: string) {
+function getToneClasses(tone: string): string {
   if (tone === "red") {
     return "border-red-200 bg-red-50 text-red-900";
   }
@@ -97,17 +97,20 @@ function getToneClasses(tone: string) {
 }
 
 export default function FounderBriefingCard({
-  clientes,
+  relationships,
 }: FounderBriefingCardProps) {
-  const revenue = buildRevenueAnalytics(clientes);
+  const revenue = buildRevenueAnalyticsV2(relationships);
 
-  const criticalClients = getCriticalClients(clientes);
-  const hotLeads = getHotLeads(clientes);
+  const criticalRelationships =
+    getCriticalRelationships(relationships);
+
+  const hotRelationships =
+    getHotRelationships(relationships);
 
   const focus = getTodayFocus(
-    criticalClients.length,
-    hotLeads.length,
-    revenue.expectedRevenue || 0
+    criticalRelationships.length,
+    hotRelationships.length,
+    revenue.expectedRevenue,
   );
 
   return (
@@ -131,7 +134,7 @@ export default function FounderBriefingCard({
 
         <div
           className={`rounded-3xl border px-5 py-4 shadow-sm ${getToneClasses(
-            focus.tone
+            focus.tone,
           )}`}
         >
           <p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-70">
@@ -153,7 +156,7 @@ export default function FounderBriefingCard({
           </p>
 
           <p className="mt-3 whitespace-nowrap text-[1.85rem] font-black leading-tight tracking-tight text-emerald-700 sm:text-3xl xl:text-[1.75rem] 2xl:text-3xl">
-            {formatGuarani(revenue.expectedRevenue || 0)}
+            {formatGuaraniV2(revenue.expectedRevenue)}
           </p>
         </div>
 
@@ -163,7 +166,7 @@ export default function FounderBriefingCard({
           </p>
 
           <p className="mt-3 text-3xl font-black tracking-tight text-red-700">
-            {criticalClients.length}
+            {criticalRelationships.length}
           </p>
         </div>
 
@@ -173,17 +176,17 @@ export default function FounderBriefingCard({
           </p>
 
           <p className="mt-3 text-3xl font-black tracking-tight text-emerald-700">
-            {hotLeads.length}
+            {hotRelationships.length}
           </p>
         </div>
 
         <div className="min-w-0 rounded-3xl border border-sky-200 bg-sky-50 p-5">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-sky-600">
-            Clientes activos
+            Relaciones activas
           </p>
 
           <p className="mt-3 text-3xl font-black tracking-tight text-sky-700">
-            {clientes.length}
+            {relationships.length}
           </p>
         </div>
       </div>

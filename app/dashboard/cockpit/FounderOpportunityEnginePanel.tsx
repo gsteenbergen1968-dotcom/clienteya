@@ -6,23 +6,23 @@ import {
   getFounderOpportunityPriorityLabel,
 } from "../../../lib/founder-opportunity-engine";
 
-import type { CommercialMemoryClient } from "../../../lib/commercial-memory-signals";
+import type { CommercialMemoryRelationship } from "../../../lib/commercial-memory-signals";
 
 type FounderOpportunityEnginePanelProps = {
-  clients: CommercialMemoryClient[];
+  relationships: CommercialMemoryRelationship[];
 };
 
 function formatGs(value: number) {
   return new Intl.NumberFormat("es-PY").format(
-    Math.max(0, value),
+    Math.max(0, value)
   );
 }
 
 export default function FounderOpportunityEnginePanel({
-  clients,
+  relationships,
 }: FounderOpportunityEnginePanelProps) {
   const opportunities =
-    buildFounderOpportunities(clients);
+    buildFounderOpportunities(relationships);
 
   const topOpportunities =
     opportunities.slice(0, 3);
@@ -30,22 +30,19 @@ export default function FounderOpportunityEnginePanel({
   const accelerating =
     opportunities.filter(
       (opportunity) =>
-        opportunity.momentum ===
-        "accelerating",
+        opportunity.momentum === "accelerating"
     ).length;
 
   const stable =
     opportunities.filter(
       (opportunity) =>
-        opportunity.momentum ===
-        "stable",
+        opportunity.momentum === "stable"
     ).length;
 
   const cooling =
     opportunities.filter(
       (opportunity) =>
-        opportunity.momentum ===
-        "cooling",
+        opportunity.momentum === "cooling"
     ).length;
 
   const topOpportunity =
@@ -53,8 +50,6 @@ export default function FounderOpportunityEnginePanel({
 
   return (
     <section className="relative overflow-hidden rounded-[40px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.10),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.12),transparent_30%)]" />
-
       <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 via-blue-600 to-slate-950" />
 
       <div className="relative grid gap-0 xl:grid-cols-[0.85fr_1.15fr]">
@@ -141,7 +136,7 @@ export default function FounderOpportunityEnginePanel({
               </p>
 
               <h3 className="mt-3 text-xl font-black text-slate-950">
-                {topOpportunity.clientName}
+                {topOpportunity.relationshipName}
               </h3>
 
               <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
@@ -151,75 +146,73 @@ export default function FounderOpportunityEnginePanel({
           ) : null}
 
           <div className="grid gap-3">
-            {topOpportunities.map(
-              (opportunity) => (
-                <article
-                  key={opportunity.id}
-                  className="rounded-[28px] border border-slate-200 bg-slate-50 p-4"
-                >
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    <span
-                      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${getFounderOpportunityPriorityClasses(
-                        opportunity.priority,
-                      )}`}
-                    >
-                      {getFounderOpportunityPriorityLabel(
-                        opportunity.priority,
-                      )}
-                    </span>
+            {topOpportunities.map((opportunity) => (
+              <article
+                key={opportunity.id}
+                className="rounded-[28px] border border-slate-200 bg-slate-50 p-4"
+              >
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <span
+                    className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${getFounderOpportunityPriorityClasses(
+                      opportunity.priority
+                    )}`}
+                  >
+                    {getFounderOpportunityPriorityLabel(
+                      opportunity.priority
+                    )}
+                  </span>
 
-                    <span
-                      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${getFounderOpportunityMomentumClasses(
-                        opportunity.momentum,
-                      )}`}
-                    >
-                      {getFounderOpportunityMomentumLabel(
-                        opportunity.momentum,
-                      )}
-                    </span>
-                  </div>
+                  <span
+                    className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${getFounderOpportunityMomentumClasses(
+                      opportunity.momentum
+                    )}`}
+                  >
+                    {getFounderOpportunityMomentumLabel(
+                      opportunity.momentum
+                    )}
+                  </span>
+                </div>
 
-                  <h3 className="text-sm font-black text-slate-950">
-                    {opportunity.clientName}
-                  </h3>
+                <h3 className="text-sm font-black text-slate-950">
+                  {opportunity.relationshipName}
+                </h3>
 
-                  <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
-                    {opportunity.description}
-                  </p>
+                <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
+                  {opportunity.description}
+                </p>
 
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl border border-white bg-white px-4 py-3">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                        Probabilidad
-                      </p>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-white bg-white px-4 py-3">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                      Probabilidad
+                    </p>
 
-                      <p className="mt-1 text-lg font-black text-slate-950">
-                        {opportunity.probability}%
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl border border-white bg-white px-4 py-3">
-                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                        Potencial
-                      </p>
-
-                      <p className="mt-1 text-lg font-black text-slate-950">
-                        Gs.{" "}
-                        {formatGs(
-                          opportunity.potentialRevenue,
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
-                    <p className="text-xs font-black leading-5 text-blue-800">
-                      {opportunity.momentumReason}
+                    <p className="mt-1 text-lg font-black text-slate-950">
+                      {opportunity.probability}%
                     </p>
                   </div>
-                </article>
-              ),
-            )}
+
+                  <div className="rounded-2xl border border-white bg-white px-4 py-3">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                      Potencial
+                    </p>
+
+                    <p className="mt-1 text-lg font-black text-slate-950">
+                      Gs.{" "}
+                      {formatGs(
+                        opportunity.potentialRevenue
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
+                  <p className="text-xs font-black leading-5 text-blue-800">
+                    {opportunity.momentumReason}
+                  </p>
+                </div>
+              </article>
+            ))}
 
             {topOpportunities.length === 0 ? (
               <div className="rounded-[28px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-bold text-slate-600">

@@ -1,4 +1,4 @@
-import type { CommercialMemoryClient } from "./commercial-memory-signals";
+import type { CommercialMemoryRelationship } from "./commercial-memory-signals";
 
 export type FounderRevenueLeverPriority =
   | "critical"
@@ -14,8 +14,8 @@ export type FounderRevenueLeverActionType =
   | "maintain";
 
 export type FounderRevenueLever = {
-  clienteId: string;
-  clienteNombre: string;
+  relationshipId: string;
+  relationshipName: string;
   expectedRevenue: number;
   revenueImpact: number;
   priority: FounderRevenueLeverPriority;
@@ -53,22 +53,33 @@ function daysBetween(date?: string | null) {
 
   return Math.max(
     0,
-    Math.floor(diff / (1000 * 60 * 60 * 24)),
+    Math.floor(diff / (1000 * 60 * 60 * 24))
   );
 }
 
-function getClientName(client: CommercialMemoryClient) {
+function getRelationshipName(
+  relationship: CommercialMemoryRelationship
+) {
   return (
-    client.nombre?.trim() ||
-    "Cliente sin nombre"
+    relationship.nombre?.trim() ||
+    "Relación sin nombre"
   );
 }
 
-function getRelationshipScore(client: CommercialMemoryClient) {
-  const estado = client.estado?.toLowerCase() || "";
-  const hasNotes = Boolean(client.notas?.trim());
-  const hasReminder = Boolean(client.recordatorio?.trim());
-  const isPaid = Boolean(client.pagado);
+function getRelationshipScore(
+  relationship: CommercialMemoryRelationship
+) {
+  const estado =
+    relationship.estado?.toLowerCase() || "";
+
+  const hasNotes =
+    Boolean(relationship.notas?.trim());
+
+  const hasReminder =
+    Boolean(relationship.recordatorio?.trim());
+
+  const isPaid =
+    Boolean(relationship.pagado);
 
   let score = 45;
 
@@ -99,18 +110,20 @@ function getRelationshipScore(client: CommercialMemoryClient) {
   return clamp(score);
 }
 
-function getMemoryScore(client: CommercialMemoryClient) {
+function getMemoryScore(
+  relationship: CommercialMemoryRelationship
+) {
   let score = 35;
 
-  if (client.notas?.trim()) {
+  if (relationship.notas?.trim()) {
     score += 25;
   }
 
-  if (client.recordatorio?.trim()) {
+  if (relationship.recordatorio?.trim()) {
     score += 20;
   }
 
-  if (client.proximo_contacto) {
+  if (relationship.proximo_contacto) {
     score += 20;
   }
 
@@ -118,11 +131,13 @@ function getMemoryScore(client: CommercialMemoryClient) {
 }
 
 function getCloseProbability(
-  client: CommercialMemoryClient,
+  relationship: CommercialMemoryRelationship,
   relationshipScore: number,
-  memoryScore: number,
+  memoryScore: number
 ) {
-  const estado = client.estado?.toLowerCase() || "";
+  const estado =
+    relationship.estado?.toLowerCase() || "";
+
   let probability = 35;
 
   probability += relationshipScore * 0.25;
@@ -140,7 +155,7 @@ function getCloseProbability(
     probability += 8;
   }
 
-  if (client.pagado) {
+  if (relationship.pagado) {
     probability += 10;
   }
 
@@ -150,7 +165,7 @@ function getCloseProbability(
 function getResponseProbability(
   relationshipScore: number,
   memoryScore: number,
-  daysSinceLastContact: number,
+  daysSinceLastContact: number
 ) {
   let probability = 55;
 
@@ -161,7 +176,9 @@ function getResponseProbability(
   return clamp(Math.round(probability));
 }
 
-function getUrgencyMultiplier(daysSinceLastContact: number) {
+function getUrgencyMultiplier(
+  daysSinceLastContact: number
+) {
   if (daysSinceLastContact >= 21) {
     return 1.4;
   }
@@ -206,11 +223,12 @@ function getMemoryMultiplier(score: number) {
 }
 
 function getActionType(
-  client: CommercialMemoryClient,
+  relationship: CommercialMemoryRelationship,
   daysSinceLastContact: number,
-  closeProbability: number,
+  closeProbability: number
 ): FounderRevenueLeverActionType {
-  const estado = client.estado?.toLowerCase() || "";
+  const estado =
+    relationship.estado?.toLowerCase() || "";
 
   if (closeProbability >= 75) {
     return "close";
@@ -220,7 +238,10 @@ function getActionType(
     return "reactivate";
   }
 
-  if (estado.includes("activo") && !client.pagado) {
+  if (
+    estado.includes("activo") &&
+    !relationship.pagado
+  ) {
     return "protect";
   }
 
@@ -232,17 +253,21 @@ function getActionType(
 }
 
 function getActionLabel(
-  actionType: FounderRevenueLeverActionType,
+  actionType: FounderRevenueLeverActionType
 ) {
   switch (actionType) {
     case "close":
       return "Cerrar esta oportunidad hoy";
+
     case "followup":
       return "Enviar seguimiento comercial";
+
     case "reactivate":
       return "Reactivar la relación";
+
     case "protect":
       return "Proteger este ingreso";
+
     case "maintain":
     default:
       return "Mantener el momentum";
@@ -260,31 +285,45 @@ function getReasoning(params: {
   const reasons: string[] = [];
 
   if (params.monto > 0) {
-    reasons.push("cliente con valor comercial claro");
+    reasons.push(
+      "relación con valor comercial claro"
+    );
   }
 
   if (params.closeProbability >= 70) {
-    reasons.push("alta probabilidad de cierre");
+    reasons.push(
+      "alta probabilidad de cierre"
+    );
   }
 
   if (params.responseProbability >= 65) {
-    reasons.push("buena probabilidad de respuesta");
+    reasons.push(
+      "buena probabilidad de respuesta"
+    );
   }
 
   if (params.relationshipScore >= 70) {
-    reasons.push("relación comercial fuerte");
+    reasons.push(
+      "relación comercial fuerte"
+    );
   }
 
   if (params.memoryScore >= 70) {
-    reasons.push("contexto suficiente para actuar con precisión");
+    reasons.push(
+      "contexto suficiente para actuar con precisión"
+    );
   }
 
   if (params.daysSinceLastContact >= 14) {
-    reasons.push("requiere seguimiento para no perder momentum");
+    reasons.push(
+      "requiere seguimiento para no perder momentum"
+    );
   }
 
   if (reasons.length === 0) {
-    reasons.push("acción recomendada para mantener control comercial");
+    reasons.push(
+      "acción recomendada para mantener control comercial"
+    );
   }
 
   return reasons.join(" + ");
@@ -292,13 +331,14 @@ function getReasoning(params: {
 
 function getPriority(
   revenueImpact: number,
-  maxImpact: number,
+  maxImpact: number
 ): FounderRevenueLeverPriority {
   if (maxImpact <= 0) {
     return "low";
   }
 
-  const ratio = revenueImpact / maxImpact;
+  const ratio =
+    revenueImpact / maxImpact;
 
   if (ratio >= 0.85) {
     return "critical";
@@ -316,77 +356,109 @@ function getPriority(
 }
 
 export function buildFounderRevenueLevers(
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[]
 ): FounderRevenueLever[] {
-  const baseLevers = clients
-    .map((client) => {
+  const baseLevers = relationships
+    .map((relationship) => {
       const monto = Math.max(
         0,
-        safeNumber(client.monto),
+        safeNumber(
+          relationship.monto
+        )
       );
 
-      const daysSinceLastContact = daysBetween(
-        client.updated_at || client.created_at,
-      );
+      const daysSinceLastContact =
+        daysBetween(
+          relationship.updated_at ||
+            relationship.created_at
+        );
 
       const relationshipScore =
-        getRelationshipScore(client);
+        getRelationshipScore(
+          relationship
+        );
 
-      const memoryScore = getMemoryScore(client);
+      const memoryScore =
+        getMemoryScore(
+          relationship
+        );
 
       const closeProbability =
         getCloseProbability(
-          client,
+          relationship,
           relationshipScore,
-          memoryScore,
+          memoryScore
         );
 
       const responseProbability =
         getResponseProbability(
           relationshipScore,
           memoryScore,
-          daysSinceLastContact,
+          daysSinceLastContact
         );
 
-      const expectedRevenue = Math.round(
-        monto * (closeProbability / 100),
-      );
+      const expectedRevenue =
+        Math.round(
+          monto *
+            (closeProbability / 100)
+        );
 
-      const revenueImpact = Math.round(
-        expectedRevenue *
-          getUrgencyMultiplier(daysSinceLastContact) *
-          getRelationshipMultiplier(relationshipScore) *
-          getMemoryMultiplier(memoryScore),
-      );
+      const revenueImpact =
+        Math.round(
+          expectedRevenue *
+            getUrgencyMultiplier(
+              daysSinceLastContact
+            ) *
+            getRelationshipMultiplier(
+              relationshipScore
+            ) *
+            getMemoryMultiplier(
+              memoryScore
+            )
+        );
 
-      const actionType = getActionType(
-        client,
-        daysSinceLastContact,
-        closeProbability,
-      );
+      const actionType =
+        getActionType(
+          relationship,
+          daysSinceLastContact,
+          closeProbability
+        );
 
       return {
-        clienteId: client.id,
-        clienteNombre: getClientName(client),
+        relationshipId:
+          relationship.id,
+        relationshipName:
+          getRelationshipName(
+            relationship
+          ),
         expectedRevenue,
         revenueImpact,
-        priority: "low" as FounderRevenueLeverPriority,
+        priority:
+          "low" as FounderRevenueLeverPriority,
         actionType,
-        actionLabel: getActionLabel(actionType),
-        reasoning: getReasoning({
-          monto,
-          closeProbability,
-          responseProbability,
-          relationshipScore,
-          memoryScore,
-          daysSinceLastContact,
-        }),
+        actionLabel:
+          getActionLabel(
+            actionType
+          ),
+        reasoning:
+          getReasoning({
+            monto,
+            closeProbability,
+            responseProbability,
+            relationshipScore,
+            memoryScore,
+            daysSinceLastContact,
+          }),
       };
     })
-    .filter((lever) => lever.revenueImpact > 0)
+    .filter(
+      (lever) =>
+        lever.revenueImpact > 0
+    )
     .sort(
       (a, b) =>
-        b.revenueImpact - a.revenueImpact,
+        b.revenueImpact -
+        a.revenueImpact
     );
 
   const maxImpact =
@@ -394,23 +466,27 @@ export function buildFounderRevenueLevers(
 
   return baseLevers.map((lever) => ({
     ...lever,
-    priority: getPriority(
-      lever.revenueImpact,
-      maxImpact,
-    ),
+    priority:
+      getPriority(
+        lever.revenueImpact,
+        maxImpact
+      ),
   }));
 }
 
 export function getFounderRevenueLeverPriorityLabel(
-  priority: FounderRevenueLeverPriority,
+  priority: FounderRevenueLeverPriority
 ) {
   switch (priority) {
     case "critical":
       return "Impacto crítico";
+
     case "high":
       return "Alto impacto";
+
     case "medium":
       return "Impacto medio";
+
     case "low":
     default:
       return "Impacto bajo";
@@ -418,15 +494,18 @@ export function getFounderRevenueLeverPriorityLabel(
 }
 
 export function getFounderRevenueLeverPriorityClasses(
-  priority: FounderRevenueLeverPriority,
+  priority: FounderRevenueLeverPriority
 ) {
   switch (priority) {
     case "critical":
       return "border-red-200 bg-red-50 text-red-700";
+
     case "high":
       return "border-amber-200 bg-amber-50 text-amber-700";
+
     case "medium":
       return "border-sky-200 bg-sky-50 text-sky-700";
+
     case "low":
     default:
       return "border-slate-200 bg-slate-50 text-slate-600";

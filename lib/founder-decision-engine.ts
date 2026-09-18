@@ -58,7 +58,7 @@ function clamp(value: number, min = 0, max = 100) {
 }
 
 export function buildFounderDecision(
-  input: FounderDecisionInput,
+  input: FounderDecisionInput
 ): FounderDecisionResult {
   let score = 0;
 
@@ -89,9 +89,9 @@ export function buildFounderDecision(
   if (input.isPaid) {
     return {
       score,
-      label: "Mantener cliente",
+      label: "Mantener relación",
       explanation:
-        "Cliente activo. Prioridad principal: confianza, recompra y recomendación.",
+        "Relación activa. Prioridad principal: confianza, recompra y recomendación.",
       actionLabel: "Mantener relación",
       urgency: "Baja",
       tone: "emerald",
@@ -139,23 +139,25 @@ export function buildFounderDecision(
     label: "Monitorear",
     explanation:
       "No requiere acción inmediata. Mantener observación y contexto.",
-    actionLabel: "Abrir cliente",
+    actionLabel: "Abrir relación",
     urgency: "Baja",
     tone: "slate",
   };
 }
 
 export function buildFounderSmartActionLabel(
-  input: FounderSmartActionLabelInput,
+  input: FounderSmartActionLabelInput
 ): FounderSmartActionLabelResult {
   const hasCommercialValue =
-    input.expectedRevenue > 0 || input.revenueAtRisk > 0;
+    input.expectedRevenue > 0 ||
+    input.revenueAtRisk > 0;
 
   if (!input.hasWhatsapp) {
     return {
-      label: "Abrir cliente",
+      label: "Abrir relación",
       shortLabel: "Abrir",
-      reason: "No hay WhatsApp disponible para este cliente.",
+      reason:
+        "No hay WhatsApp disponible para esta relación.",
       tone: "slate",
       urgency: "Baja",
     };
@@ -166,7 +168,7 @@ export function buildFounderSmartActionLabel(
       label: "❤️ Mantener relación",
       shortLabel: "Mantener",
       reason:
-        "Cliente convertido. La mejor acción es cuidar confianza, recompra o recomendación.",
+        "Relación convertida. La mejor acción es cuidar confianza, recompra o recomendación.",
       tone: "emerald",
       urgency: "Baja",
     };
@@ -183,7 +185,10 @@ export function buildFounderSmartActionLabel(
     };
   }
 
-  if (input.closeProbability >= 75 && hasCommercialValue) {
+  if (
+    input.closeProbability >= 75 &&
+    hasCommercialValue
+  ) {
     return {
       label: "🔥 Cerrar hoy",
       shortLabel: "Cerrar",
@@ -194,7 +199,10 @@ export function buildFounderSmartActionLabel(
     };
   }
 
-  if (input.responseProbability <= 30 && input.memoryScore >= 45) {
+  if (
+    input.responseProbability <= 30 &&
+    input.memoryScore >= 45
+  ) {
     return {
       label: "⚠️ Reactivar ahora",
       shortLabel: "Reactivar",
@@ -205,7 +213,10 @@ export function buildFounderSmartActionLabel(
     };
   }
 
-  if (input.relationshipScore >= 70 && input.memoryScore >= 65) {
+  if (
+    input.relationshipScore >= 70 &&
+    input.memoryScore >= 65
+  ) {
     return {
       label: "📲 Mantener conversación",
       shortLabel: "Conversar",
@@ -221,7 +232,7 @@ export function buildFounderSmartActionLabel(
       label: "⚡ Priorizar contacto",
       shortLabel: "Priorizar",
       reason:
-        "El impacto comercial es alto. Este cliente merece atención antes que otros.",
+        "El impacto comercial es alto. Esta relación merece atención antes que otras.",
       tone: "amber",
       urgency: "Alta",
     };

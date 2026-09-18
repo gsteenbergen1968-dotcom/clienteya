@@ -1,15 +1,15 @@
-export type Cliente = {
+export type Relationship = {
   id: string;
-  nombre: string;
-  estado: string;
-  proximo_contacto: string | null;
-  recordatorio: string | null;
-  telefono?: string | null;
+  full_name: string;
+  status: string;
+  next_contact_at: string | null;
+  reminder: string | null;
+  phone?: string | null;
 };
 
 export type Suggestion = {
-  cliente: Cliente;
-  type: "hoy" | "atrasado" | "sin_fecha" | "nuevo" | "pago";
+  relationship: Relationship;
+  type: "today" | "overdue" | "no_date" | "new" | "paid";
   score: number;
   label: string;
 };
@@ -21,65 +21,74 @@ function daysDiff(date: string) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-export function getClienteSuggestion(cliente: Cliente): Suggestion | null {
-  // 1. SIN PRÓXIMO CONTACTO (probleem)
-  if (!cliente.proximo_contacto) {
+export function getRelationshipSuggestion(
+  relationship: Relationship,
+): Suggestion | null {
+  if (!relationship.next_contact_at) {
     return {
-      cliente,
-      type: "sin_fecha",
+      relationship,
+      type: "no_date",
       score: 70,
       label: "Sin próxima fecha",
     };
   }
 
-  const diff = daysDiff(cliente.proximo_contacto);
+  const diff = daysDiff(relationship.next_contact_at);
 
-  // 2. ATRASADO
   if (diff < 0) {
     return {
-      cliente,
-      type: "atrasado",
+      relationship,
+      type: "overdue",
       score: 90,
       label: "Seguimiento atrasado",
     };
   }
 
-  // 3. HOY
   if (diff === 0) {
     return {
-      cliente,
-      type: "hoy",
+      relationship,
+      type: "today",
       score: 85,
       label: "Contactar hoy",
     };
   }
 
-  // 4. MAÑANA / PRÓXIMO
   if (diff === 1) {
     return {
-      cliente,
-      type: "hoy",
+      relationship,
+      type: "today",
       score: 75,
       label: "Preparar contacto",
     };
   }
 
-  // 5. NUEVO cliente
-  if (cliente.estado === "Nuevo") {
+  if (relationship.status === "Nuevo") {
     return {
-      cliente,
-      type: "nuevo",
+      relationship,
+      type: "new",
       score: 60,
       label: "Primer contacto",
+    };
+  }
+
+  if (relationship.status === "Pagó") {
+    return {
+      relationship,
+      type: "paid",
+      score: 40,
+      label: "Postventa",
     };
   }
 
   return null;
 }
 
-export function getTopSuggestions(clientes: Cliente[], limit = 3): Suggestion[] {
-  return clientes
-    .map(getClienteSuggestion)
+export function getTopRelationshipSuggestions(
+  relationships: Relationship[],
+  limit = 3,
+): Suggestion[] {
+  return relationships
+    .map(getRelationshipSuggestion)
     .filter((s): s is Suggestion => s !== null)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);

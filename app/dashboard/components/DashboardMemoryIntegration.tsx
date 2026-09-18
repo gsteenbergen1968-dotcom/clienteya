@@ -13,7 +13,7 @@ import {
   getCommercialMemorySignalBadgeClasses,
   getCommercialMemorySignalPriorityLabel,
   getCommercialMemorySignalTypeLabel,
-  type CommercialMemoryClient,
+  type CommercialMemoryRelationship,
 } from "../../../lib/commercial-memory-signals";
 
 import {
@@ -25,7 +25,7 @@ import {
 
 type DashboardMemoryIntegrationProps = {
   sector?: string | null;
-  clients: CommercialMemoryClient[];
+  relationships: CommercialMemoryRelationship[];
 };
 
 function formatNumber(value: number) {
@@ -44,6 +44,7 @@ function isToday(value?: string | null) {
   if (!value) return false;
 
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) return false;
 
   const now = new Date();
@@ -59,6 +60,7 @@ function isOverdue(value?: string | null) {
   if (!value) return false;
 
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) return false;
 
   const now = new Date();
@@ -69,62 +71,67 @@ function isOverdue(value?: string | null) {
 
 function buildKpiInput(
   sector: string | null | undefined,
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[]
 ): SectorKpiExplanationInput {
-  const totalClients = clients.length;
+  const totalRelationships = relationships.length;
 
-  const activeClients = clients.filter((client) => {
-    if (!client.updated_at) return false;
+  const activeRelationships = relationships.filter((relationship) => {
+    if (!relationship.updated_at) return false;
 
-    const updatedAt = new Date(client.updated_at);
+    const updatedAt = new Date(relationship.updated_at);
+
     if (Number.isNaN(updatedAt.getTime())) return false;
 
     const diffDays = Math.floor(
-      (Date.now() - updatedAt.getTime()) / (24 * 60 * 60 * 1000),
+      (Date.now() - updatedAt.getTime()) / (24 * 60 * 60 * 1000)
     );
 
     return diffDays <= 30;
   }).length;
 
-  const clientsToContactToday = clients.filter((client) =>
-    isToday(client.proximo_contacto),
+  const relationshipsToContactToday = relationships.filter((relationship) =>
+    isToday(relationship.proximo_contacto)
   ).length;
 
-  const overdueClients = clients.filter((client) =>
-    isOverdue(client.proximo_contacto),
+  const overdueRelationships = relationships.filter((relationship) =>
+    isOverdue(relationship.proximo_contacto)
   ).length;
 
-  const paidClients = clients.filter((client) => Boolean(client.pagado)).length;
-
-  const unpaidClients = clients.filter(
-    (client) => Number(client.monto ?? 0) > 0 && !client.pagado,
+  const paidRelationships = relationships.filter((relationship) =>
+    Boolean(relationship.pagado)
   ).length;
 
-  const totalRevenue = clients.reduce((total, client) => {
-    if (!client.pagado) return total;
-    return total + Number(client.monto ?? 0);
+  const unpaidRelationships = relationships.filter(
+    (relationship) =>
+      Number(relationship.monto ?? 0) > 0 && !relationship.pagado
+  ).length;
+
+  const totalRevenue = relationships.reduce((total, relationship) => {
+    if (!relationship.pagado) return total;
+
+    return total + Number(relationship.monto ?? 0);
   }, 0);
 
   return {
     sector,
-    totalClients,
-    activeClients,
-    clientsToContactToday,
-    overdueClients,
-    paidClients,
-    unpaidClients,
+    totalRelationships,
+    activeRelationships,
+    relationshipsToContactToday,
+    overdueRelationships,
+    paidRelationships,
+    unpaidRelationships,
     totalRevenue,
   };
 }
 
 export default function DashboardMemoryIntegration({
   sector,
-  clients,
+  relationships,
 }: DashboardMemoryIntegrationProps) {
-  const kpiInput = buildKpiInput(sector, clients);
+  const kpiInput = buildKpiInput(sector, relationships);
   const kpiExplanations = buildSectorKpiExplanations(kpiInput);
-  const memorySignals = buildCommercialMemorySignals(clients);
-  const memoryClusters = buildMemoryPatternClusters(clients);
+  const memorySignals = buildCommercialMemorySignals(relationships);
+  const memoryClusters = buildMemoryPatternClusters(relationships);
 
   const topExplanations = kpiExplanations.explanations.slice(0, 4);
   const topClusters = memoryClusters.clusters.slice(0, 4);
@@ -137,9 +144,11 @@ export default function DashboardMemoryIntegration({
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
             Inteligencia de KPI
           </p>
+
           <h2 className="mt-1 text-lg font-bold text-slate-950">
             {kpiExplanations.title}
           </h2>
+
           <p className="mt-2 text-sm leading-6 text-slate-600">
             {kpiExplanations.summary}
           </p>
@@ -150,14 +159,15 @@ export default function DashboardMemoryIntegration({
             <article
               key={item.id}
               className={`rounded-2xl border p-4 ${getSectorKpiExplanationToneClasses(
-                item.tone,
+                item.tone
               )}`}
             >
               <div className="mb-2 flex items-center justify-between gap-3">
                 <h3 className="text-sm font-bold">{item.title}</h3>
+
                 <span
                   className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${getSectorKpiExplanationBadgeClasses(
-                    item.tone,
+                    item.tone
                   )}`}
                 >
                   {getSectorKpiExplanationUrgencyLabel(item.urgency)}
@@ -165,9 +175,11 @@ export default function DashboardMemoryIntegration({
               </div>
 
               <p className="text-sm font-semibold">{item.valueLabel}</p>
+
               <p className="mt-2 text-sm leading-6 opacity-85">
                 {item.explanation}
               </p>
+
               <p className="mt-3 text-sm font-semibold">
                 {item.actionHint}
               </p>
@@ -181,9 +193,11 @@ export default function DashboardMemoryIntegration({
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
             Patrones de memoria
           </p>
+
           <h2 className="mt-1 text-lg font-bold text-slate-950">
             {memoryClusters.summary.title}
           </h2>
+
           <p className="mt-2 text-sm leading-6 text-slate-600">
             {memoryClusters.summary.summary}
           </p>
@@ -202,6 +216,7 @@ export default function DashboardMemoryIntegration({
                       {getMemoryPatternClusterIcon(cluster.type)}{" "}
                       {cluster.title}
                     </h3>
+
                     <p className="mt-1 text-xs text-slate-500">
                       {cluster.subtitle}
                     </p>
@@ -209,7 +224,7 @@ export default function DashboardMemoryIntegration({
 
                   <span
                     className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${getMemoryPatternClusterBadgeClasses(
-                      cluster.tone,
+                      cluster.tone
                     )}`}
                   >
                     {getMemoryPatternClusterPriorityLabel(cluster.priority)}
@@ -222,8 +237,9 @@ export default function DashboardMemoryIntegration({
 
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <span className="text-xs font-semibold text-slate-500">
-                    {formatNumber(cluster.count)} clientes
+                    {formatNumber(cluster.count)} relaciones
                   </span>
+
                   <span className="text-xs font-bold text-slate-900">
                     {cluster.actionLabel}
                   </span>
@@ -233,7 +249,7 @@ export default function DashboardMemoryIntegration({
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
-            ClienteYA todavía necesita más clientes o actividad para detectar
+            ClienteYA todavía necesita más relaciones o actividad para detectar
             patrones comerciales.
           </div>
         )}
@@ -244,9 +260,11 @@ export default function DashboardMemoryIntegration({
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
             Señales comerciales
           </p>
+
           <h2 className="mt-1 text-lg font-bold text-slate-950">
             {memorySignals.summary.title}
           </h2>
+
           <p className="mt-2 text-sm leading-6 text-slate-600">
             {memorySignals.summary.bestAction}
           </p>
@@ -262,8 +280,9 @@ export default function DashboardMemoryIntegration({
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-bold text-slate-950">
-                      {signal.clientName}
+                      {signal.relationshipName}
                     </h3>
+
                     <p className="mt-1 text-xs text-slate-500">
                       {getCommercialMemorySignalTypeLabel(signal.type)}
                     </p>
@@ -271,7 +290,7 @@ export default function DashboardMemoryIntegration({
 
                   <span
                     className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${getCommercialMemorySignalBadgeClasses(
-                      signal.tone,
+                      signal.tone
                     )}`}
                   >
                     {getCommercialMemorySignalPriorityLabel(signal.priority)}
@@ -281,6 +300,7 @@ export default function DashboardMemoryIntegration({
                 <p className="text-sm font-semibold text-slate-900">
                   {signal.title}
                 </p>
+
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   {signal.insight}
                 </p>
@@ -291,7 +311,7 @@ export default function DashboardMemoryIntegration({
                   </span>
 
                   <Link
-                    href={`/dashboard/clientes/${signal.clientId}`}
+                    href={`/dashboard/relationships/${signal.relationshipId}`}
                     className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700"
                   >
                     {signal.actionLabel}
@@ -310,9 +330,11 @@ export default function DashboardMemoryIntegration({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-500">
             Acción recomendada
           </p>
+
           <p className="mt-2 text-sm font-bold text-blue-950">
             {memoryClusters.summary.bestAction}
           </p>
+
           <p className="mt-1 text-sm text-blue-800">
             {memoryClusters.summary.mainRisk}
           </p>
@@ -322,10 +344,11 @@ export default function DashboardMemoryIntegration({
       <div className="grid gap-3 md:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold text-slate-400">
-            Clientes
+            Relaciones
           </p>
+
           <p className="mt-1 text-xl font-black text-slate-950">
-            {formatNumber(kpiInput.totalClients)}
+            {formatNumber(kpiInput.totalRelationships)}
           </p>
         </div>
 
@@ -333,6 +356,7 @@ export default function DashboardMemoryIntegration({
           <p className="text-xs font-semibold text-slate-400">
             Patrones
           </p>
+
           <p className="mt-1 text-xl font-black text-slate-950">
             {formatNumber(memoryClusters.summary.totalClusters)}
           </p>
@@ -342,6 +366,7 @@ export default function DashboardMemoryIntegration({
           <p className="text-xs font-semibold text-slate-400">
             Señales altas
           </p>
+
           <p className="mt-1 text-xl font-black text-slate-950">
             {formatNumber(memorySignals.summary.highSignals)}
           </p>
@@ -351,6 +376,7 @@ export default function DashboardMemoryIntegration({
           <p className="text-xs font-semibold text-slate-400">
             Ingresos
           </p>
+
           <p className="mt-1 text-xl font-black text-slate-950">
             {formatCurrency(kpiInput.totalRevenue)}
           </p>

@@ -13,7 +13,7 @@ import {
   type FounderGrowthOpportunity,
 } from "./founder-growth-engine";
 
-import type { CommercialMemoryClient } from "./commercial-memory-signals";
+import type { CommercialMemoryRelationship } from "./commercial-memory-signals";
 
 export type FounderExecutivePriorityCategory =
   | "revenue"
@@ -28,8 +28,8 @@ export type FounderExecutivePriorityUrgency =
 
 export type FounderExecutivePriority = {
   id: string;
-  clienteId: string;
-  clienteNombre: string;
+  relationshipId: string;
+  relationshipName: string;
   category: FounderExecutivePriorityCategory;
   urgency: FounderExecutivePriorityUrgency;
   title: string;
@@ -40,7 +40,7 @@ export type FounderExecutivePriority = {
 };
 
 function getUrgencyScore(
-  urgency: FounderExecutivePriorityUrgency,
+  urgency: FounderExecutivePriorityUrgency
 ) {
   switch (urgency) {
     case "critical":
@@ -56,7 +56,7 @@ function getUrgencyScore(
 }
 
 function normalizeUrgency(
-  priority: string,
+  priority: string
 ): FounderExecutivePriorityUrgency {
   if (priority === "critical") {
     return "critical";
@@ -74,12 +74,12 @@ function normalizeUrgency(
 }
 
 function fromRevenueLever(
-  lever: FounderRevenueLever,
+  lever: FounderRevenueLever
 ): FounderExecutivePriority {
   return {
-    id: `revenue-${lever.clienteId}`,
-    clienteId: lever.clienteId,
-    clienteNombre: lever.clienteNombre,
+    id: `revenue-${lever.relationshipId}`,
+    relationshipId: lever.relationshipId,
+    relationshipName: lever.relationshipName,
     category: "revenue",
     urgency: normalizeUrgency(lever.priority),
     title: "Mayor impacto de ingreso hoy",
@@ -91,12 +91,12 @@ function fromRevenueLever(
 }
 
 function fromRiskForecast(
-  forecast: FounderRiskForecast,
+  forecast: FounderRiskForecast
 ): FounderExecutivePriority {
   return {
-    id: `risk-${forecast.clienteId}`,
-    clienteId: forecast.clienteId,
-    clienteNombre: forecast.clienteNombre,
+    id: `risk-${forecast.relationshipId}`,
+    relationshipId: forecast.relationshipId,
+    relationshipName: forecast.relationshipName,
     category: "risk",
     urgency: normalizeUrgency(forecast.priority),
     title: "Ingreso en riesgo si no actúas",
@@ -108,12 +108,12 @@ function fromRiskForecast(
 }
 
 function fromGrowthOpportunity(
-  opportunity: FounderGrowthOpportunity,
+  opportunity: FounderGrowthOpportunity
 ): FounderExecutivePriority {
   return {
-    id: `growth-${opportunity.clienteId}`,
-    clienteId: opportunity.clienteId,
-    clienteNombre: opportunity.clienteNombre,
+    id: `growth-${opportunity.relationshipId}`,
+    relationshipId: opportunity.relationshipId,
+    relationshipName: opportunity.relationshipName,
     category: "growth",
     urgency: normalizeUrgency(opportunity.priority),
     title: "Mayor potencial de crecimiento",
@@ -124,22 +124,23 @@ function fromGrowthOpportunity(
   };
 }
 
-function deduplicateByClient(
-  priorities: FounderExecutivePriority[],
+function deduplicateByRelationship(
+  priorities: FounderExecutivePriority[]
 ) {
-  const bestByClient = new Map<
+  const bestByRelationship = new Map<
     string,
     FounderExecutivePriority
   >();
 
   for (const priority of priorities) {
-    const existing =
-      bestByClient.get(priority.clienteId);
+    const existing = bestByRelationship.get(
+      priority.relationshipId
+    );
 
     if (!existing) {
-      bestByClient.set(
-        priority.clienteId,
-        priority,
+      bestByRelationship.set(
+        priority.relationshipId,
+        priority
       );
       continue;
     }
@@ -153,35 +154,35 @@ function deduplicateByClient(
       getUrgencyScore(existing.urgency);
 
     if (currentScore > existingScore) {
-      bestByClient.set(
-        priority.clienteId,
-        priority,
+      bestByRelationship.set(
+        priority.relationshipId,
+        priority
       );
     }
   }
 
-  return Array.from(bestByClient.values());
+  return Array.from(bestByRelationship.values());
 }
 
 export function buildFounderAIExecutiveAdvisor(
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[]
 ): FounderExecutivePriority[] {
   const revenuePriorities =
-    buildFounderRevenueLevers(clients)
+    buildFounderRevenueLevers(relationships)
       .slice(0, 5)
       .map(fromRevenueLever);
 
   const riskPriorities =
-    buildFounderRiskForecast(clients)
+    buildFounderRiskForecast(relationships)
       .slice(0, 5)
       .map(fromRiskForecast);
 
   const growthPriorities =
-    buildFounderGrowthEngine(clients)
+    buildFounderGrowthEngine(relationships)
       .slice(0, 5)
       .map(fromGrowthOpportunity);
 
-  return deduplicateByClient([
+  return deduplicateByRelationship([
     ...revenuePriorities,
     ...riskPriorities,
     ...growthPriorities,
@@ -202,7 +203,7 @@ export function buildFounderAIExecutiveAdvisor(
 }
 
 export function getFounderExecutiveCategoryLabel(
-  category: FounderExecutivePriorityCategory,
+  category: FounderExecutivePriorityCategory
 ) {
   switch (category) {
     case "revenue":
@@ -217,7 +218,7 @@ export function getFounderExecutiveCategoryLabel(
 }
 
 export function getFounderExecutiveUrgencyLabel(
-  urgency: FounderExecutivePriorityUrgency,
+  urgency: FounderExecutivePriorityUrgency
 ) {
   switch (urgency) {
     case "critical":
@@ -233,7 +234,7 @@ export function getFounderExecutiveUrgencyLabel(
 }
 
 export function getFounderExecutiveUrgencyClasses(
-  urgency: FounderExecutivePriorityUrgency,
+  urgency: FounderExecutivePriorityUrgency
 ) {
   switch (urgency) {
     case "critical":

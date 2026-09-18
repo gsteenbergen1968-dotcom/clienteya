@@ -19,28 +19,28 @@ function normalize(value: string) {
 }
 
 export function detectWhatsAppPatterns(
-  events: WhatsAppMemoryEvent[],
+  events: WhatsAppMemoryEvent[]
 ): WhatsAppPattern[] {
   const patterns: WhatsAppPattern[] = [];
 
   const promises = events.filter(
-    (event) => event.type === "promise",
+    (event) => event.type === "promise"
   );
 
   const followups = events.filter(
-    (event) => event.type === "followup",
+    (event) => event.type === "followup"
   );
 
   const priceRequests = events.filter(
-    (event) => event.type === "price_request",
+    (event) => event.type === "price_request"
   );
 
   const meetings = events.filter(
-    (event) => event.type === "meeting",
+    (event) => event.type === "meeting"
   );
 
   const payments = events.filter(
-    (event) => event.type === "payment",
+    (event) => event.type === "payment"
   );
 
   const lastEvent = events[0];
@@ -51,7 +51,7 @@ export function detectWhatsAppPatterns(
       id: "third-delay",
       title: "Tercer aplazamiento detectado",
       description:
-        "El cliente ya pospuso varias veces la conversación o decisión.",
+        "La relación ya pospuso varias veces la conversación o decisión.",
       risk: "high",
       action: "Contactar hoy por WhatsApp",
     });
@@ -66,7 +66,7 @@ export function detectWhatsAppPatterns(
       id: "interest-no-response",
       title: "Interés sin respuesta",
       description:
-        "El cliente pidió información o precio, pero todavía no avanzó.",
+        "La relación pidió información o precio, pero todavía no avanzó.",
       risk: "medium",
       action: "Enviar recordatorio",
     });
@@ -95,8 +95,8 @@ export function detectWhatsAppPatterns(
     payments.length === 0
   ) {
     patterns.push({
-      id: "hot-client",
-      title: "Cliente caliente",
+      id: "hot-relationship",
+      title: "Relación caliente",
       description:
         "Existe interés activo y seguimiento reciente.",
       risk: "low",
@@ -110,8 +110,8 @@ export function detectWhatsAppPatterns(
     normalize(lastEvent.summary).includes("pago")
   ) {
     patterns.push({
-      id: "converted-client",
-      title: "Cliente convertido",
+      id: "converted-relationship",
+      title: "Relación convertida",
       description:
         "La relación ya generó ingreso confirmado.",
       risk: "low",

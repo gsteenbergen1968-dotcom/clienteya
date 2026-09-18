@@ -4,31 +4,31 @@ import {
   getFounderRevenueLeverPriorityLabel,
 } from "../../../lib/founder-revenue-levers";
 
-import type { CommercialMemoryClient } from "../../../lib/commercial-memory-signals";
+import type { CommercialMemoryRelationship } from "../../../lib/commercial-memory-signals";
 
 type FounderRevenueLeversPanelProps = {
-  clients: CommercialMemoryClient[];
+  relationships: CommercialMemoryRelationship[];
 };
 
 function formatGs(value: number) {
   return new Intl.NumberFormat("es-PY").format(
-    Math.max(0, value),
+    Math.max(0, value)
   );
 }
 
 export default function FounderRevenueLeversPanel({
-  clients,
+  relationships,
 }: FounderRevenueLeversPanelProps) {
   const levers =
-    buildFounderRevenueLevers(clients);
+    buildFounderRevenueLevers(relationships);
 
   const topLevers = levers.slice(0, 5);
 
   if (topLevers.length === 0) {
     return (
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
             Founder Revenue Levers
           </p>
 
@@ -37,7 +37,7 @@ export default function FounderRevenueLeversPanel({
           </h2>
 
           <p className="text-sm leading-6 text-slate-600">
-            Cuando haya clientes con valor comercial,
+            Cuando haya relaciones con valor comercial,
             ClienteYA identificará dónde una acción
             concreta puede generar el mayor impacto de
             ingreso.
@@ -49,7 +49,7 @@ export default function FounderRevenueLeversPanel({
 
   const totalImpact = topLevers.reduce(
     (sum, lever) => sum + lever.revenueImpact,
-    0,
+    0
   );
 
   const primaryLever = topLevers[0];
@@ -57,8 +57,8 @@ export default function FounderRevenueLeversPanel({
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
             Founder Revenue Levers
           </p>
 
@@ -96,7 +96,7 @@ export default function FounderRevenueLeversPanel({
             </h3>
 
             <p className="text-sm font-medium text-slate-700">
-              {primaryLever.clienteNombre}
+              {primaryLever.relationshipName}
             </p>
 
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
@@ -119,7 +119,7 @@ export default function FounderRevenueLeversPanel({
       <div className="grid gap-3">
         {topLevers.map((lever, index) => (
           <article
-            key={lever.clienteId}
+            key={lever.relationshipId}
             className="rounded-2xl border border-slate-200 bg-white p-4"
           >
             <div className="flex items-start justify-between gap-3">
@@ -130,16 +130,16 @@ export default function FounderRevenueLeversPanel({
                   </span>
 
                   <h3 className="text-sm font-semibold text-slate-950">
-                    {lever.clienteNombre}
+                    {lever.relationshipName}
                   </h3>
 
                   <span
                     className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getFounderRevenueLeverPriorityClasses(
-                      lever.priority,
+                      lever.priority
                     )}`}
                   >
                     {getFounderRevenueLeverPriorityLabel(
-                      lever.priority,
+                      lever.priority
                     )}
                   </span>
                 </div>

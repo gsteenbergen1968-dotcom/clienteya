@@ -1,6 +1,6 @@
 export type FounderBriefingTone = "good" | "warning" | "critical";
 
-export type FounderBriefingClient = {
+export type FounderBriefingRelationship = {
   id?: string | number;
   nombre?: string | null;
   name?: string | null;
@@ -25,7 +25,7 @@ export type FounderBriefingItem = {
 
 export type PipelineRiskItem = {
   id: string;
-  clientName: string;
+  relationshipName: string;
   riskType: "ghosting" | "stalled" | "hot" | "revenue";
   title: string;
   description: string;
@@ -35,7 +35,7 @@ export type PipelineRiskItem = {
 
 export type RevenueForecastItem = {
   id: string;
-  clientName: string;
+  relationshipName: string;
   probability: number;
   expectedValue: number;
   pipelineValue: number;
@@ -78,6 +78,7 @@ function normalizeDate(value?: string | null): Date | null {
   if (!value) return null;
 
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) return null;
 
   return date;
@@ -85,11 +86,13 @@ function normalizeDate(value?: string | null): Date | null {
 
 function startOfToday() {
   const now = new Date();
+
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 function daysSince(date?: string | null) {
   const parsed = normalizeDate(date);
+
   if (!parsed) return null;
 
   const msPerDay = 1000 * 60 * 60 * 24;
@@ -99,6 +102,7 @@ function daysSince(date?: string | null) {
 
 function daysUntil(date?: string | null) {
   const parsed = normalizeDate(date);
+
   if (!parsed) return null;
 
   const msPerDay = 1000 * 60 * 60 * 24;
@@ -106,31 +110,31 @@ function daysUntil(date?: string | null) {
   return Math.floor((parsed.getTime() - startOfToday().getTime()) / msPerDay);
 }
 
-function getClientName(client: FounderBriefingClient) {
-  return client.nombre || client.name || "Cliente sin nombre";
+function getRelationshipName(relationship: FounderBriefingRelationship) {
+  return relationship.nombre || relationship.name || "Relación sin nombre";
 }
 
-function getStatus(client: FounderBriefingClient) {
-  return (client.estado || client.status || "").toLowerCase().trim();
+function getStatus(relationship: FounderBriefingRelationship) {
+  return (relationship.estado || relationship.status || "").toLowerCase().trim();
 }
 
-function getClientValue(client: FounderBriefingClient) {
-  return Number(client.monto || 50000);
+function getRelationshipValue(relationship: FounderBriefingRelationship) {
+  return Number(relationship.monto || 50000);
 }
 
-function isPaid(client: FounderBriefingClient) {
-  const status = getStatus(client);
+function isPaid(relationship: FounderBriefingRelationship) {
+  const status = getStatus(relationship);
 
   return (
-    client.pagado === true ||
+    relationship.pagado === true ||
     status.includes("pagó") ||
     status.includes("pago") ||
     status.includes("pagado")
   );
 }
 
-function isWarm(client: FounderBriefingClient) {
-  const status = getStatus(client);
+function isWarm(relationship: FounderBriefingRelationship) {
+  const status = getStatus(relationship);
 
   return (
     status.includes("warm") ||
@@ -143,8 +147,8 @@ function isWarm(client: FounderBriefingClient) {
   );
 }
 
-function isColdOrLost(client: FounderBriefingClient) {
-  const status = getStatus(client);
+function isColdOrLost(relationship: FounderBriefingRelationship) {
+  const status = getStatus(relationship);
 
   return (
     status.includes("cold") ||
@@ -162,12 +166,17 @@ function buildItem(
   description: string,
   tone: FounderBriefingTone
 ): FounderBriefingItem {
-  return { id, title, description, tone };
+  return {
+    id,
+    title,
+    description,
+    tone,
+  };
 }
 
 function buildPipelineRisk(
   id: string,
-  clientName: string,
+  relationshipName: string,
   riskType: PipelineRiskItem["riskType"],
   title: string,
   description: string,
@@ -176,7 +185,7 @@ function buildPipelineRisk(
 ): PipelineRiskItem {
   return {
     id,
-    clientName,
+    relationshipName,
     riskType,
     title,
     description,
@@ -185,19 +194,28 @@ function buildPipelineRisk(
   };
 }
 
-function getConversionProbability(client: FounderBriefingClient) {
-  const status = getStatus(client);
+function getConversionProbability(
+  relationship: FounderBriefingRelationship
+) {
+  const status = getStatus(relationship);
+
   const followUpDelta =
-    daysUntil(client.proximo_contacto) ?? daysUntil(client.recordatorio);
-  const lastActivityDays = daysSince(client.updated_at || client.created_at);
+    daysUntil(relationship.proximo_contacto) ??
+    daysUntil(relationship.recordatorio);
+
+  const lastActivityDays = daysSince(
+    relationship.updated_at || relationship.created_at
+  );
 
   let probability = 35;
 
-  if (isPaid(client)) probability = 100;
-  if (isWarm(client)) probability += 25;
+  if (isPaid(relationship)) probability = 100;
+  if (isWarm(relationship)) probability += 25;
+
   if (status.includes("propuesta") || status.includes("proposal")) {
     probability += 20;
   }
+
   if (status.includes("contact")) probability += 10;
   if (status.includes("nuevo")) probability += 5;
 
@@ -210,18 +228,22 @@ function getConversionProbability(client: FounderBriefingClient) {
   if (lastActivityDays !== null && lastActivityDays >= 7) probability -= 15;
   if (lastActivityDays !== null && lastActivityDays >= 14) probability -= 10;
 
-  if (isColdOrLost(client)) probability -= 30;
+  if (isColdOrLost(relationship)) probability -= 30;
 
   return Math.max(5, Math.min(95, probability));
 }
 
 function getForecastCategory(
-  client: FounderBriefingClient,
+  relationship: FounderBriefingRelationship,
   probability: number
 ): RevenueForecastItem["category"] {
   const followUpDelta =
-    daysUntil(client.proximo_contacto) ?? daysUntil(client.recordatorio);
-  const lastActivityDays = daysSince(client.updated_at || client.created_at);
+    daysUntil(relationship.proximo_contacto) ??
+    daysUntil(relationship.recordatorio);
+
+  const lastActivityDays = daysSince(
+    relationship.updated_at || relationship.created_at
+  );
 
   if (
     probability >= 75 &&
@@ -232,7 +254,9 @@ function getForecastCategory(
     return "hot";
   }
 
-  if (probability >= 60) return "likely";
+  if (probability >= 60) {
+    return "likely";
+  }
 
   if (
     probability >= 35 &&
@@ -248,8 +272,14 @@ function getForecastCategory(
 function getForecastTone(
   category: RevenueForecastItem["category"]
 ): FounderBriefingTone {
-  if (category === "hot" || category === "likely") return "good";
-  if (category === "delayed") return "warning";
+  if (category === "hot" || category === "likely") {
+    return "good";
+  }
+
+  if (category === "delayed") {
+    return "warning";
+  }
+
   return "critical";
 }
 
@@ -257,6 +287,7 @@ function getForecastTitle(category: RevenueForecastItem["category"]) {
   if (category === "hot") return "Alta probabilidad de cierre";
   if (category === "likely") return "Ingreso probable";
   if (category === "delayed") return "Ingreso retrasado";
+
   return "Ingreso en riesgo";
 }
 
@@ -280,16 +311,19 @@ function getForecastDescription(
 }
 
 function buildRevenueForecastItem(
-  client: FounderBriefingClient
+  relationship: FounderBriefingRelationship
 ): RevenueForecastItem {
-  const probability = getConversionProbability(client);
-  const pipelineValue = getClientValue(client);
+  const probability = getConversionProbability(relationship);
+  const pipelineValue = getRelationshipValue(relationship);
   const expectedValue = Math.round((pipelineValue * probability) / 100);
-  const category = getForecastCategory(client, probability);
+  const category = getForecastCategory(relationship, probability);
 
   return {
-    id: String(client.id || `${getClientName(client)}-${pipelineValue}`),
-    clientName: getClientName(client),
+    id: String(
+      relationship.id ||
+        `${getRelationshipName(relationship)}-${pipelineValue}`
+    ),
+    relationshipName: getRelationshipName(relationship),
     probability,
     expectedValue,
     pipelineValue,
@@ -305,73 +339,97 @@ function formatGsInternal(value: number) {
 }
 
 export function buildFounderBriefing(
-  clients: FounderBriefingClient[] = []
+  relationships: FounderBriefingRelationship[] = []
 ): FounderBriefing {
-  const totalClients = clients.length;
+  const totalRelationships = relationships.length;
 
-  const openClients = clients.filter((client) => !isPaid(client));
-  const warmClients = openClients.filter(isWarm);
-  const coldOrLostClients = openClients.filter(isColdOrLost);
+  const openRelationships = relationships.filter(
+    (relationship) => !isPaid(relationship)
+  );
 
-  const overdueFollowUps = openClients.filter((client) => {
+  const warmRelationships = openRelationships.filter(isWarm);
+
+  const coldOrLostRelationships = openRelationships.filter(isColdOrLost);
+
+  const overdueFollowUps = openRelationships.filter((relationship) => {
     const followUpDelta =
-      daysUntil(client.proximo_contacto) ?? daysUntil(client.recordatorio);
+      daysUntil(relationship.proximo_contacto) ??
+      daysUntil(relationship.recordatorio);
 
     return followUpDelta !== null && followUpDelta < 0;
   });
 
-  const todaysFollowUps = openClients.filter((client) => {
+  const todaysFollowUps = openRelationships.filter((relationship) => {
     const followUpDelta =
-      daysUntil(client.proximo_contacto) ?? daysUntil(client.recordatorio);
+      daysUntil(relationship.proximo_contacto) ??
+      daysUntil(relationship.recordatorio);
 
     return followUpDelta === 0;
   });
 
-  const inactiveClients = openClients.filter((client) => {
-    const lastActivityDays = daysSince(client.updated_at || client.created_at);
+  const inactiveRelationships = openRelationships.filter((relationship) => {
+    const lastActivityDays = daysSince(
+      relationship.updated_at || relationship.created_at
+    );
 
     return lastActivityDays !== null && lastActivityDays >= 7;
   });
 
-  const ghostingRiskClients = openClients.filter((client) => {
-    const lastActivityDays = daysSince(client.updated_at || client.created_at);
-    const followUpDelta =
-      daysUntil(client.proximo_contacto) ?? daysUntil(client.recordatorio);
+  const ghostingRiskRelationships = openRelationships.filter(
+    (relationship) => {
+      const lastActivityDays = daysSince(
+        relationship.updated_at || relationship.created_at
+      );
 
-    return (
-      !isColdOrLost(client) &&
-      ((isWarm(client) && lastActivityDays !== null && lastActivityDays >= 5) ||
-        (followUpDelta !== null && followUpDelta <= -2))
+      const followUpDelta =
+        daysUntil(relationship.proximo_contacto) ??
+        daysUntil(relationship.recordatorio);
+
+      return (
+        !isColdOrLost(relationship) &&
+        ((isWarm(relationship) &&
+          lastActivityDays !== null &&
+          lastActivityDays >= 5) ||
+          (followUpDelta !== null && followUpDelta <= -2))
+      );
+    }
+  );
+
+  const stalledRelationships = openRelationships.filter((relationship) => {
+    const lastActivityDays = daysSince(
+      relationship.updated_at || relationship.created_at
     );
-  });
 
-  const stalledClients = openClients.filter((client) => {
-    const lastActivityDays = daysSince(client.updated_at || client.created_at);
     const followUpDelta =
-      daysUntil(client.proximo_contacto) ?? daysUntil(client.recordatorio);
+      daysUntil(relationship.proximo_contacto) ??
+      daysUntil(relationship.recordatorio);
 
     return (
-      !isColdOrLost(client) &&
+      !isColdOrLost(relationship) &&
       lastActivityDays !== null &&
       lastActivityDays >= 10 &&
       (followUpDelta === null || followUpDelta < 0)
     );
   });
 
-  const hotLeadClients = openClients.filter((client) => {
+  const hotLeadRelationships = openRelationships.filter((relationship) => {
     const followUpDelta =
-      daysUntil(client.proximo_contacto) ?? daysUntil(client.recordatorio);
-    const lastActivityDays = daysSince(client.updated_at || client.created_at);
+      daysUntil(relationship.proximo_contacto) ??
+      daysUntil(relationship.recordatorio);
+
+    const lastActivityDays = daysSince(
+      relationship.updated_at || relationship.created_at
+    );
 
     return (
-      isWarm(client) &&
+      isWarm(relationship) &&
       (followUpDelta === 0 ||
         followUpDelta === 1 ||
         (lastActivityDays !== null && lastActivityDays <= 2))
     );
   });
 
-  const revenueForecast = openClients
+  const revenueForecast = openRelationships
     .map(buildRevenueForecastItem)
     .sort((a, b) => b.expectedValue - a.expectedValue);
 
@@ -411,24 +469,24 @@ export function buildFounderBriefing(
     0,
     Math.min(
       100,
-      ghostingRiskClients.length * 18 +
-        stalledClients.length * 15 +
+      ghostingRiskRelationships.length * 18 +
+        stalledRelationships.length * 15 +
         overdueFollowUps.length * 10 +
-        inactiveClients.length * 5
+        inactiveRelationships.length * 5
     )
   );
 
   let score = 88;
 
   score -= overdueFollowUps.length * 7;
-  score -= inactiveClients.length * 3;
-  score -= coldOrLostClients.length * 2;
-  score -= ghostingRiskClients.length * 4;
-  score -= stalledClients.length * 4;
+  score -= inactiveRelationships.length * 3;
+  score -= coldOrLostRelationships.length * 2;
+  score -= ghostingRiskRelationships.length * 4;
+  score -= stalledRelationships.length * 4;
 
   if (todaysFollowUps.length >= 1) score += 3;
-  if (hotLeadClients.length >= 1) score += 5;
-  if (warmClients.length >= 3) score += 5;
+  if (hotLeadRelationships.length >= 1) score += 5;
+  if (warmRelationships.length >= 3) score += 5;
   if (likelyRevenue > 0) score += 3;
 
   score = Math.max(0, Math.min(100, score));
@@ -444,61 +502,61 @@ export function buildFounderBriefing(
         : "Baja";
 
   const commercialMomentum =
-    hotLeadClients.length >= 3 || warmClients.length >= 5
+    hotLeadRelationships.length >= 3 || warmRelationships.length >= 5
       ? "Fuerte"
-      : hotLeadClients.length >= 1 || warmClients.length >= 2
+      : hotLeadRelationships.length >= 1 || warmRelationships.length >= 2
         ? "Estable"
         : "Débil";
 
   const executionRisk =
-    ghostingRiskClients.length >= 4 || overdueFollowUps.length >= 5
+    ghostingRiskRelationships.length >= 4 || overdueFollowUps.length >= 5
       ? "Crítico"
-      : ghostingRiskClients.length >= 1 ||
+      : ghostingRiskRelationships.length >= 1 ||
           overdueFollowUps.length >= 2 ||
-          inactiveClients.length >= 5
+          inactiveRelationships.length >= 5
         ? "Elevado"
         : "Bajo";
 
   const pipelineRisks: PipelineRiskItem[] = [];
 
-  ghostingRiskClients.slice(0, 3).forEach((client, index) => {
+  ghostingRiskRelationships.slice(0, 3).forEach((relationship, index) => {
     pipelineRisks.push(
       buildPipelineRisk(
-        `ghosting-${client.id || index}`,
-        getClientName(client),
+        `ghosting-${relationship.id || index}`,
+        getRelationshipName(relationship),
         "ghosting",
         "Riesgo de pérdida de contacto",
-        "Cliente con señales de interés o seguimiento vencido, pero sin movimiento comercial suficiente.",
+        "Relación con señales de interés o seguimiento vencido, pero sin movimiento comercial suficiente.",
         "critical",
-        getClientValue(client)
+        getRelationshipValue(relationship)
       )
     );
   });
 
-  stalledClients.slice(0, 3).forEach((client, index) => {
+  stalledRelationships.slice(0, 3).forEach((relationship, index) => {
     pipelineRisks.push(
       buildPipelineRisk(
-        `stalled-${client.id || index}`,
-        getClientName(client),
+        `stalled-${relationship.id || index}`,
+        getRelationshipName(relationship),
         "stalled",
         "Oportunidad detenida",
         "Oportunidad sin avance comercial claro. Requiere decisión: recuperar, avanzar o cerrar.",
         "warning",
-        getClientValue(client)
+        getRelationshipValue(relationship)
       )
     );
   });
 
-  hotLeadClients.slice(0, 3).forEach((client, index) => {
+  hotLeadRelationships.slice(0, 3).forEach((relationship, index) => {
     pipelineRisks.push(
       buildPipelineRisk(
-        `hot-${client.id || index}`,
-        getClientName(client),
+        `hot-${relationship.id || index}`,
+        getRelationshipName(relationship),
         "hot",
         "Oportunidad caliente",
-        "Cliente con señales activas. Prioriza contacto rápido para proteger conversión.",
+        "Relación con señales activas. Prioriza contacto rápido para proteger conversión.",
         "good",
-        getClientValue(client)
+        getRelationshipValue(relationship)
       )
     );
   });
@@ -508,15 +566,15 @@ export function buildFounderBriefing(
   const risks: FounderBriefingItem[] = [];
   const recommendations: FounderBriefingItem[] = [];
 
-  if (ghostingRiskClients.length > 0) {
+  if (ghostingRiskRelationships.length > 0) {
     priorities.push(
       buildItem(
         "ghosting-risk",
-        `${ghostingRiskClients.length} cliente${
-          ghostingRiskClients.length === 1 ? "" : "s"
+        `${ghostingRiskRelationships.length} relación${
+          ghostingRiskRelationships.length === 1 ? "" : "es"
         } con riesgo de pérdida de contacto`,
         "Recupera estos contactos antes de que el pipeline pierda velocidad comercial.",
-        ghostingRiskClients.length >= 3 ? "critical" : "warning"
+        ghostingRiskRelationships.length >= 3 ? "critical" : "warning"
       )
     );
   }
@@ -528,7 +586,7 @@ export function buildFounderBriefing(
         `${overdueFollowUps.length} seguimiento${
           overdueFollowUps.length === 1 ? "" : "s"
         } vencido${overdueFollowUps.length === 1 ? "" : "s"}`,
-        "Estos clientes necesitan atención inmediata antes de que se pierda el momentum comercial.",
+        "Estas relaciones necesitan atención inmediata antes de que se pierda el momentum comercial.",
         overdueFollowUps.length >= 5 ? "critical" : "warning"
       )
     );
@@ -548,7 +606,7 @@ export function buildFounderBriefing(
       buildItem(
         "likely-revenue",
         "Ingreso probable detectado",
-        `ClientYA estima ${formatGsInternal(
+        `ClienteYA estima ${formatGsInternal(
           likelyRevenue
         )} como ingreso con mayor probabilidad de conversión.`,
         "good"
@@ -569,15 +627,15 @@ export function buildFounderBriefing(
     );
   }
 
-  if (stalledClients.length > 0) {
+  if (stalledRelationships.length > 0) {
     risks.push(
       buildItem(
         "stalled-pipeline",
-        `${stalledClients.length} oportunidad${
-          stalledClients.length === 1 ? "" : "es"
-        } detenida${stalledClients.length === 1 ? "" : "s"}`,
+        `${stalledRelationships.length} oportunidad${
+          stalledRelationships.length === 1 ? "" : "es"
+        } detenida${stalledRelationships.length === 1 ? "" : "s"}`,
         "Estas oportunidades necesitan una decisión comercial: avanzar, reactivar o cerrar.",
-        stalledClients.length >= 3 ? "critical" : "warning"
+        stalledRelationships.length >= 3 ? "critical" : "warning"
       )
     );
   }
@@ -595,41 +653,41 @@ export function buildFounderBriefing(
     );
   }
 
-  if (hotLeadClients.length > 0) {
+  if (hotLeadRelationships.length > 0) {
     opportunities.push(
       buildItem(
         "hot-leads",
-        `${hotLeadClients.length} oportunidad${
-          hotLeadClients.length === 1 ? "" : "es"
-        } caliente${hotLeadClients.length === 1 ? "" : "s"}`,
-        "Estos clientes muestran señales recientes. Un contacto rápido puede mejorar la conversión.",
+        `${hotLeadRelationships.length} oportunidad${
+          hotLeadRelationships.length === 1 ? "" : "es"
+        } caliente${hotLeadRelationships.length === 1 ? "" : "s"}`,
+        "Estas relaciones muestran señales recientes. Un contacto rápido puede mejorar la conversión.",
         "good"
       )
     );
   }
 
-  if (warmClients.length > 0) {
+  if (warmRelationships.length > 0) {
     opportunities.push(
       buildItem(
         "warm-pipeline",
-        `${warmClients.length} oportunidad${
-          warmClients.length === 1 ? "" : "es"
-        } comercial${warmClients.length === 1 ? "" : "es"} en pipeline`,
+        `${warmRelationships.length} oportunidad${
+          warmRelationships.length === 1 ? "" : "es"
+        } comercial${warmRelationships.length === 1 ? "" : "es"} en pipeline`,
         "Existen señales de intención comercial o movimiento activo.",
-        warmClients.length >= 5 ? "good" : "warning"
+        warmRelationships.length >= 5 ? "good" : "warning"
       )
     );
   }
 
-  if (inactiveClients.length > 0) {
+  if (inactiveRelationships.length > 0) {
     risks.push(
       buildItem(
-        "inactive-clients",
-        `${inactiveClients.length} cliente${
-          inactiveClients.length === 1 ? "" : "s"
-        } inactivo${inactiveClients.length === 1 ? "" : "s"}`,
+        "inactive-relationships",
+        `${inactiveRelationships.length} relación${
+          inactiveRelationships.length === 1 ? "" : "es"
+        } inactiva${inactiveRelationships.length === 1 ? "" : "s"}`,
         "No muestran actividad reciente y pueden necesitar una acción de reactivación.",
-        inactiveClients.length >= 8 ? "critical" : "warning"
+        inactiveRelationships.length >= 8 ? "critical" : "warning"
       )
     );
   }
@@ -647,12 +705,12 @@ export function buildFounderBriefing(
     );
   }
 
-  if (totalClients === 0) {
+  if (totalRelationships === 0) {
     priorities.push(
       buildItem(
         "empty-system",
         "Sin datos comerciales todavía",
-        "Carga clientes activos para activar la capa de inteligencia founder.",
+        "Carga relaciones activas para activar la capa de inteligencia founder.",
         "warning"
       )
     );
@@ -667,20 +725,20 @@ export function buildFounderBriefing(
     );
   }
 
-  if (ghostingRiskClients.length > 0) {
-    const examples = ghostingRiskClients
+  if (ghostingRiskRelationships.length > 0) {
+    const examples = ghostingRiskRelationships
       .slice(0, 3)
-      .map((client) => getClientName(client))
+      .map((relationship) => getRelationshipName(relationship))
       .join(", ");
 
     recommendations.push(
       buildItem(
         "recover-ghosting",
-        "Recupera primero clientes con riesgo de pérdida de contacto",
+        "Recupera primero relaciones con riesgo de pérdida de contacto",
         examples
           ? `Comienza con: ${examples}. Usa un mensaje corto, directo y orientado a decisión.`
           : "Comienza por los contactos con seguimiento vencido y mayor valor comercial.",
-        ghostingRiskClients.length >= 3 ? "critical" : "warning"
+        ghostingRiskRelationships.length >= 3 ? "critical" : "warning"
       )
     );
   }
@@ -696,7 +754,7 @@ export function buildFounderBriefing(
     );
   }
 
-  if (hotLeadClients.length > 0) {
+  if (hotLeadRelationships.length > 0) {
     recommendations.push(
       buildItem(
         "convert-hot-leads",
@@ -707,7 +765,7 @@ export function buildFounderBriefing(
     );
   }
 
-  if (stalledClients.length > 0) {
+  if (stalledRelationships.length > 0) {
     recommendations.push(
       buildItem(
         "clean-stalled",
@@ -729,7 +787,7 @@ export function buildFounderBriefing(
     );
   }
 
-  if (opportunities.length === 0 && totalClients > 0) {
+  if (opportunities.length === 0 && totalRelationships > 0) {
     opportunities.push(
       buildItem(
         "create-momentum",
@@ -777,10 +835,10 @@ export function buildFounderBriefing(
         : "Operación estable";
 
   const summary =
-    totalClients === 0
-      ? "ClientYA está listo para generar inteligencia founder cuando exista actividad comercial registrada."
-      : `ClientYA analizó ${totalClients} cliente${
-          totalClients === 1 ? "" : "s"
+    totalRelationships === 0
+      ? "ClienteYA está listo para generar inteligencia founder cuando exista actividad comercial registrada."
+      : `ClienteYA analizó ${totalRelationships} relación${
+          totalRelationships === 1 ? "" : "es"
         }, proyecta ${formatGsInternal(
           projectedRevenue
         )} en ingreso ponderado y detecta ${averageConversionProbability}% de probabilidad promedio de conversión.`;
@@ -790,11 +848,11 @@ export function buildFounderBriefing(
       ? `El forecast muestra ingreso probable por ${formatGsInternal(
           likelyRevenue
         )}. La prioridad es proteger estas oportunidades con seguimiento rápido y claro.`
-      : ghostingRiskClients.length > 0
-        ? "El pipeline muestra riesgo de pérdida de momentum. La prioridad es recuperar clientes con señales de interés antes de que se enfríen."
-        : stalledClients.length > 0
+      : ghostingRiskRelationships.length > 0
+        ? "El pipeline muestra riesgo de pérdida de momentum. La prioridad es recuperar relaciones con señales de interés antes de que se enfríen."
+        : stalledRelationships.length > 0
           ? "Existen oportunidades detenidas. El foco debe estar en decidir cuáles avanzar, reactivar o cerrar."
-          : hotLeadClients.length > 0
+          : hotLeadRelationships.length > 0
             ? "Hay oportunidades calientes activas. El día debe enfocarse en conversión rápida y seguimiento comercial."
             : tone === "critical"
               ? "El sistema muestra señales de pérdida de control comercial. Recupera primero seguimientos vencidos y oportunidades con mayor intención."
@@ -805,11 +863,11 @@ export function buildFounderBriefing(
   const founderFocus =
     likelyRevenue > 0
       ? "Protección de ingreso probable"
-      : ghostingRiskClients.length > 0
-        ? "Recuperación de clientes en riesgo"
-        : hotLeadClients.length > 0
+      : ghostingRiskRelationships.length > 0
+        ? "Recuperación de relaciones en riesgo"
+        : hotLeadRelationships.length > 0
           ? "Conversión de oportunidades calientes"
-          : stalledClients.length > 0
+          : stalledRelationships.length > 0
             ? "Limpieza del pipeline detenido"
             : overdueFollowUps.length > 0
               ? "Recuperación de seguimientos vencidos"
@@ -828,9 +886,9 @@ export function buildFounderBriefing(
     executionRisk,
     riskScore,
     revenueAtRisk,
-    hotLeadCount: hotLeadClients.length,
-    ghostingRiskCount: ghostingRiskClients.length,
-    stalledCount: stalledClients.length,
+    hotLeadCount: hotLeadRelationships.length,
+    ghostingRiskCount: ghostingRiskRelationships.length,
+    stalledCount: stalledRelationships.length,
     projectedRevenue,
     likelyRevenue,
     delayedRevenue,

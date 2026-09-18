@@ -17,51 +17,23 @@ import { createAdminClient } from "../../../lib/supabase/server";
 import { buildWhatsAppLink } from "../../../lib/whatsapp-link";
 
 import {
-  buildCommercialAutomationQueue,
-  getCommercialAdapterBadgeClasses,
-  getCommercialAdapterPriorityClasses,
-  getCommercialAdapterPriorityLabel,
-  type CommercialAutomationReminder,
-} from "../../../lib/commercial-operating-adapter";
-
-import { buildAIRecommendations } from "../../../lib/ai-recommendations";
-import { buildWhatsAppDraft } from "../../../lib/whatsapp-drafts";
+  buildAutomationRemindersV2,
+  type AutomationReminderV2,
+} from "../../../lib/automation-engine-v2";
 
 import {
-  detectClientPhase,
-  getPhaseClasses,
-} from "../../../lib/phase-detection";
+  buildRevenueAnalyticsV2,
+  formatGuaraniV2,
+} from "../../../lib/revenue-analytics-v2";
 
 import {
-  buildRevenueAnalytics,
-  formatGuarani,
-} from "../../../lib/revenue-analytics";
+  buildBusinessHealthV2,
+  getBusinessHealthClassesV2,
+} from "../../../lib/business-health-v2";
 
-import {
-  calculateOpportunityScore,
-  getOpportunityClasses,
-} from "../../../lib/opportunity-scoring";
-
-import {
-  buildTimelineInsight,
-  getTimelineClasses,
-} from "../../../lib/timeline-intelligence";
-
-import {
-  buildBusinessHealth,
-  getBusinessHealthClasses,
-} from "../../../lib/business-health";
-
-import {
-  markClientContacted,
-  scheduleNextFollowup,
-  closeOpportunity,
-} from "../../../lib/client-actions";
-
-import {
-  buildClientMemory,
-  getClientMemoryClasses,
-} from "../../../lib/client-memory";
+import { adaptRelationshipMemory } from "../../../lib/relationship-memory-adapter";
+import { buildRelationshipMemory } from "../../../lib/relationship-memory";
+import type { RelationshipRecord } from "../../../lib/relationship-repository";
 
 import {
   canAccessAutomations,
@@ -69,27 +41,6 @@ import {
 } from "../../../lib/access-control";
 
 export const dynamic = "force-dynamic";
-
-type Cliente = {
-  id: string;
-  nombre: string;
-  telefono: string;
-  estado?: string | null;
-  notas?: string | null;
-  memory?: string | null;
-  recordatorio?: string | null;
-  proximo_contacto?: string | null;
-  monto?: number | null;
-  pagado?: boolean | null;
-  fecha_pago?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
-
-type RawCliente = Omit<Cliente, "telefono" | "nombre"> & {
-  nombre?: string | null;
-  telefono?: string | null;
-};
 
 type Profile = ProfileAccess & {
   id: string;
@@ -99,22 +50,49 @@ type Profile = ProfileAccess & {
 
 type FilterType = "todos" | "urgente" | "alta" | "media" | "normal";
 
-function normalizeCliente(cliente: RawCliente): Cliente {
-  return {
-    id: cliente.id,
-    nombre: cliente.nombre || "Cliente sin nombre",
-    telefono: cliente.telefono || "",
-    estado: cliente.estado ?? null,
-    notas: cliente.notas ?? null,
-    memory: cliente.memory ?? null,
-    recordatorio: cliente.recordatorio ?? null,
-    proximo_contacto: cliente.proximo_contacto ?? null,
-    monto: cliente.monto ?? null,
-    pagado: cliente.pagado ?? false,
-    fecha_pago: cliente.fecha_pago ?? null,
-    created_at: cliente.created_at ?? null,
-    updated_at: cliente.updated_at ?? null,
-  };
+type RelationshipMemoryV2 = ReturnType<typeof buildRelationshipMemory>;
+
+function buildAutomationRelationshipMemory(
+  relationship: RelationshipRecord,
+) {
+  const relationshipMemoryModel = adaptRelationshipMemory({
+    id: relationship.id,
+    name: relationship.name,
+    phone: relationship.phone,
+    status: relationship.status,
+    notes: relationship.notes,
+    reminder: relationship.reminder,
+    next_follow_up_at: relationship.next_contact_at,
+    estimated_value: 0,
+    pagado: false,
+    payment_date: null,
+    created_at: relationship.created_at,
+  });
+
+  return buildRelationshipMemory(relationshipMemoryModel);
+}
+
+function getRelationshipMemoryLabel(memory: RelationshipMemoryV2) {
+  if ("label" in memory && typeof memory.label === "string") {
+    return memory.label;
+  }
+
+  if (memory.score >= 75) return "Relación prioritaria";
+  if (memory.score >= 50) return "Seguimiento activo";
+
+  return "Seguimiento normal";
+}
+
+function getRelationshipMemoryClasses(memory: RelationshipMemoryV2) {
+  if (memory.score >= 75) {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+
+  if (memory.score >= 50) {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
 function formatDate(date: string | null | undefined) {
@@ -123,9 +101,11 @@ function formatDate(date: string | null | undefined) {
   const cleanDate = date.slice(0, 10);
   const parts = cleanDate.split("-");
 
-  if (parts.length !== 3) return date;
+  if (parts.length != 3) return date;
 
   const [y, m, d] = parts;
+
+  if (!y || !m || !d) return date;
 
   return `${d}/${m}/${y}`;
 }
@@ -146,11 +126,35 @@ function filterHref(filter: FilterType) {
 }
 
 function getActionSuccessMessage(ok?: string) {
-  if (ok === "contactado") return "Cliente marcado como contactado.";
+  if (ok === "contactado") return "Relación marcada como contactada.";
   if (ok === "seguimiento") return "Seguimiento programado en 3 días.";
   if (ok === "cerrado") return "Oportunidad cerrada.";
 
   return null;
+}
+
+function getPriorityClasses(priority: AutomationReminderV2["priority"]) {
+  if (priority === "urgent") return "border-red-200 bg-red-50";
+  if (priority === "high") return "border-amber-200 bg-amber-50";
+  if (priority === "medium") return "border-sky-200 bg-sky-50";
+
+  return "border-slate-200 bg-white";
+}
+
+function getPriorityBadgeClasses(priority: AutomationReminderV2["priority"]) {
+  if (priority === "urgent") return "bg-red-600 text-white";
+  if (priority === "high") return "bg-amber-500 text-white";
+  if (priority === "medium") return "bg-sky-600 text-white";
+
+  return "bg-slate-900 text-white";
+}
+
+function getPriorityLabel(priority: AutomationReminderV2["priority"]) {
+  if (priority === "urgent") return "Urgente";
+  if (priority === "high") return "Alta";
+  if (priority === "medium") return "Media";
+
+  return "Normal";
 }
 
 function FeedbackBanner({ ok }: { ok?: string }) {
@@ -220,35 +224,35 @@ function AutomationCommandCenter({
   remindersCount,
   urgentCount,
   highCount,
-  hotLeads,
-  ghostingRisk,
+  todayCount,
+  noDateCount,
   expectedRevenue,
 }: {
   remindersCount: number;
   urgentCount: number;
   highCount: number;
-  hotLeads: number;
-  ghostingRisk: number;
+  todayCount: number;
+  noDateCount: number;
   expectedRevenue: string;
 }) {
   return (
     <SectionCard
-      badge="Commercial Operating System"
-      title="Orden de trabajo inteligente"
-      description="Cola comercial calculada desde una sola verdad: ClienteYA Commercial Operating System Core."
+      badge="Commercial Action Engine"
+      title="Cola comercial"
+      description="Acciones generadas desde una sola verdad comercial. Automations ejecuta; no vuelve a calcular."
     >
       <div className="mb-5 flex justify-end">
-        <Link href="/dashboard/nuevo" className={ui.buttons.primary}>
-          + Nuevo cliente
+        <Link href="/dashboard/new" className={ui.buttons.primary}>
+          + Nueva relación
         </Link>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <KpiCard label="Automatizaciones" value={remindersCount} tone="sky" />
+        <KpiCard label="Acciones" value={remindersCount} tone="sky" />
         <KpiCard label="Urgente" value={urgentCount} tone="red" />
         <KpiCard label="Alta" value={highCount} tone="amber" />
-        <KpiCard label="Hot leads" value={hotLeads} tone="red" />
-        <KpiCard label="Ghosting risk" value={ghostingRisk} tone="amber" />
+        <KpiCard label="Hoy" value={todayCount} tone="emerald" />
+        <KpiCard label="Sin fecha" value={noDateCount} tone="default" />
       </div>
 
       <div className="mt-4 rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm font-medium text-slate-700">
@@ -260,32 +264,28 @@ function AutomationCommandCenter({
 }
 
 function AutomationCard({
-  cliente,
   reminder,
   actionContacted,
   actionSchedule3Days,
   actionClose,
 }: {
-  cliente: Cliente;
-  reminder: CommercialAutomationReminder;
+  reminder: AutomationReminderV2;
   actionContacted: (formData: FormData) => Promise<void>;
   actionSchedule3Days: (formData: FormData) => Promise<void>;
   actionClose: (formData: FormData) => Promise<void>;
 }) {
-  const memory = buildClientMemory(cliente);
-  const aiRecommendations = buildAIRecommendations(cliente);
-  const primaryRecommendation = aiRecommendations[0];
-
-  const smartDraft = buildWhatsAppDraft(cliente, primaryRecommendation);
-  const phase = detectClientPhase(cliente);
-  const opportunity = calculateOpportunityScore(cliente);
-  const timeline = buildTimelineInsight(cliente);
-
-  const whatsappLink = buildWhatsAppLink(cliente.telefono, smartDraft);
+  const relationship = reminder.relationship;
+  const memory = buildAutomationRelationshipMemory(relationship);
+  const relationshipName =
+    relationship.name || "Relación sin nombre";
+  const relationshipPhone = relationship.phone || "";
+  const nextContactAt = relationship.next_contact_at;
+  const whatsappDraft = `${relationshipName}, buen día. ${reminder.nextBestAction}.`;
+  const whatsappLink = buildWhatsAppLink(relationshipPhone, whatsappDraft);
 
   return (
     <div
-      className={`rounded-[28px] border p-4 shadow-sm sm:p-5 ${getCommercialAdapterPriorityClasses(
+      className={`rounded-[28px] border p-4 shadow-sm sm:p-5 ${getPriorityClasses(
         reminder.priority,
       )}`}
     >
@@ -293,104 +293,69 @@ function AutomationCard({
         <div className="min-w-0 flex-1">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${getCommercialAdapterBadgeClasses(
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${getPriorityBadgeClasses(
                 reminder.priority,
               )}`}
             >
-              {getCommercialAdapterPriorityLabel(reminder.priority)}
+              {getPriorityLabel(reminder.priority)}
             </span>
 
             <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
               Score {reminder.score}
             </span>
 
-            <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
-              COS {reminder.commercialScore}/100
-            </span>
-
             <span
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getClientMemoryClasses(
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getRelationshipMemoryClasses(
                 memory,
               )}`}
             >
-              {memory.label}
-            </span>
-
-            <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-              Memory {reminder.memoryScore}/100
-            </span>
-
-            <span
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getPhaseClasses(
-                phase.tone,
-              )}`}
-            >
-              {phase.label}
-            </span>
-
-            <span
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getOpportunityClasses(
-                opportunity.risk,
-              )}`}
-            >
-              {opportunity.label}
-            </span>
-
-            <span
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getTimelineClasses(
-                timeline.tone,
-              )}`}
-            >
-              {timeline.label}
+              {getRelationshipMemoryLabel(memory)}
             </span>
           </div>
 
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            {cliente.nombre}
+            {relationshipName}
           </h2>
 
           <p className="mt-1 text-sm text-slate-500 sm:text-base">
-            {cliente.telefono || "Sin teléfono"}
+            {relationshipPhone || "Sin teléfono"}
           </p>
 
           <p className="mt-2 text-sm text-slate-500">
             Próximo contacto:{" "}
             <span className="font-semibold text-slate-700">
-              {formatDate(reminder.nextDate)}
+              {formatDate(nextContactAt)}
             </span>
           </p>
 
           <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr]">
             <div className="rounded-2xl border border-white/60 bg-white/70 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Razón del sistema
+                Acción generada
               </p>
 
-              <p className="mt-3 text-sm leading-6 text-slate-700">
-                {reminder.reason}
+              <p className="mt-3 text-sm font-bold leading-6 text-slate-900">
+                {reminder.title}
               </p>
 
-              <p className="mt-3 text-sm font-semibold text-slate-800">
-                Próxima acción: {reminder.nextActionLabel}
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {reminder.description}
               </p>
             </div>
 
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                Borrador WhatsApp AI
+                Siguiente mejor acción
               </p>
 
               <p className="mt-3 text-sm leading-6 text-slate-700">
-                {smartDraft}
+                {reminder.nextBestAction}
               </p>
             </div>
           </div>
 
           <div className="mt-3 rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-600">
-            💡{" "}
-            {primaryRecommendation?.description ||
-              reminder.description ||
-              memory.nextBestStep}
+            💡 {memory.nextBestStep}
           </div>
         </div>
 
@@ -405,14 +370,14 @@ function AutomationCard({
           </a>
 
           <Link
-            href={`/dashboard/clientes/${cliente.id}`}
+            href={`/dashboard/relationships/${relationship.id}`}
             className={ui.buttons.secondary}
           >
-            Abrir cliente
+            Abrir relación
           </Link>
 
           <form action={actionContacted}>
-            <input type="hidden" name="id" value={cliente.id} />
+            <input type="hidden" name="id" value={relationship.id} />
 
             <button
               type="submit"
@@ -423,7 +388,7 @@ function AutomationCard({
           </form>
 
           <form action={actionSchedule3Days}>
-            <input type="hidden" name="id" value={cliente.id} />
+            <input type="hidden" name="id" value={relationship.id} />
 
             <button
               type="submit"
@@ -434,7 +399,7 @@ function AutomationCard({
           </form>
 
           <form action={actionClose}>
-            <input type="hidden" name="id" value={cliente.id} />
+            <input type="hidden" name="id" value={relationship.id} />
 
             <button
               type="submit"
@@ -487,28 +452,32 @@ export default async function AutomationsPage({
 
     const id = String(formData.get("id") || "");
 
-    console.log("[AUTOMATIONS ACTION] contactado_submit", {
-      userId: user.id,
-      id,
-    });
-
     if (!id) redirect("/dashboard/automations");
 
-    const result = await markClientContacted(user.id, id);
+    const now = new Date().toISOString();
 
-    console.log("[AUTOMATIONS ACTION] contactado_result", result);
+    const { error: updateError } = await supabase
+      .from("relationships")
+      .update({
+        status: "Contactado",
+        reminder: null,
+        next_contact_at: null,
+        last_contact_at: now,
+        updated_at: now,
+      })
+      .eq("id", id)
+      .eq("owner_id", user.id);
 
-    if (!result.ok) {
-      console.error("CONTACTADO ERROR:", result.message);
-      throw new Error(result.message);
+    if (updateError) {
+      throw new Error(updateError.message);
     }
 
     revalidatePath("/dashboard");
-    revalidatePath("/dashboard/clientes");
+    revalidatePath("/dashboard/relationships");
     revalidatePath("/dashboard/automations");
-    revalidatePath("/dashboard/calendario");
+    revalidatePath("/dashboard/planning");
     revalidatePath("/dashboard/cockpit");
-    revalidatePath(`/dashboard/clientes/${id}`);
+    revalidatePath(`/dashboard/relationships/${id}`);
 
     redirect("/dashboard/automations?ok=contactado");
   }
@@ -526,28 +495,33 @@ export default async function AutomationsPage({
 
     const id = String(formData.get("id") || "");
 
-    console.log("[AUTOMATIONS ACTION] schedule_submit", {
-      userId: user.id,
-      id,
-    });
-
     if (!id) redirect("/dashboard/automations");
 
-    const result = await scheduleNextFollowup(user.id, id, 3);
+    const nextContactAt = new Date();
+    nextContactAt.setDate(nextContactAt.getDate() + 3);
 
-    console.log("[AUTOMATIONS ACTION] schedule_result", result);
+    const now = new Date().toISOString();
 
-    if (!result.ok) {
-      console.error("SCHEDULE ERROR:", result.message);
-      throw new Error(result.message);
+    const { error: updateError } = await supabase
+      .from("relationships")
+      .update({
+        reminder: "Seguimiento programado",
+        next_contact_at: nextContactAt.toISOString().slice(0, 10),
+        updated_at: now,
+      })
+      .eq("id", id)
+      .eq("owner_id", user.id);
+
+    if (updateError) {
+      throw new Error(updateError.message);
     }
 
     revalidatePath("/dashboard");
-    revalidatePath("/dashboard/clientes");
+    revalidatePath("/dashboard/relationships");
     revalidatePath("/dashboard/automations");
-    revalidatePath("/dashboard/calendario");
+    revalidatePath("/dashboard/planning");
     revalidatePath("/dashboard/cockpit");
-    revalidatePath(`/dashboard/clientes/${id}`);
+    revalidatePath(`/dashboard/relationships/${id}`);
 
     redirect("/dashboard/automations?ok=seguimiento");
   }
@@ -565,28 +539,31 @@ export default async function AutomationsPage({
 
     const id = String(formData.get("id") || "");
 
-    console.log("[AUTOMATIONS ACTION] close_submit", {
-      userId: user.id,
-      id,
-    });
-
     if (!id) redirect("/dashboard/automations");
 
-    const result = await closeOpportunity(user.id, id);
+    const now = new Date().toISOString();
 
-    console.log("[AUTOMATIONS ACTION] close_result", result);
+    const { error: updateError } = await supabase
+      .from("relationships")
+      .update({
+        status: "Cerrado",
+        reminder: null,
+        next_contact_at: null,
+        updated_at: now,
+      })
+      .eq("id", id)
+      .eq("owner_id", user.id);
 
-    if (!result.ok) {
-      console.error("CLOSE ERROR:", result.message);
-      throw new Error(result.message);
+    if (updateError) {
+      throw new Error(updateError.message);
     }
 
     revalidatePath("/dashboard");
-    revalidatePath("/dashboard/clientes");
+    revalidatePath("/dashboard/relationships");
     revalidatePath("/dashboard/automations");
-    revalidatePath("/dashboard/calendario");
+    revalidatePath("/dashboard/planning");
     revalidatePath("/dashboard/cockpit");
-    revalidatePath(`/dashboard/clientes/${id}`);
+    revalidatePath(`/dashboard/relationships/${id}`);
 
     redirect("/dashboard/automations?ok=cerrado");
   }
@@ -610,42 +587,34 @@ export default async function AutomationsPage({
   const hasAutomationsAccess = automationAccess.allowed;
   const founderModeActive = automationAccess.reason === "founder_mode";
 
-  const { data: clientesData } = await supabase
-    .from("clientes")
+  const { data: relationshipsData, error: relationshipsError } = await supabase
+    .from("relationships")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("owner_id", user.id)
     .order("created_at", { ascending: false });
 
-  const clientes = ((clientesData ?? []) as RawCliente[]).map(
-    normalizeCliente,
-  );
+  if (relationshipsError) {
+    console.error("AUTOMATIONS RELATIONSHIPS SELECT ERROR:", relationshipsError);
+  }
 
-  const commercialQueue = buildCommercialAutomationQueue(clientes);
+  const relationshipRecords =
+    (relationshipsData ?? []) as RelationshipRecord[];
 
-  const remindersWithMemory = commercialQueue
-    .map((reminder) => {
-      const cliente = normalizeCliente(reminder.cliente as RawCliente);
-
-      return {
-        ...reminder,
-        cliente,
-        memory: buildClientMemory(cliente),
-      };
-    })
+  const remindersWithMemory = buildAutomationRemindersV2(relationshipRecords)
+    .map((reminder) => ({
+      ...reminder,
+      memory: buildAutomationRelationshipMemory(reminder.relationship),
+    }))
     .sort((a, b) => {
       const scoreDiff = b.score - a.score;
 
       if (scoreDiff !== 0) return scoreDiff;
 
-      const memoryDiff = b.memory.score - a.memory.score;
-
-      if (memoryDiff !== 0) return memoryDiff;
-
-      return b.commercialScore - a.commercialScore;
+      return b.memory.score - a.memory.score;
     });
 
-  const revenue = buildRevenueAnalytics(clientes);
-  const businessHealth = buildBusinessHealth(clientes);
+  const revenue = buildRevenueAnalyticsV2(relationshipRecords);
+  const businessHealth = buildBusinessHealthV2(relationshipRecords);
 
   const counts = {
     todos: remindersWithMemory.length,
@@ -655,13 +624,13 @@ export default async function AutomationsPage({
     normal: remindersWithMemory.filter((r) => r.priority === "low").length,
   };
 
-  const hotLeads = remindersWithMemory.filter(
-    (r) => r.memory.salesTemperature === "hot",
-  );
+  const todayCount = remindersWithMemory.filter(
+    (r) => r.type === "today",
+  ).length;
 
-  const ghostingRisk = remindersWithMemory.filter(
-    (r) => r.memory.ghostingRisk === "high",
-  );
+  const noDateCount = remindersWithMemory.filter(
+    (r) => r.type === "general" && !r.relationship.next_contact_at,
+  ).length;
 
   const priorityFilter = filterToPriority(activeFilter);
 
@@ -680,15 +649,15 @@ export default async function AutomationsPage({
           </aside>
 
           <div className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-            <div className="mx-auto max-w-[1600px]">
+            <div className="mx-auto max-w-[1280px]">
               <div className="mb-4">
                 <FounderModeBadge enabled={founderModeActive} />
               </div>
 
               <PageHeader
                 title="Automatizaciones"
-                description="Seguimientos, WhatsApp AI, oportunidades, revenue, client memory y salud comercial."
-                badge="Commercial Operating System"
+                description="Cola comercial ejecutable conectada a la misma verdad que Dashboard y Calendario."
+                badge="V22 Commercial Action Engine"
               />
 
               <div className="space-y-6">
@@ -710,15 +679,15 @@ export default async function AutomationsPage({
                       remindersCount={remindersWithMemory.length}
                       urgentCount={counts.urgente}
                       highCount={counts.alta}
-                      hotLeads={hotLeads.length}
-                      ghostingRisk={ghostingRisk.length}
-                      expectedRevenue={formatGuarani(
+                      todayCount={todayCount}
+                      noDateCount={noDateCount}
+                      expectedRevenue={formatGuaraniV2(
                         revenue.expectedRevenue || 0,
                       )}
                     />
 
                     <div
-                      className={`rounded-[28px] border p-5 shadow-sm ${getBusinessHealthClasses(
+                      className={`rounded-[28px] border p-5 shadow-sm ${getBusinessHealthClassesV2(
                         businessHealth.tone,
                       )}`}
                     >
@@ -751,8 +720,8 @@ export default async function AutomationsPage({
 
                     <SectionCard
                       badge="Filtros"
-                      title="Prioridad de seguimiento"
-                      description="Filtra la cola por urgencia para trabajar primero lo importante."
+                      title="Prioridad de ejecución"
+                      description="Trabaja primero las acciones que la Commercial Action Engine marcó como más importantes."
                     >
                       <div className="flex flex-wrap gap-3">
                         <FilterTab
@@ -796,21 +765,20 @@ export default async function AutomationsPage({
                       <EmptyState
                         icon="🤖"
                         title="No hay automatizaciones todavía"
-                        description="Agrega clientes con próximos contactos y ClienteYA empezará a generar seguimientos automáticos."
-                        actionHref="/dashboard/nuevo"
-                        actionLabel="+ Nuevo cliente"
+                        description="Agrega relaciones con próximos contactos y ClienteYA empezará a generar acciones comerciales."
+                        actionHref="/dashboard/new"
+                        actionLabel="+ Nueva relación"
                       />
                     ) : (
                       <SectionCard
                         badge="Smart Queue"
-                        title="Cola inteligente de seguimiento"
-                        description={`${visibleReminders.length} seguimiento(s) detectado(s), calculados desde una sola verdad comercial.`}
+                        title="Cola de ejecución"
+                        description={`${visibleReminders.length} acción(es) generada(s) desde la misma verdad comercial.`}
                       >
                         <div className="space-y-4">
                           {visibleReminders.map((reminder) => (
                             <AutomationCard
-                              key={reminder.cliente.id}
-                              cliente={reminder.cliente}
+                              key={reminder.relationshipId}
                               reminder={reminder}
                               actionContacted={actionContacted}
                               actionSchedule3Days={actionSchedule3Days}

@@ -102,12 +102,12 @@ export const ui = {
   },
 
   nav: {
-    dashboard: "Resumen ejecutivo",
-    cockpit: "AI Cockpit",
-    clientes: "Clientes",
-    calendario: "Calendario",
+    dashboard: "Resumen",
+    cockpit: "Cockpit",
+    relaciones: "Relaciones",
+    calendario: "Planificación",
     automations: "Automatizaciones",
-    nuevoCliente: "Nuevo cliente",
+    nuevaRelacion: "Nueva relación",
     configuracion: "Configuración",
     salir: "Salir",
   },
@@ -149,7 +149,7 @@ export const ui = {
   dashboard: {
     title: "Resumen ejecutivo",
     description:
-      "Vista central de clientes, ingresos, riesgos comerciales y prioridades operativas.",
+      "Vista central de relaciones, ingresos, riesgos comerciales y prioridades operativas.",
     dailyFocus: "Enfoque diario",
     aiCockpit: "AI Cockpit",
     founderBriefing: "Founder Briefing",
@@ -160,12 +160,12 @@ export const ui = {
       "Cuando haya actividad suficiente, ClienteYA mostrará aquí los indicadores ejecutivos.",
   },
 
-  clients: {
-    title: "Clientes",
+  relationships: {
+    title: "Relaciones",
     description:
-      "Gestiona clientes, seguimiento comercial, recordatorios y oportunidades activas.",
-    newClient: "Nuevo cliente",
-    clientName: "Nombre del cliente",
+      "Gestiona relaciones, seguimiento comercial, recordatorios y oportunidades activas.",
+    newRelationship: "Nueva relación",
+    relationshipName: "Nombre de la relación",
     phone: "Teléfono",
     email: "Correo electrónico",
     company: "Empresa",
@@ -173,9 +173,9 @@ export const ui = {
     nextContact: "Próximo contacto",
     reminder: "Recordatorio",
     notes: "Notas",
-    noClientsTitle: "Todavía no hay clientes",
-    noClientsDescription:
-      "Agrega tu primer cliente para comenzar a construir tu pipeline comercial.",
+    noRelationshipsTitle: "Todavía no hay relaciones",
+    noRelationshipsDescription:
+      "Agrega tu primera relación para comenzar a construir tu pipeline comercial.",
   },
 
   calendar: {
@@ -197,13 +197,13 @@ export const ui = {
     detectedActions: "Acciones detectadas",
     noAutomationsTitle: "Sin automatizaciones activas",
     noAutomationsDescription:
-      "Cuando existan clientes con seguimiento pendiente, ClienteYA generará alertas automáticas.",
+      "Cuando existan relaciones con seguimiento pendiente, ClienteYA generará alertas automáticas.",
   },
 
   ai: {
     cockpitTitle: "AI Cockpit",
     cockpitDescription:
-      "Centro inteligente para priorizar clientes, riesgos y oportunidades.",
+      "Centro inteligente para priorizar relaciones, riesgos y oportunidades.",
     briefingTitle: "Founder Briefing",
     briefingDescription:
       "Resumen ejecutivo con lo más importante para tomar decisiones rápidas.",

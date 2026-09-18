@@ -1,4 +1,4 @@
-type Cliente = {
+type Relationship = {
   id: string;
   nombre: string;
   estado?: string | null;
@@ -7,7 +7,7 @@ type Cliente = {
   proximo_contacto?: string | null;
 };
 
-export type ClientPhase =
+export type RelationshipPhase =
   | "nuevo_lead"
   | "interesado"
   | "negociacion"
@@ -17,7 +17,7 @@ export type ClientPhase =
   | "sin_respuesta";
 
 export type PhaseDetectionResult = {
-  phase: ClientPhase;
+  phase: RelationshipPhase;
   label: string;
   description: string;
   confidence: number;
@@ -28,11 +28,12 @@ function normalize(value?: string | null) {
   return value?.toLowerCase().trim() || "";
 }
 
-export function detectClientPhase(cliente: Cliente): PhaseDetectionResult {
-  const estado = normalize(cliente.estado);
-  const notas = normalize(cliente.notas);
-  const recordatorio = normalize(cliente.recordatorio);
-
+export function detectRelationshipPhase(
+  relationship: Relationship
+): PhaseDetectionResult {
+  const estado = normalize(relationship.estado);
+  const notas = normalize(relationship.notas);
+  const recordatorio = normalize(relationship.recordatorio);
   const text = `${estado} ${notas} ${recordatorio}`;
 
   if (
@@ -45,7 +46,7 @@ export function detectClientPhase(cliente: Cliente): PhaseDetectionResult {
     return {
       phase: "cerrado",
       label: "Cerrado",
-      description: "Cliente convertido o pago confirmado.",
+      description: "Relación convertida o pago confirmado.",
       confidence: 95,
       tone: "green",
     };
@@ -60,7 +61,7 @@ export function detectClientPhase(cliente: Cliente): PhaseDetectionResult {
     return {
       phase: "perdido",
       label: "Perdido",
-      description: "Cliente sin oportunidad activa por ahora.",
+      description: "Relación sin oportunidad activa por ahora.",
       confidence: 90,
       tone: "slate",
     };
@@ -76,7 +77,7 @@ export function detectClientPhase(cliente: Cliente): PhaseDetectionResult {
     return {
       phase: "esperando_pago",
       label: "Esperando pago",
-      description: "Cliente está en fase de pago o confirmación.",
+      description: "La relación está en fase de pago o confirmación.",
       confidence: 88,
       tone: "amber",
     };
@@ -92,7 +93,8 @@ export function detectClientPhase(cliente: Cliente): PhaseDetectionResult {
     return {
       phase: "negociacion",
       label: "Negociación",
-      description: "Cliente está evaluando precio, propuesta o condiciones.",
+      description:
+        "La relación está evaluando precio, propuesta o condiciones.",
       confidence: 82,
       tone: "amber",
     };
@@ -108,7 +110,8 @@ export function detectClientPhase(cliente: Cliente): PhaseDetectionResult {
     return {
       phase: "interesado",
       label: "Interesado",
-      description: "Cliente mostró intención o curiosidad comercial.",
+      description:
+        "La relación mostró intención o curiosidad comercial.",
       confidence: 80,
       tone: "green",
     };
@@ -122,7 +125,7 @@ export function detectClientPhase(cliente: Cliente): PhaseDetectionResult {
     return {
       phase: "sin_respuesta",
       label: "Sin respuesta",
-      description: "Cliente no respondió el último contacto.",
+      description: "La relación no respondió el último contacto.",
       confidence: 78,
       tone: "red",
     };
@@ -131,13 +134,16 @@ export function detectClientPhase(cliente: Cliente): PhaseDetectionResult {
   return {
     phase: "nuevo_lead",
     label: "Nuevo lead",
-    description: "Cliente nuevo o sin señales suficientes todavía.",
+    description:
+      "Relación nueva o sin señales suficientes todavía.",
     confidence: 65,
     tone: "blue",
   };
 }
 
-export function getPhaseClasses(tone: PhaseDetectionResult["tone"]) {
+export function getPhaseClasses(
+  tone: PhaseDetectionResult["tone"]
+) {
   if (tone === "green") {
     return "border-emerald-200 bg-emerald-50 text-emerald-800";
   }

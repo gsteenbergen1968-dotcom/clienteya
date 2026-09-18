@@ -1,68 +1,146 @@
 import { createAdminClient } from "./supabase/server";
 
-type Cliente = {
+type Relationship = {
   id: string;
-  user_id: string | null;
-  estado: string;
-  proximo_contacto: string | null;
-  recordatorio: string | null;
+  owner_id: string | null;
+  status: string | null;
+  next_contact_at?: string | null;
+  reminder?: string | null;
 };
 
 function todayIsoDate() {
-  return new Date().toISOString().split("T")[0];
+  return new Date()
+    .toISOString()
+    .split("T")[0];
 }
 
-function addDays(base: string, days: number) {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
+function addDays(
+  base: string,
+  days: number,
+) {
+  const date = new Date(base);
+
+  date.setDate(
+    date.getDate() + days,
+  );
+
+  return date
+    .toISOString()
+    .split("T")[0];
 }
 
-export async function runAutoActionsForUser(userId: string) {
-  const admin = createAdminClient();
-  const today = todayIsoDate();
+export async function runAutoActionsForUser(
+  userId: string,
+) {
+  const admin =
+    createAdminClient();
 
-  const { data: clientes } = await admin
-    .from("clientes")
-    .select("id,user_id,estado,proximo_contacto,recordatorio")
-    .eq("user_id", userId);
+  const today =
+    todayIsoDate();
 
-  const rows = (clientes || []) as Cliente[];
+  const {
+    data: relationships,
+  } = await admin
+    .from("relationships")
+    .select(
+      "id,owner_id,status,next_contact_at,reminder",
+    )
+    .eq(
+      "owner_id",
+      userId,
+    );
 
-  for (const cliente of rows) {
-    const estado = cliente.estado?.toLowerCase?.() || "";
+  const rows =
+    (relationships || []) as Relationship[];
 
-    if (estado === "pagó" || estado === "pagado" || estado === "entregado") {
+  for (
+    const relationship of rows
+  ) {
+    const status =
+      relationship.status
+        ?.toLowerCase?.() ||
+      "";
+
+    const nextContactAt =
+      relationship.next_contact_at ??
+      null;
+
+    const reminder =
+      relationship.reminder ??
+      null;
+
+    if (
+      status === "pagó" ||
+      status === "pagado" ||
+      status === "entregado"
+    ) {
       continue;
     }
 
-    if (cliente.proximo_contacto && cliente.proximo_contacto < today) {
+    if (
+      nextContactAt &&
+      nextContactAt < today
+    ) {
       await admin
-        .from("clientes")
+        .from("relationships")
         .update({
-          estado: "Interesado",
-          proximo_contacto: addDays(today, 2),
-          recordatorio: "Seguimiento automático",
+          status:
+            "Interesado",
+          next_contact_at:
+            addDays(
+              today,
+              2,
+            ),
+          reminder:
+            "Seguimiento automático",
+          updated_at:
+            new Date().toISOString(),
         })
-        .eq("id", cliente.id)
-        .eq("user_id", userId);
+        .eq(
+          "id",
+          relationship.id,
+        )
+        .eq(
+          "owner_id",
+          userId,
+        );
 
       continue;
     }
 
     if (
-      (estado === "interesado" || estado === "nuevo") &&
-      !cliente.proximo_contacto
+      (
+        status === "interesado" ||
+        status === "nuevo"
+      ) &&
+      !nextContactAt
     ) {
       await admin
-        .from("clientes")
+        .from("relationships")
         .update({
-          estado: estado === "nuevo" ? "Nuevo" : "Interesado",
-          proximo_contacto: addDays(today, 3),
-          recordatorio: cliente.recordatorio || "Seguimiento automático",
+          status:
+            status === "nuevo"
+              ? "Nuevo"
+              : "Interesado",
+          next_contact_at:
+            addDays(
+              today,
+              3,
+            ),
+          reminder:
+            reminder ||
+            "Seguimiento automático",
+          updated_at:
+            new Date().toISOString(),
         })
-        .eq("id", cliente.id)
-        .eq("user_id", userId);
+        .eq(
+          "id",
+          relationship.id,
+        )
+        .eq(
+          "owner_id",
+          userId,
+        );
     }
   }
 }

@@ -3,17 +3,17 @@ import { ui } from "../../../lib/ui";
 import KpiCard from "../../components/KpiCard";
 import SectionCard from "../../components/SectionCard";
 
-type Cliente = {
+type Relationship = {
   id: string;
-  nombre: string;
-  estado?: string | null;
-  telefono?: string | null;
-  proximo_contacto?: string | null;
-  monto?: number | null;
+  name: string;
+  status?: string | null;
+  phone?: string | null;
+  next_contact_at?: string | null;
+  amount?: number | null;
 };
 
 type DailyFocusPanelProps = {
-  clientes: Cliente[];
+  relationships: Relationship[];
 };
 
 function normalizeText(value: string | null | undefined) {
@@ -24,71 +24,75 @@ function formatGs(value: number) {
   return `Gs.\u00A0${Number(value || 0).toLocaleString("es-PY")}`;
 }
 
-function getPriorityData(clientes: Cliente[]) {
-  const safeClientes = Array.isArray(clientes) ? clientes : [];
+function getPriorityData(relationships: Relationship[]) {
+  const safeRelationships = Array.isArray(relationships)
+    ? relationships
+    : [];
 
-  const estadosCriticos = safeClientes.filter((cliente) =>
-    normalizeText(cliente.estado).includes("sin")
+  const criticalStatuses = safeRelationships.filter((relationship) =>
+    normalizeText(relationship.status).includes("sin"),
   );
 
-  const altaPrioridad = safeClientes.filter((cliente) =>
-    normalizeText(cliente.estado).includes("interes")
+  const highPriority = safeRelationships.filter((relationship) =>
+    normalizeText(relationship.status).includes("interes"),
   );
 
-  const oportunidades = safeClientes.filter((cliente) =>
-    normalizeText(cliente.estado).includes("pag")
+  const opportunities = safeRelationships.filter((relationship) =>
+    normalizeText(relationship.status).includes("pag"),
   );
 
-  const riesgo = safeClientes.filter((cliente) =>
-    normalizeText(cliente.estado).includes("cerr")
+  const risk = safeRelationships.filter((relationship) =>
+    normalizeText(relationship.status).includes("cerr"),
   );
 
-  const pipeline = safeClientes.reduce(
-    (sum, cliente) => sum + Number(cliente.monto || 0),
-    0
+  const pipeline = safeRelationships.reduce(
+    (sum, relationship) => sum + Number(relationship.amount || 0),
+    0,
   );
 
   return {
-    estadosCriticos,
-    altaPrioridad,
-    oportunidades,
-    riesgo,
+    criticalStatuses,
+    highPriority,
+    opportunities,
+    risk,
     pipeline,
   };
 }
 
-export default function DailyFocusPanel({ clientes }: DailyFocusPanelProps) {
-  const data = getPriorityData(clientes);
+export default function DailyFocusPanel({
+  relationships,
+}: DailyFocusPanelProps) {
+  const data = getPriorityData(relationships);
 
   return (
     <SectionCard
-      badge="Prioridades del día"
-      title="Hoy debes enfocarte en esto"
-      description="La operación está estable. Mantener ritmo de seguimiento."
+      badge="Foco diario"
+      title="Prioridades comerciales"
+      description="Una lectura rápida de las relaciones que requieren atención."
     >
-      <div className="space-y-5">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <KpiCard
-            label="Crítico"
-            value={data.estadosCriticos.length}
+            label="Estado crítico"
+            value={data.criticalStatuses.length}
             tone="red"
           />
 
           <KpiCard
             label="Alta prioridad"
-            value={data.altaPrioridad.length}
+            value={data.highPriority.length}
             tone="amber"
           />
 
           <KpiCard
             label="Oportunidades"
-            value={data.oportunidades.length}
+            value={data.opportunities.length}
             tone="sky"
           />
 
           <KpiCard
-            label="Contacto en riesgo"
-            value={data.riesgo.length}
+            label="Relación en riesgo"
+            value={data.risk.length}
             tone="amber"
           />
 
@@ -103,7 +107,7 @@ export default function DailyFocusPanel({ clientes }: DailyFocusPanelProps) {
           <p className={ui.typography.label}>Recomendación operativa</p>
 
           <p className={`${ui.typography.body} mt-2 leading-6 text-slate-700`}>
-            Prioriza clientes con mayor intención comercial antes de buscar
+            Prioriza relaciones con mayor intención comercial antes de buscar
             nuevos contactos.
           </p>
         </div>

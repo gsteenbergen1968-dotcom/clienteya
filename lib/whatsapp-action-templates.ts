@@ -17,19 +17,19 @@ export type WhatsAppActionTemplate = {
 };
 
 export type WhatsAppActionTemplateInput = {
-  clienteNombre?: string | null;
+  relationshipName?: string | null;
   pattern?: WhatsAppPattern | null;
 };
 
 function getName(value: string | null | undefined) {
-  return value?.trim() || "cliente";
+  return value?.trim() || "relación";
 }
 
 export function buildWhatsAppActionTemplate({
-  clienteNombre,
+  relationshipName,
   pattern,
 }: WhatsAppActionTemplateInput): WhatsAppActionTemplate {
-  const name = getName(clienteNombre);
+  const name = getName(relationshipName);
 
   if (pattern?.id === "third-delay") {
     return {
@@ -39,7 +39,6 @@ export function buildWhatsAppActionTemplate({
       description:
         "Mensaje corto para recuperar una conversación que fue aplazada varias veces.",
       message: `Hola ${name}, ¿seguimos con esto esta semana?
-
 Te escribo para confirmar si todavía te interesa avanzar o si prefieres que lo dejemos para más adelante.`,
     };
   }
@@ -52,9 +51,7 @@ Te escribo para confirmar si todavía te interesa avanzar o si prefieres que lo 
       description:
         "Mensaje amable para recuperar momentum después de una consulta de precio o información.",
       message: `Hola ${name}, ¿cómo estás?
-
 Solo quería saber si todavía te interesa la información que vimos.
-
 Quedo atento.`,
     };
   }
@@ -67,7 +64,6 @@ Quedo atento.`,
       description:
         "Mensaje para convertir conversación en próximo paso claro.",
       message: `Hola ${name}, para avanzar de forma ordenada, ¿te parece si definimos el próximo paso?
-
 Puede ser una llamada corta o una confirmación por aquí.`,
     };
   }
@@ -78,9 +74,8 @@ Puede ser una llamada corta o una confirmación por aquí.`,
       type: "closing",
       title: "Avanzar al cierre",
       description:
-        "Mensaje directo para un cliente con señales activas de interés.",
+        "Mensaje directo para una relación con señales activas de interés.",
       message: `Hola ${name}, creo que estamos en buen momento para avanzar.
-
 ¿Te parece si cerramos el próximo paso hoy?`,
     };
   }
@@ -93,7 +88,6 @@ Puede ser una llamada corta o una confirmación por aquí.`,
       description:
         "Mensaje para cuidar la relación después de una conversión o pago.",
       message: `Hola ${name}, gracias nuevamente por la confianza.
-
 Quedo atento por si necesitas algo más.`,
     };
   }
@@ -105,7 +99,6 @@ Quedo atento por si necesitas algo más.`,
     description:
       "Mensaje simple para retomar una conversación comercial sin presión.",
     message: `Hola ${name}, ¿cómo estás?
-
 Te escribo para dar seguimiento y ver si puedo ayudarte con algo más.`,
   };
 }

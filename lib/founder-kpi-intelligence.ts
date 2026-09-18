@@ -2,12 +2,12 @@ import { buildSectorKpiExplanations } from "./sector-kpi-explanations";
 
 export type FounderKpiInput = {
   sector: string;
-  totalClients: number;
-  activeClients: number;
-  clientsToContactToday: number;
-  overdueClients: number;
-  paidClients: number;
-  unpaidClients: number;
+  totalRelationships: number;
+  activeRelationships: number;
+  relationshipsToContactToday: number;
+  overdueRelationships: number;
+  paidRelationships: number;
+  unpaidRelationships: number;
   totalRevenue: number;
 };
 
@@ -28,7 +28,7 @@ export type FounderKpiIntelligence = {
 };
 
 export function buildFounderKpiIntelligence(
-  input: FounderKpiInput,
+  input: FounderKpiInput
 ): FounderKpiIntelligence {
   const result = buildSectorKpiExplanations(input);
 
@@ -39,7 +39,7 @@ export function buildFounderKpiIntelligence(
       explanation: item.explanation,
       recommendation: item.actionHint,
       priority: index === 0 ? "high" : index <= 2 ? "medium" : "low",
-    }),
+    })
   );
 
   return {

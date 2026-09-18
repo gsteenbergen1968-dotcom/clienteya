@@ -3,7 +3,7 @@ import { createAdminClient } from "./supabase/server";
 export type WhatsAppLog = {
   id: string;
   user_id: string;
-  cliente_id: string;
+  relationship_id: string;
   direction: string;
   message: string;
   source: string;
@@ -12,7 +12,7 @@ export type WhatsAppLog = {
 
 export async function createWhatsAppLog(params: {
   userId: string;
-  clienteId: string;
+  relationshipId: string;
   message: string;
   direction?: "outgoing" | "incoming";
   source?: "manual" | "ai_preview" | "ai_template";
@@ -21,7 +21,7 @@ export async function createWhatsAppLog(params: {
 
   const { error } = await admin.from("whatsapp_logs").insert({
     user_id: params.userId,
-    cliente_id: params.clienteId,
+    relationship_id: params.relationshipId,
     message: params.message,
     direction: params.direction || "outgoing",
     source: params.source || "manual",
@@ -30,9 +30,9 @@ export async function createWhatsAppLog(params: {
   return { error };
 }
 
-export async function getWhatsAppLogsByCliente(params: {
+export async function getWhatsAppLogsByRelationship(params: {
   userId: string;
-  clienteId: string;
+  relationshipId: string;
   limit?: number;
 }) {
   const admin = createAdminClient();
@@ -41,7 +41,7 @@ export async function getWhatsAppLogsByCliente(params: {
     .from("whatsapp_logs")
     .select("*")
     .eq("user_id", params.userId)
-    .eq("cliente_id", params.clienteId)
+    .eq("relationship_id", params.relationshipId)
     .order("created_at", { ascending: false })
     .limit(params.limit || 20);
 

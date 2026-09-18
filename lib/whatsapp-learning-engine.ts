@@ -6,7 +6,7 @@ export type WhatsAppLearningOutcome =
 
 export type WhatsAppLearningEvent = {
   id: string;
-  clienteId: string;
+  relationshipId: string;
   patternId: string;
   actionId: string;
   outcome: WhatsAppLearningOutcome;
@@ -29,22 +29,22 @@ function calculateRate(success: number, total: number) {
 }
 
 export function buildWhatsAppLearningStats(
-  events: WhatsAppLearningEvent[],
+  events: WhatsAppLearningEvent[]
 ): WhatsAppLearningStats {
   const successfulActions = events.filter(
-    (event) => event.outcome === "success",
+    (event) => event.outcome === "success"
   ).length;
 
   const pendingActions = events.filter(
-    (event) => event.outcome === "pending",
+    (event) => event.outcome === "pending"
   ).length;
 
   const lostActions = events.filter(
-    (event) => event.outcome === "lost",
+    (event) => event.outcome === "lost"
   ).length;
 
   const noResponseActions = events.filter(
-    (event) => event.outcome === "no_response",
+    (event) => event.outcome === "no_response"
   ).length;
 
   return {
@@ -53,15 +53,12 @@ export function buildWhatsAppLearningStats(
     pendingActions,
     lostActions,
     noResponseActions,
-    successRate: calculateRate(
-      successfulActions,
-      events.length,
-    ),
+    successRate: calculateRate(successfulActions, events.length),
   };
 }
 
 export function getWhatsAppOutcomeLabel(
-  outcome: WhatsAppLearningOutcome,
+  outcome: WhatsAppLearningOutcome
 ) {
   if (outcome === "success") {
     return "Respuesta positiva";
@@ -79,7 +76,7 @@ export function getWhatsAppOutcomeLabel(
 }
 
 export function getWhatsAppOutcomeScore(
-  outcome: WhatsAppLearningOutcome,
+  outcome: WhatsAppLearningOutcome
 ) {
   if (outcome === "success") return 100;
   if (outcome === "pending") return 50;
@@ -89,7 +86,7 @@ export function getWhatsAppOutcomeScore(
 }
 
 export function getBestPerformingPattern(
-  events: WhatsAppLearningEvent[],
+  events: WhatsAppLearningEvent[]
 ) {
   const grouped = new Map<
     string,
@@ -117,10 +114,7 @@ export function getBestPerformingPattern(
   const results = [...grouped.entries()]
     .map(([patternId, value]) => ({
       patternId,
-      successRate: calculateRate(
-        value.success,
-        value.total,
-      ),
+      successRate: calculateRate(value.success, value.total),
       total: value.total,
     }))
     .sort((a, b) => b.successRate - a.successRate);
@@ -129,7 +123,7 @@ export function getBestPerformingPattern(
 }
 
 export function getWorstPerformingPattern(
-  events: WhatsAppLearningEvent[],
+  events: WhatsAppLearningEvent[]
 ) {
   const grouped = new Map<
     string,
@@ -157,10 +151,7 @@ export function getWorstPerformingPattern(
   const results = [...grouped.entries()]
     .map(([patternId, value]) => ({
       patternId,
-      successRate: calculateRate(
-        value.success,
-        value.total,
-      ),
+      successRate: calculateRate(value.success, value.total),
       total: value.total,
     }))
     .sort((a, b) => a.successRate - b.successRate);

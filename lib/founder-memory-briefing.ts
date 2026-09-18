@@ -3,7 +3,7 @@ import {
 } from "./memory-pattern-clusters";
 
 import type {
-  CommercialMemoryClient,
+  CommercialMemoryRelationship,
 } from "./commercial-memory-signals";
 
 export type FounderMemoryBriefing = {
@@ -17,34 +17,50 @@ export type FounderMemoryBriefing = {
   totalPatterns: number;
 };
 
-function clamp(value: number, min = 0, max = 100) {
-  return Math.max(min, Math.min(max, value));
+function clamp(
+  value: number,
+  min = 0,
+  max = 100
+) {
+  return Math.max(
+    min,
+    Math.min(max, value)
+  );
 }
 
 export function buildFounderMemoryBriefing(
-  clients: CommercialMemoryClient[],
+  relationships: CommercialMemoryRelationship[]
 ): FounderMemoryBriefing {
-  const patterns = buildMemoryPatternClusters(clients);
+  const patterns =
+    buildMemoryPatternClusters(
+      relationships
+    );
 
-  const totalPatterns = patterns.clusters.length;
+  const totalPatterns =
+    patterns.clusters.length;
 
-  const totalClients =
-    Number((patterns.summary as any)?.totalClients) ||
-    clients.length ||
+  const totalRelationships =
+    Number(
+      patterns.summary
+        ?.totalRelationshipsInClusters
+    ) ||
+    relationships.length ||
     0;
 
   const calculatedScore =
     40 +
     totalPatterns * 8 +
-    clients.length * 0.5 +
-    totalClients * 0.25;
+    relationships.length * 0.5 +
+    totalRelationships * 0.25;
 
   const memoryScore = clamp(
     Math.round(
-      Number.isFinite(calculatedScore)
+      Number.isFinite(
+        calculatedScore
+      )
         ? calculatedScore
-        : 40,
-    ),
+        : 40
+    )
   );
 
   let memoryLabel = "Inicial";
@@ -62,11 +78,11 @@ export function buildFounderMemoryBriefing(
     "ClienteYA todavía está aprendiendo patrones.";
 
   const mainRisk =
-    (patterns.summary as any)?.mainRisk ||
+    patterns.summary.mainRisk ||
     "No se detectan riesgos relevantes actualmente.";
 
   const bestAction =
-    (patterns.summary as any)?.bestAction ||
+    patterns.summary.bestAction ||
     "Continúa registrando actividad comercial.";
 
   const summary =
@@ -80,9 +96,10 @@ export function buildFounderMemoryBriefing(
       : "Registra contactos, seguimientos y pagos para acelerar el aprendizaje de ClienteYA.";
 
   return {
-    memoryScore: Number.isFinite(memoryScore)
-      ? memoryScore
-      : 40,
+    memoryScore:
+      Number.isFinite(memoryScore)
+        ? memoryScore
+        : 40,
     memoryLabel,
     summary,
     founderReminder,

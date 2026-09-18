@@ -13,10 +13,7 @@ export default function CockpitUnifiedSignalsPanel({
   result,
 }: CockpitUnifiedSignalsPanelProps) {
   return (
-    <section className="relative overflow-hidden rounded-[40px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.10),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.10),transparent_30%)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-600 via-emerald-400 to-slate-950" />
-
+    <section className="overflow-hidden rounded-[36px] border border-slate-200 bg-white shadow-sm">
       <div className="relative p-5 sm:p-7 xl:p-8">
         <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
@@ -114,7 +111,7 @@ export default function CockpitUnifiedSignalsPanel({
                     </div>
 
                     <h3 className="text-xl font-black leading-tight text-slate-950">
-                      {signal.clientName}
+                      {signal.relationshipName}
                     </h3>
 
                     <p className="mt-2 text-base font-black leading-6">

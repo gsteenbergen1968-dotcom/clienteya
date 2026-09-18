@@ -195,11 +195,11 @@ export function getSectorVocabulary(
 
   if (type === "restaurant") {
     return {
-      inactive: "Cliente ausente",
-      returning: "Cliente recurrente",
+      inactive: "Relación ausente",
+      returning: "Relación recurrente",
       hot: "Reserva pendiente",
-      converted: "Cliente convertido",
-      atRisk: "Cliente perdiéndose",
+      converted: "Relación convertida",
+      atRisk: "Relación perdiéndose",
       followUp: "Seguimiento de mesa",
     };
   }
@@ -209,7 +209,7 @@ export function getSectorVocabulary(
       inactive: "Seguimiento pendiente",
       returning: "Interesado activo",
       hot: "Visita pendiente",
-      converted: "Cliente avanzado",
+      converted: "Relación avanzada",
       atRisk: "Interés enfriándose",
       followUp: "Seguimiento de propiedad",
     };
@@ -228,21 +228,21 @@ export function getSectorVocabulary(
 
   if (type === "beauty") {
     return {
-      inactive: "Cliente sin cita",
-      returning: "Cliente recurrente",
+      inactive: "Relación sin cita",
+      returning: "Relación recurrente",
       hot: "Reserva pendiente",
-      converted: "Cliente atendido",
-      atRisk: "Cliente por perder",
+      converted: "Relación atendida",
+      atRisk: "Relación por perder",
       followUp: "Seguimiento de cita",
     };
   }
 
   if (type === "retail") {
     return {
-      inactive: "Cliente sin retorno",
-      returning: "Cliente frecuente",
+      inactive: "Relación sin retorno",
+      returning: "Relación frecuente",
       hot: "Recompra probable",
-      converted: "Cliente comprador",
+      converted: "Relación compradora",
       atRisk: "Riesgo de abandono",
       followUp: "Seguimiento de compra",
     };
@@ -251,9 +251,9 @@ export function getSectorVocabulary(
   if (type === "automotive") {
     return {
       inactive: "Interés enfriándose",
-      returning: "Cliente recurrente",
+      returning: "Relación recurrente",
       hot: "Cotización pendiente",
-      converted: "Cliente convertido",
+      converted: "Relación convertida",
       atRisk: "Venta en riesgo",
       followUp: "Seguimiento postventa",
     };
@@ -284,9 +284,9 @@ export function getSectorVocabulary(
   if (type === "consulting" || type === "services") {
     return {
       inactive: "Seguimiento pendiente",
-      returning: "Cliente recurrente",
+      returning: "Relación recurrente",
       hot: "Siguiente paso comercial",
-      converted: "Cliente convertido",
+      converted: "Relación convertida",
       atRisk: "Oportunidad enfriándose",
       followUp: "Seguimiento profesional",
     };
@@ -294,11 +294,11 @@ export function getSectorVocabulary(
 
   return {
     inactive: "Seguimiento pendiente",
-    returning: "Cliente recurrente",
+    returning: "Relación recurrente",
     hot: "Oportunidad abierta",
-    converted: "Cliente convertido",
+    converted: "Relación convertida",
     atRisk: "Riesgo de abandono",
-    followUp: "Cliente en seguimiento",
+    followUp: "Relación en seguimiento",
   };
 }
 
@@ -323,11 +323,14 @@ function getSignalFromDecision(
   const decision = normalizeText(decisionLabel);
 
   if (isPaid || decision.includes("mantener")) return "converted";
+
   if (decision.includes("actuar") || decision.includes("reactivar")) {
     return "inactive";
   }
+
   if (decision.includes("cerrar")) return "hot";
   if (decision.includes("proteger")) return "at_risk";
+
   if (decision.includes("preparar") || decision.includes("momentum")) {
     return "returning";
   }
@@ -335,12 +338,15 @@ function getSignalFromDecision(
   return "follow_up";
 }
 
-function getFallbackReason(reason: string, daysOverdue?: number | null) {
+function getFallbackReason(
+  reason: string,
+  daysOverdue?: number | null
+) {
   if (typeof daysOverdue === "number" && daysOverdue > 0) {
-    return `No has hablado con este cliente desde hace ${daysOverdue} día(s).`;
+    return `No has hablado con esta relación desde hace ${daysOverdue} día(s).`;
   }
 
-  return reason || "Cliente necesita una acción comercial clara.";
+  return reason || "La relación necesita una acción comercial clara.";
 }
 
 function buildSectorCopy(input: {
@@ -369,7 +375,7 @@ function buildSectorCopy(input: {
       headline: vocabulary.converted,
       actionPhrase: "Mantén la relación activa y abre la próxima oportunidad.",
       humanReason:
-        "Este cliente ya generó valor. Buen momento para cuidar la relación, pedir feedback o provocar una nueva compra.",
+        "Esta relación ya generó valor. Buen momento para cuidarla, pedir feedback o provocar una nueva compra.",
       primaryVerb: "Mantener relación",
     };
   }
@@ -378,9 +384,9 @@ function buildSectorCopy(input: {
     if (input.businessType === "restaurant") {
       return {
         headline: vocabulary.inactive,
-        actionPhrase: "Recupéralo hoy.",
-        humanReason: `Cliente no ha vuelto en ${overdueText}. Un mensaje corto puede recuperar la visita.`,
-        primaryVerb: "Recuperar cliente",
+        actionPhrase: "Recupérala hoy.",
+        humanReason: `La relación no ha vuelto en ${overdueText}. Un mensaje corto puede recuperar la visita.`,
+        primaryVerb: "Recuperar relación",
       };
     }
 
@@ -398,14 +404,14 @@ function buildSectorCopy(input: {
         headline: vocabulary.inactive,
         actionPhrase: "Retoma la conversación sobre la propiedad.",
         humanReason: `Hace ${overdueText} que no recibe seguimiento. El interés puede enfriarse si no hay contacto.`,
-        primaryVerb: "Contactar cliente",
+        primaryVerb: "Contactar relación",
       };
     }
 
     if (input.businessType === "retail") {
       return {
         headline: vocabulary.inactive,
-        actionPhrase: "Recupéralo con una propuesta simple.",
+        actionPhrase: "Recupérala con una propuesta simple.",
         humanReason: `Hace ${overdueText} que no hay seguimiento. Puede volver con una oferta o recomendación adecuada.`,
         primaryVerb: "Activar recompra",
       };
@@ -462,7 +468,7 @@ function buildSectorCopy(input: {
         actionPhrase: "Convierte el interés en pedido.",
         humanReason: hasValue
           ? "Hay una oportunidad comercial abierta. Conviene confirmar pedido, reserva o próxima compra."
-          : "El cliente muestra interés. Conviene llevarlo a una decisión simple.",
+          : "La relación muestra interés. Conviene llevarla a una decisión simple.",
         primaryVerb: "Cerrar pedido",
       };
     }
@@ -492,7 +498,7 @@ function buildSectorCopy(input: {
         headline: vocabulary.hot,
         actionPhrase: "Convierte interés en venta.",
         humanReason:
-          "El cliente muestra intención. Conviene facilitar decisión, disponibilidad o precio.",
+          "La relación muestra intención. Conviene facilitar decisión, disponibilidad o precio.",
         primaryVerb: "Cerrar venta",
       };
     }
@@ -502,7 +508,7 @@ function buildSectorCopy(input: {
         headline: vocabulary.hot,
         actionPhrase: "Convierte interés en cita.",
         humanReason:
-          "El cliente muestra intención. Conviene proponer horario o confirmar reserva.",
+          "La relación muestra intención. Conviene proponer horario o confirmar reserva.",
         primaryVerb: "Cerrar reserva",
       };
     }
@@ -541,7 +547,7 @@ function buildSectorCopy(input: {
       headline: vocabulary.hot,
       actionPhrase: "Convierte interés en decisión.",
       humanReason:
-        "El cliente necesita una propuesta, llamada o confirmación concreta.",
+        "La relación necesita una propuesta, llamada o confirmación concreta.",
       primaryVerb: "Cerrar siguiente paso",
     };
   }

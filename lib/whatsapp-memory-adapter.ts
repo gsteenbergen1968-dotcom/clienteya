@@ -4,7 +4,7 @@ import {
   type WhatsAppMemoryEventType,
 } from "./whatsapp-memory";
 
-export type ClienteMemorySource = {
+export type RelationshipMemorySource = {
   id: string;
   nombre?: string | null;
   estado?: string | null;
@@ -21,8 +21,8 @@ function normalize(value: string | null | undefined) {
   return (value || "").toLowerCase().trim();
 }
 
-function fallbackDate(cliente: ClienteMemorySource) {
-  return cliente.created_at ?? new Date().toISOString();
+function fallbackDate(relationship: RelationshipMemorySource) {
+  return relationship.created_at ?? new Date().toISOString();
 }
 
 function detectEventType(text: string): WhatsAppMemoryEventType {
@@ -109,65 +109,76 @@ function splitMemoryLines(value: string | null | undefined) {
     .slice(0, 8);
 }
 
-export function buildClienteMemoryProfile(cliente: ClienteMemorySource) {
+export function buildRelationshipMemoryProfile(
+  relationship: RelationshipMemorySource
+) {
   const events: WhatsAppMemoryEvent[] = [];
 
-  if (cliente.created_at) {
+  if (relationship.created_at) {
     events.push({
-      id: `${cliente.id}-created`,
-      clienteId: cliente.id,
-      date: cliente.created_at,
+      id: `${relationship.id}-created`,
+      relationshipId: relationship.id,
+      date: relationship.created_at,
       type: "message_received",
       summary: "Primer contacto registrado",
     });
   }
 
-  splitMemoryLines(cliente.notas).forEach((line, index) => {
+  splitMemoryLines(relationship.notas).forEach((line, index) => {
     const type = detectEventType(line);
 
     events.push({
-      id: `${cliente.id}-note-${index}`,
-      clienteId: cliente.id,
-      date: fallbackDate(cliente),
+      id: `${relationship.id}-note-${index}`,
+      relationshipId: relationship.id,
+      date: fallbackDate(relationship),
       type,
       summary: buildSummary(line, type),
     });
   });
 
-  splitMemoryLines(cliente.recordatorio).forEach((line, index) => {
+  splitMemoryLines(relationship.recordatorio).forEach((line, index) => {
     const type = detectEventType(line);
+    const eventType: WhatsAppMemoryEventType =
+      type === "note" ? "followup" : type;
 
     events.push({
-      id: `${cliente.id}-reminder-${index}`,
-      clienteId: cliente.id,
-      date: fallbackDate(cliente),
-      type: type === "note" ? "followup" : type,
-      summary: buildSummary(line, type === "note" ? "followup" : type),
+      id: `${relationship.id}-reminder-${index}`,
+      relationshipId: relationship.id,
+      date: fallbackDate(relationship),
+      type: eventType,
+      summary: buildSummary(line, eventType),
     });
   });
 
-  if (cliente.proximo_contacto) {
+  if (relationship.proximo_contacto) {
     events.push({
-      id: `${cliente.id}-next-contact`,
-      clienteId: cliente.id,
-      date: cliente.proximo_contacto,
+      id: `${relationship.id}-next-contact`,
+      relationshipId: relationship.id,
+      date: relationship.proximo_contacto,
       type: "promise",
       summary: "Próximo contacto acordado",
     });
   }
 
-  if (cliente.pagado || normalize(cliente.estado).includes("pag")) {
+  if (
+    relationship.pagado ||
+    normalize(relationship.estado).includes("pag")
+  ) {
     events.push({
-      id: `${cliente.id}-paid`,
-      clienteId: cliente.id,
-      date: cliente.fecha_pago ?? fallbackDate(cliente),
+      id: `${relationship.id}-paid`,
+      relationshipId: relationship.id,
+      date: relationship.fecha_pago ?? fallbackDate(relationship),
       type: "payment",
-      summary: `Pago confirmado${cliente.monto ? ` · Gs. ${cliente.monto.toLocaleString("es-PY")}` : ""}`,
+      summary: `Pago confirmado${
+        relationship.monto
+          ? ` · Gs. ${relationship.monto.toLocaleString("es-PY")}`
+          : ""
+      }`,
     });
   }
 
   return buildWhatsAppMemoryProfile({
-    clienteId: cliente.id,
+    relationshipId: relationship.id,
     events,
   });
 }

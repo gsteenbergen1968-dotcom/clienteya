@@ -5,29 +5,29 @@ import {
   getFounderExecutiveUrgencyLabel,
 } from "../../../lib/founder-ai-executive-advisor";
 
-import type { CommercialMemoryClient } from "../../../lib/commercial-memory-signals";
+import type { CommercialMemoryRelationship } from "../../../lib/commercial-memory-signals";
 
 type FounderAIExecutiveAdvisorPanelProps = {
-  clients: CommercialMemoryClient[];
+  relationships: CommercialMemoryRelationship[];
 };
 
 function formatGs(value: number) {
   return new Intl.NumberFormat("es-PY").format(
-    Math.max(0, value),
+    Math.max(0, value)
   );
 }
 
 export default function FounderAIExecutiveAdvisorPanel({
-  clients,
+  relationships,
 }: FounderAIExecutiveAdvisorPanelProps) {
   const priorities =
-    buildFounderAIExecutiveAdvisor(clients);
+    buildFounderAIExecutiveAdvisor(relationships);
 
   if (priorities.length === 0) {
     return (
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
             Founder AI Executive Advisor
           </p>
 
@@ -49,8 +49,8 @@ export default function FounderAIExecutiveAdvisorPanel({
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-5 space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+      <div className="mb-5 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
           Founder AI Executive Advisor
         </p>
 
@@ -77,7 +77,7 @@ export default function FounderAIExecutiveAdvisorPanel({
             </h3>
 
             <p className="text-sm font-medium text-slate-700">
-              {primaryDecision.clienteNombre}
+              {primaryDecision.relationshipName}
             </p>
 
             <p className="text-sm leading-6 text-slate-600">
@@ -112,17 +112,17 @@ export default function FounderAIExecutiveAdvisorPanel({
 
                   <span
                     className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getFounderExecutiveUrgencyClasses(
-                      priority.urgency,
+                      priority.urgency
                     )}`}
                   >
                     {getFounderExecutiveUrgencyLabel(
-                      priority.urgency,
+                      priority.urgency
                     )}
                   </span>
 
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600">
                     {getFounderExecutiveCategoryLabel(
-                      priority.category,
+                      priority.category
                     )}
                   </span>
                 </div>
@@ -136,7 +136,7 @@ export default function FounderAIExecutiveAdvisorPanel({
                 </p>
 
                 <p className="text-sm text-slate-700">
-                  {priority.clienteNombre}
+                  {priority.relationshipName}
                 </p>
 
                 <p className="text-sm leading-6 text-slate-600">

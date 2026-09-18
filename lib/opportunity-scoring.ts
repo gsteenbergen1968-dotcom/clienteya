@@ -1,14 +1,4 @@
-type Cliente = {
-  id: string;
-  nombre: string;
-  estado?: string | null;
-  notas?: string | null;
-  recordatorio?: string | null;
-  proximo_contacto?: string | null;
-  monto?: number | null;
-  pagado?: boolean | null;
-  fecha_pago?: string | null;
-};
+import type { RelationshipRecord } from "./relationship-repository";
 
 export type OpportunityScore = {
   score: number;
@@ -19,41 +9,60 @@ export type OpportunityScore = {
   recommendation: string;
 };
 
-function normalize(value?: string | null) {
+function normalize(value?: string | null): string {
   return value?.toLowerCase().trim() || "";
 }
 
-function daysSince(dateString?: string | null) {
+function daysSince(dateString?: string | null): number {
   if (!dateString) return 0;
 
   const now = new Date();
   const target = new Date(dateString);
 
+  if (Number.isNaN(target.getTime())) return 0;
+
   const diff = now.getTime() - target.getTime();
 
-  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+  return Math.max(
+    0,
+    Math.floor(diff / (1000 * 60 * 60 * 24)),
+  );
+}
+
+function getRelationshipPaid(
+  relationship: RelationshipRecord,
+): boolean {
+  const status = normalize(relationship.status);
+
+  return (
+    status.includes("pag") ||
+    status.includes("convert")
+  );
 }
 
 export function calculateOpportunityScore(
-  cliente: Cliente
+  relationship: RelationshipRecord,
 ): OpportunityScore {
-  const estado = normalize(cliente.estado);
-  const notas = normalize(cliente.notas);
-  const recordatorio = normalize(cliente.recordatorio);
-
-  const text = `${estado} ${notas} ${recordatorio}`;
-  const inactiveDays = daysSince(cliente.proximo_contacto);
+  const status = normalize(relationship.status);
+  const notes = normalize(relationship.notes);
+  const reminder = normalize(relationship.reminder);
+  const text = `${status} ${notes} ${reminder}`;
+  const inactiveDays = daysSince(relationship.next_contact_at);
 
   let score = 40;
 
-  if (cliente.pagado || text.includes("pagado") || text.includes("cerrado")) {
+  if (
+    getRelationshipPaid(relationship) ||
+    text.includes("pagado") ||
+    text.includes("cerrado")
+  ) {
     return {
       score: 100,
       probability: 100,
       label: "Won",
       risk: "low",
-      description: "Cliente ya convertido o cerrado.",
-      recommendation: "Mantener relación y buscar upsell futuro.",
+      description: "Relación ya convertida o cerrada.",
+      recommendation: "Mantener la relación y buscar upsell futuro.",
     };
   }
 
@@ -107,52 +116,55 @@ export function calculateOpportunityScore(
 
   score = Math.max(0, Math.min(100, score));
 
-  const probability = score;
-
   if (score >= 80) {
     return {
       score,
-      probability,
+      probability: score,
       label: "Hot lead",
       risk: "low",
       description: "Alta probabilidad de conversión.",
-      recommendation: "Contactar hoy y cerrar siguiente paso.",
+      recommendation: "Contactar hoy y cerrar el siguiente paso.",
     };
   }
 
   if (score >= 60) {
     return {
       score,
-      probability,
+      probability: score,
       label: "Warm lead",
       risk: "medium",
-      description: "Cliente con señales comerciales positivas.",
-      recommendation: "Enviar seguimiento con propuesta clara.",
+      description: "Relación con señales comerciales positivas.",
+      recommendation: "Enviar seguimiento con una propuesta clara.",
     };
   }
 
   if (score >= 35) {
     return {
       score,
-      probability,
+      probability: score,
       label: "Cold lead",
       risk: "medium",
-      description: "Cliente activo pero sin señales fuertes de cierre.",
-      recommendation: "Nutrir con prueba social o beneficio concreto.",
+      description:
+        "Relación activa pero sin señales fuertes de cierre.",
+      recommendation:
+        "Nutrir con prueba social o un beneficio concreto.",
     };
   }
 
   return {
     score,
-    probability,
+    probability: score,
     label: "Ghosting risk",
     risk: "high",
     description: "Riesgo alto de perder la oportunidad.",
-    recommendation: "Enviar mensaje corto, directo y fácil de responder.",
+    recommendation:
+      "Enviar un mensaje corto, directo y fácil de responder.",
   };
 }
 
-export function getOpportunityClasses(risk: OpportunityScore["risk"]) {
+export function getOpportunityClasses(
+  risk: OpportunityScore["risk"],
+): string {
   if (risk === "low") {
     return "border-emerald-200 bg-emerald-50 text-emerald-800";
   }

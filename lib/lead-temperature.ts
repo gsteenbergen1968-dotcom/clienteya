@@ -1,17 +1,17 @@
-export type LeadTemperature =
+export type RelationshipTemperature =
   | "hot"
   | "warm"
   | "cold"
   | "inactive";
 
-export type LeadTemperatureResult = {
-  temperature: LeadTemperature;
+export type RelationshipTemperatureResult = {
+  temperature: RelationshipTemperature;
   score: number;
   label: string;
   reason: string;
 };
 
-type Cliente = {
+type Relationship = {
   estado?: string | null;
   notas?: string | null;
   monto?: number | null;
@@ -34,18 +34,22 @@ function daysUntil(date: string | null | undefined) {
 
   const diff = target.getTime() - today.getTime();
 
-  return Math.round(diff / (1000 * 60 * 60 * 24));
+  return Math.round(
+    diff / (1000 * 60 * 60 * 24)
+  );
 }
 
-export function getLeadTemperature(
-  cliente: Cliente
-): LeadTemperatureResult {
+export function getRelationshipTemperature(
+  relationship: Relationship
+): RelationshipTemperatureResult {
   let score = 40;
 
-  const estado = normalize(cliente.estado);
-  const notas = normalize(cliente.notas);
+  const estado = normalize(relationship.estado);
+  const notas = normalize(relationship.notas);
 
-  const days = daysUntil(cliente.proximo_contacto);
+  const days = daysUntil(
+    relationship.proximo_contacto
+  );
 
   if (
     estado.includes("interes") ||
@@ -64,11 +68,14 @@ export function getLeadTemperature(
     score += 20;
   }
 
-  if (cliente.monto && cliente.monto > 0) {
+  if (
+    relationship.monto &&
+    relationship.monto > 0
+  ) {
     score += 10;
   }
 
-  if (cliente.pagado) {
+  if (relationship.pagado) {
     score += 25;
   }
 
@@ -94,14 +101,18 @@ export function getLeadTemperature(
     score -= 30;
   }
 
-  score = Math.max(0, Math.min(100, score));
+  score = Math.max(
+    0,
+    Math.min(100, score)
+  );
 
   if (score >= 80) {
     return {
       temperature: "hot",
       score,
-      label: "Hot Lead",
-      reason: "Alta intención comercial detectada.",
+      label: "Relación caliente",
+      reason:
+        "Alta intención comercial detectada.",
     };
   }
 
@@ -109,8 +120,9 @@ export function getLeadTemperature(
     return {
       temperature: "warm",
       score,
-      label: "Warm Lead",
-      reason: "Existe potencial comercial activo.",
+      label: "Relación activa",
+      reason:
+        "Existe potencial comercial activo.",
     };
   }
 
@@ -118,21 +130,23 @@ export function getLeadTemperature(
     return {
       temperature: "cold",
       score,
-      label: "Cold Lead",
-      reason: "Interacción comercial baja o lenta.",
+      label: "Relación fría",
+      reason:
+        "Interacción comercial baja o lenta.",
     };
   }
 
   return {
     temperature: "inactive",
     score,
-    label: "Inactive",
-    reason: "Lead con señales mínimas o inactivas.",
+    label: "Inactiva",
+    reason:
+      "Relación con señales mínimas o inactivas.",
   };
 }
 
-export function getLeadTemperatureClasses(
-  temperature: LeadTemperature
+export function getRelationshipTemperatureClasses(
+  temperature: RelationshipTemperature
 ) {
   if (temperature === "hot") {
     return "border-red-200 bg-red-50 text-red-700";

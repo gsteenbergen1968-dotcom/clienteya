@@ -7,24 +7,24 @@ import {
 } from "../../../lib/memory-pattern-clusters";
 
 import type {
-  CommercialMemoryClient,
+  CommercialMemoryRelationship,
 } from "../../../lib/commercial-memory-signals";
 
 type FounderMemoryBriefingPanelProps = {
-  clients: CommercialMemoryClient[];
+  relationships: CommercialMemoryRelationship[];
 };
 
 export default function FounderMemoryBriefingPanel({
-  clients,
+  relationships,
 }: FounderMemoryBriefingPanelProps) {
-  const briefing = buildFounderMemoryBriefing(clients);
-  const patterns = buildMemoryPatternClusters(clients);
+  const briefing = buildFounderMemoryBriefing(relationships);
+  const patterns = buildMemoryPatternClusters(relationships);
   const topClusters = patterns.clusters.slice(0, 4);
 
   return (
-    <section className="relative overflow-hidden rounded-[40px] border border-blue-200 bg-white shadow-[0_24px_80px_rgba(37,99,235,0.10)]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.12),transparent_30%)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-400" />
+    <section className="relative overflow-hidden rounded-[40px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.10),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.10),transparent_30%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-slate-950 via-blue-600 to-emerald-400" />
 
       <div className="relative grid gap-0 xl:grid-cols-[0.82fr_1.18fr]">
         <div className="border-b border-blue-100 bg-gradient-to-br from-white via-blue-50/75 to-slate-50 p-5 sm:p-7 xl:border-b-0 xl:border-r xl:p-8">
@@ -88,6 +88,7 @@ export default function FounderMemoryBriefingPanel({
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
                 Patrones detectados
               </p>
+
               <p className="mt-1 text-sm font-bold text-slate-950">
                 ClienteYA convierte actividad comercial en memoria útil para decidir mejor.
               </p>
@@ -103,6 +104,7 @@ export default function FounderMemoryBriefingPanel({
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">
                 Patrón más fuerte
               </p>
+
               <p className="mt-2 text-sm font-black leading-6 text-slate-950">
                 {briefing.strongestPattern}
               </p>
@@ -112,6 +114,7 @@ export default function FounderMemoryBriefingPanel({
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-red-700">
                 Riesgo principal
               </p>
+
               <p className="mt-2 text-sm font-black leading-6 text-slate-950">
                 {briefing.mainRisk}
               </p>
@@ -121,6 +124,7 @@ export default function FounderMemoryBriefingPanel({
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-700">
                 Mejor acción
               </p>
+
               <p className="mt-2 text-sm font-black leading-6 text-slate-950">
                 {briefing.bestAction}
               </p>
@@ -139,6 +143,7 @@ export default function FounderMemoryBriefingPanel({
                       <p className="text-sm font-black text-slate-950">
                         {cluster.title}
                       </p>
+
                       <p className="mt-1 text-xs font-bold leading-5 text-slate-600">
                         {cluster.subtitle}
                       </p>

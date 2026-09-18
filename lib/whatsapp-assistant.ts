@@ -1,6 +1,6 @@
 import { createAdminClient } from "./supabase/server";
 
-type ClienteInput = {
+type RelationshipInput = {
   id?: string;
   nombre: string;
   telefono?: string | null;
@@ -47,13 +47,17 @@ function todayISO() {
 
 function formatDateEs(value?: string | null) {
   if (!value) return "";
+
   const [year, month, day] = value.slice(0, 10).split("-");
+
   if (!year || !month || !day) return value;
+
   return `${day}/${month}/${year}`;
 }
 
 function formatGs(value?: number | null) {
   if (!value) return "";
+
   return `Gs. ${Number(value).toLocaleString("es-ES")}`;
 }
 
@@ -80,6 +84,7 @@ function daysBetween(date?: string | null) {
   );
 
   const diff = todayClean.getTime() - targetClean.getTime();
+
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
@@ -87,26 +92,35 @@ function normalize(value?: string | null) {
   return (value || "").trim();
 }
 
-function getFollowupKey(cliente: ClienteInput) {
+function getFollowupKey(relationship: RelationshipInput) {
   const today = todayISO();
-  const next = cliente.proximo_contacto;
-  const estado = normalize(cliente.estado).toLowerCase();
+  const next = relationship.proximo_contacto;
+  const estado = normalize(relationship.estado).toLowerCase();
 
-  if (cliente.pagado || estado === "pagó" || estado === "pagado") return "postventa";
+  if (
+    relationship.pagado ||
+    estado === "pagó" ||
+    estado === "pagado"
+  ) {
+    return "postventa";
+  }
+
   if (estado === "cerrado") return "closed";
   if (estado === "sin respuesta") return "no_response";
   if (estado === "contactado") return "contacted";
+
   if (next && next < today) return "overdue";
   if (next === today) return "today";
   if (next && next > today) return "upcoming";
+
   if (estado === "interesado") return "interested";
   if (estado === "nuevo") return "new";
 
   return "general";
 }
 
-function getFollowupIntensity(cliente: ClienteInput) {
-  const days = daysBetween(cliente.proximo_contacto);
+function getFollowupIntensity(relationship: RelationshipInput) {
+  const days = daysBetween(relationship.proximo_contacto);
 
   if (days >= 7) return "final";
   if (days >= 3) return "push";
@@ -125,24 +139,28 @@ function getToneRules(tone?: string | null, style?: StyleMemory) {
         closer: "Quedo a disposición.",
         emoji: "",
       };
+
     case "vendedor":
       return {
         opener: "Hola",
         closer: "Estoy atento para ayudarte a avanzar hoy.",
         emoji: usesEmojis ? "🔥" : "",
       };
+
     case "directo":
       return {
         opener: "Hola",
         closer: "Quedo atento.",
         emoji: "",
       };
+
     case "amable":
       return {
         opener: "Hola",
         closer: "Gracias por tu tiempo, quedo atenta.",
         emoji: usesEmojis ? "🙂" : "",
       };
+
     default:
       return {
         opener: "Hola",
@@ -152,27 +170,32 @@ function getToneRules(tone?: string | null, style?: StyleMemory) {
   }
 }
 
-function buildContext(cliente: ClienteInput, style?: StyleMemory) {
+function buildContext(
+  relationship: RelationshipInput,
+  style?: StyleMemory
+) {
   if (style?.prefersShort) {
     const lines: string[] = [];
 
-    if (cliente.recordatorio) {
-      lines.push(`Recordatorio: ${cliente.recordatorio}.`);
+    if (relationship.recordatorio) {
+      lines.push(`Recordatorio: ${relationship.recordatorio}.`);
     }
 
-    if (cliente.proximo_contacto) {
-      lines.push(`Seguimiento: ${formatDateEs(cliente.proximo_contacto)}.`);
+    if (relationship.proximo_contacto) {
+      lines.push(
+        `Seguimiento: ${formatDateEs(relationship.proximo_contacto)}.`
+      );
     }
 
     return lines;
   }
 
   const lines: string[] = [];
-  const estado = normalize(cliente.estado) || "Sin estado";
-  const notas = normalize(cliente.notas);
-  const recordatorio = normalize(cliente.recordatorio);
-  const fecha = formatDateEs(cliente.proximo_contacto);
-  const monto = formatGs(cliente.monto);
+  const estado = normalize(relationship.estado) || "Sin estado";
+  const notas = normalize(relationship.notas);
+  const recordatorio = normalize(relationship.recordatorio);
+  const fecha = formatDateEs(relationship.proximo_contacto);
+  const monto = formatGs(relationship.monto);
 
   lines.push(`Estado actual: ${estado}.`);
 
@@ -188,15 +211,18 @@ function buildContext(cliente: ClienteInput, style?: StyleMemory) {
     lines.push(`Contexto útil: ${notas}.`);
   }
 
-  if (cliente.pagado) {
+  if (relationship.pagado) {
     lines.push(`Pago registrado${monto ? ` por ${monto}` : ""}.`);
   }
 
   return lines;
 }
 
-function getFollowLine(cliente: ClienteInput, style?: StyleMemory) {
-  const intensity = getFollowupIntensity(cliente);
+function getFollowLine(
+  relationship: RelationshipInput,
+  style?: StyleMemory
+) {
+  const intensity = getFollowupIntensity(relationship);
 
   if (intensity === "final") {
     return pickRandom([
@@ -248,25 +274,31 @@ function buildOpening(
 
 function buildMessage(
   key: string,
-  cliente: ClienteInput,
+  relationship: RelationshipInput,
   settings: UserSettings,
   style: StyleMemory,
   forcedTone?: string
 ) {
-  const tone = getToneRules(forcedTone || settings.business_tone, style);
-  const nombre = normalize(cliente.nombre) || "cliente";
-  const businessType = normalize(settings.business_type) || "ventas generales";
+  const tone = getToneRules(
+    forcedTone || settings.business_tone,
+    style
+  );
+
+  const nombre = normalize(relationship.nombre) || "relación";
+  const businessType =
+    normalize(settings.business_type) || "ventas generales";
   const aiPrompt = normalize(settings.ai_prompt);
-  const context = buildContext(cliente, style);
-  const followLine = getFollowLine(cliente, style);
+
+  const context = buildContext(relationship, style);
+  const followLine = getFollowLine(relationship, style);
   const opening = buildOpening(nombre, tone, style);
 
   const contextBlock =
     context.length > 0 && !style.prefersShort
       ? ["", "Para contexto:", ...context.map((line) => `- ${line}`)]
       : context.length > 0
-      ? ["", ...context]
-      : [];
+        ? ["", ...context]
+        : [];
 
   const promptHint =
     aiPrompt && !style.prefersShort
@@ -438,7 +470,9 @@ async function getStyleMemory(userId: string): Promise<StyleMemory> {
     .order("created_at", { ascending: false })
     .limit(8);
 
-  const messages = (data || []).map((item) => String(item.message || ""));
+  const messages = (data || []).map((item) =>
+    String(item.message || "")
+  );
 
   if (messages.length === 0) {
     return {
@@ -448,7 +482,11 @@ async function getStyleMemory(userId: string): Promise<StyleMemory> {
     };
   }
 
-  const totalLength = messages.reduce((sum, msg) => sum + msg.length, 0);
+  const totalLength = messages.reduce(
+    (sum, msg) => sum + msg.length,
+    0
+  );
+
   const avgLength = totalLength / messages.length;
 
   const emojiCount = messages.filter((msg) =>
@@ -474,14 +512,14 @@ async function getStyleMemory(userId: string): Promise<StyleMemory> {
 
 export async function buildAssistantMessage({
   userId,
-  cliente,
+  relationship,
 }: {
   userId: string;
-  cliente: ClienteInput;
+  relationship: RelationshipInput;
 }): Promise<AssistantMessageResult> {
   const settings = await getSettings(userId);
   const style = await getStyleMemory(userId);
-  const key = getFollowupKey(cliente);
+  const key = getFollowupKey(relationship);
 
   return {
     key,
@@ -490,31 +528,54 @@ export async function buildAssistantMessage({
     aiPrompt:
       settings.ai_prompt ||
       "Escribe mensajes claros, útiles y breves. Mantén un tono humano y orientado a convertir sin sonar agresivo.",
-    message: buildMessage(key, cliente, settings, style),
+    message: buildMessage(
+      key,
+      relationship,
+      settings,
+      style
+    ),
   };
 }
 
 export async function buildAssistantVariants({
   userId,
-  cliente,
+  relationship,
 }: {
   userId: string;
-  cliente: ClienteInput;
+  relationship: RelationshipInput;
 }): Promise<VariantItem[]> {
   const settings = await getSettings(userId);
   const style = await getStyleMemory(userId);
-  const key = getFollowupKey(cliente);
+  const key = getFollowupKey(relationship);
 
   const tones = [
-    { id: "base", label: "Base", tone: settings.business_tone || "cercano" },
-    { id: "formal", label: "Formal", tone: "formal" },
-    { id: "vendedor", label: "Vendedor", tone: "vendedor" },
+    {
+      id: "base",
+      label: "Base",
+      tone: settings.business_tone || "cercano",
+    },
+    {
+      id: "formal",
+      label: "Formal",
+      tone: "formal",
+    },
+    {
+      id: "vendedor",
+      label: "Vendedor",
+      tone: "vendedor",
+    },
   ];
 
-  return tones.map((t) => ({
-    id: t.id,
-    label: t.label,
-    tone: t.tone,
-    message: buildMessage(key, cliente, settings, style, t.tone),
+  return tones.map((tone) => ({
+    id: tone.id,
+    label: tone.label,
+    tone: tone.tone,
+    message: buildMessage(
+      key,
+      relationship,
+      settings,
+      style,
+      tone.tone
+    ),
   }));
 }

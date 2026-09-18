@@ -1,4 +1,4 @@
-import type { FounderBriefingClient } from "./founder-briefing";
+import type { FounderBriefingRelationship } from "./founder-briefing";
 
 export type WeeklyReportTone = "good" | "warning" | "critical";
 
@@ -27,9 +27,9 @@ export type WeeklyFounderReport = {
   executionDiscipline: "Alta" | "Media" | "Baja";
   pipelineHealth: "Saludable" | "En observación" | "Crítico";
 
-  totalClients: number;
-  activeClients: number;
-  inactiveClients: number;
+  totalRelationships: number;
+  activeRelationships: number;
+  inactiveRelationships: number;
 
   overdueCount: number;
   ghostingCount: number;
@@ -57,7 +57,11 @@ function normalizeDate(value?: string | null) {
 function startOfToday() {
   const now = new Date();
 
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
 }
 
 function daysSince(date?: string | null) {
@@ -67,7 +71,10 @@ function daysSince(date?: string | null) {
 
   const msPerDay = 1000 * 60 * 60 * 24;
 
-  return Math.floor((startOfToday().getTime() - parsed.getTime()) / msPerDay);
+  return Math.floor(
+    (startOfToday().getTime() - parsed.getTime()) /
+      msPerDay
+  );
 }
 
 function daysUntil(date?: string | null) {
@@ -77,23 +84,44 @@ function daysUntil(date?: string | null) {
 
   const msPerDay = 1000 * 60 * 60 * 24;
 
-  return Math.floor((parsed.getTime() - startOfToday().getTime()) / msPerDay);
+  return Math.floor(
+    (parsed.getTime() - startOfToday().getTime()) /
+      msPerDay
+  );
 }
 
-function getClientName(client: FounderBriefingClient) {
-  return client.nombre || client.name || "Cliente sin nombre";
+function getRelationshipName(
+  relationship: FounderBriefingRelationship
+) {
+  return (
+    relationship.nombre ||
+    relationship.name ||
+    "Relación sin nombre"
+  );
 }
 
-function getStatus(client: FounderBriefingClient) {
-  return (client.estado || client.status || "").toLowerCase().trim();
+function getStatus(
+  relationship: FounderBriefingRelationship
+) {
+  return (
+    relationship.estado ||
+    relationship.status ||
+    ""
+  )
+    .toLowerCase()
+    .trim();
 }
 
-function getClientValue(client: FounderBriefingClient) {
-  return Number(client.monto || 50000);
+function getRelationshipValue(
+  relationship: FounderBriefingRelationship
+) {
+  return Number(relationship.monto || 50000);
 }
 
-function isWarm(client: FounderBriefingClient) {
-  const status = getStatus(client);
+function isWarm(
+  relationship: FounderBriefingRelationship
+) {
+  const status = getStatus(relationship);
 
   return (
     status.includes("warm") ||
@@ -105,8 +133,10 @@ function isWarm(client: FounderBriefingClient) {
   );
 }
 
-function isCold(client: FounderBriefingClient) {
-  const status = getStatus(client);
+function isCold(
+  relationship: FounderBriefingRelationship
+) {
+  const status = getStatus(relationship);
 
   return (
     status.includes("cold") ||
@@ -132,118 +162,217 @@ function buildItem(
   };
 }
 
-function estimateProbability(client: FounderBriefingClient) {
+function estimateProbability(
+  relationship: FounderBriefingRelationship
+) {
   const followUpDelta =
-    daysUntil(client.proximo_contacto) ?? daysUntil(client.recordatorio);
+    daysUntil(relationship.proximo_contacto) ??
+    daysUntil(relationship.recordatorio);
 
-  const activityDays = daysSince(client.updated_at || client.created_at);
+  const activityDays = daysSince(
+    relationship.updated_at ||
+      relationship.created_at
+  );
 
   let probability = 35;
 
-  if (isWarm(client)) probability += 30;
-
-  if (followUpDelta === 0) probability += 15;
-  if (followUpDelta === 1) probability += 10;
-
-  if (followUpDelta !== null && followUpDelta < 0) {
-    probability -= 20;
+  if (isWarm(relationship)) {
+    probability += 30;
   }
 
-  if (activityDays !== null && activityDays <= 2) {
+  if (followUpDelta === 0) {
     probability += 15;
   }
 
-  if (activityDays !== null && activityDays >= 7) {
+  if (followUpDelta === 1) {
+    probability += 10;
+  }
+
+  if (
+    followUpDelta !== null &&
+    followUpDelta < 0
+  ) {
     probability -= 20;
   }
 
-  if (isCold(client)) {
+  if (
+    activityDays !== null &&
+    activityDays <= 2
+  ) {
+    probability += 15;
+  }
+
+  if (
+    activityDays !== null &&
+    activityDays >= 7
+  ) {
+    probability -= 20;
+  }
+
+  if (isCold(relationship)) {
     probability -= 25;
   }
 
-  return Math.max(5, Math.min(95, probability));
+  return Math.max(
+    5,
+    Math.min(95, probability)
+  );
 }
 
 function formatGs(value: number) {
-  return `Gs. ${value.toLocaleString("es-ES")}`;
+  return `Gs. ${value.toLocaleString("es-PY")}`;
 }
 
 export function buildWeeklyFounderReport(
-  clients: FounderBriefingClient[] = []
+  relationships: FounderBriefingRelationship[] = []
 ): WeeklyFounderReport {
-  const totalClients = clients.length;
+  const totalRelationships =
+    relationships.length;
 
-  const inactiveClients = clients.filter((client) => {
-    const days = daysSince(client.updated_at || client.created_at);
+  const inactiveRelationships =
+    relationships.filter((relationship) => {
+      const days = daysSince(
+        relationship.updated_at ||
+          relationship.created_at
+      );
 
-    return days !== null && days >= 7;
-  });
+      return (
+        days !== null &&
+        days >= 7
+      );
+    });
 
-  const overdueClients = clients.filter((client) => {
-    const delta =
-      daysUntil(client.proximo_contacto) ?? daysUntil(client.recordatorio);
+  const overdueRelationships =
+    relationships.filter((relationship) => {
+      const delta =
+        daysUntil(
+          relationship.proximo_contacto
+        ) ??
+        daysUntil(
+          relationship.recordatorio
+        );
 
-    return delta !== null && delta < 0;
-  });
+      return (
+        delta !== null &&
+        delta < 0
+      );
+    });
 
-  const ghostingClients = clients.filter((client) => {
-    const activityDays = daysSince(client.updated_at || client.created_at);
+  const ghostingRelationships =
+    relationships.filter((relationship) => {
+      const activityDays = daysSince(
+        relationship.updated_at ||
+          relationship.created_at
+      );
 
-    return isWarm(client) && activityDays !== null && activityDays >= 5;
-  });
+      return (
+        isWarm(relationship) &&
+        activityDays !== null &&
+        activityDays >= 5
+      );
+    });
 
-  const stalledClients = clients.filter((client) => {
-    const activityDays = daysSince(client.updated_at || client.created_at);
+  const stalledRelationships =
+    relationships.filter((relationship) => {
+      const activityDays = daysSince(
+        relationship.updated_at ||
+          relationship.created_at
+      );
 
-    return activityDays !== null && activityDays >= 10;
-  });
+      return (
+        activityDays !== null &&
+        activityDays >= 10
+      );
+    });
 
-  const forecast = clients.map((client) => {
-    const probability = estimateProbability(client);
-    const value = getClientValue(client);
+  const forecast = relationships.map(
+    (relationship) => {
+      const probability =
+        estimateProbability(relationship);
 
-    return {
-      client,
-      probability,
-      value,
-      expectedValue: Math.round((value * probability) / 100),
-    };
-  });
+      const value =
+        getRelationshipValue(relationship);
 
-  const projectedRevenue = forecast.reduce(
-    (sum, item) => sum + item.expectedValue,
-    0
+      return {
+        relationship,
+        probability,
+        value,
+        expectedValue: Math.round(
+          (value * probability) / 100
+        ),
+      };
+    }
   );
 
+  const projectedRevenue =
+    forecast.reduce(
+      (sum, item) =>
+        sum + item.expectedValue,
+      0
+    );
+
   const likelyRevenue = forecast
-    .filter((item) => item.probability >= 60)
-    .reduce((sum, item) => sum + item.expectedValue, 0);
+    .filter(
+      (item) =>
+        item.probability >= 60
+    )
+    .reduce(
+      (sum, item) =>
+        sum + item.expectedValue,
+      0
+    );
 
   const revenueAtRisk = forecast
-    .filter((item) => item.probability <= 35)
-    .reduce((sum, item) => sum + item.value, 0);
+    .filter(
+      (item) =>
+        item.probability <= 35
+    )
+    .reduce(
+      (sum, item) =>
+        sum + item.value,
+      0
+    );
 
   const averageProbability =
     forecast.length > 0
       ? Math.round(
-          forecast.reduce((sum, item) => sum + item.probability, 0) /
-            forecast.length
+          forecast.reduce(
+            (sum, item) =>
+              sum + item.probability,
+            0
+          ) / forecast.length
         )
       : 0;
 
   let score = 85;
 
-  score -= overdueClients.length * 6;
-  score -= ghostingClients.length * 5;
-  score -= stalledClients.length * 4;
-  score -= inactiveClients.length * 3;
+  score -=
+    overdueRelationships.length * 6;
 
-  if (likelyRevenue > 0) score += 4;
+  score -=
+    ghostingRelationships.length * 5;
 
-  score = Math.max(0, Math.min(100, score));
+  score -=
+    stalledRelationships.length * 4;
+
+  score -=
+    inactiveRelationships.length * 3;
+
+  if (likelyRevenue > 0) {
+    score += 4;
+  }
+
+  score = Math.max(
+    0,
+    Math.min(100, score)
+  );
 
   const tone: WeeklyReportTone =
-    score < 55 ? "critical" : score < 75 ? "warning" : "good";
+    score < 55
+      ? "critical"
+      : score < 75
+        ? "warning"
+        : "good";
 
   const momentum =
     likelyRevenue >= 300000
@@ -253,16 +382,18 @@ export function buildWeeklyFounderReport(
         : "Débil";
 
   const executionDiscipline =
-    overdueClients.length >= 5
+    overdueRelationships.length >= 5
       ? "Baja"
-      : overdueClients.length >= 2
+      : overdueRelationships.length >= 2
         ? "Media"
         : "Alta";
 
   const pipelineHealth =
-    ghostingClients.length >= 4 || stalledClients.length >= 4
+    ghostingRelationships.length >= 4 ||
+    stalledRelationships.length >= 4
       ? "Crítico"
-      : ghostingClients.length >= 1 || stalledClients.length >= 1
+      : ghostingRelationships.length >= 1 ||
+          stalledRelationships.length >= 1
         ? "En observación"
         : "Saludable";
 
@@ -271,13 +402,19 @@ export function buildWeeklyFounderReport(
   const recommendations: WeeklyReportItem[] = [];
 
   forecast
-    .sort((a, b) => b.expectedValue - a.expectedValue)
+    .sort(
+      (a, b) =>
+        b.expectedValue -
+        a.expectedValue
+    )
     .slice(0, 3)
     .forEach((item, index) => {
       topOpportunities.push(
         buildItem(
           `opportunity-${index}`,
-          getClientName(item.client),
+          getRelationshipName(
+            item.relationship
+          ),
           `${item.probability}% de probabilidad • ${formatGs(
             item.expectedValue
           )} de ingreso esperado`,
@@ -290,41 +427,71 @@ export function buildWeeklyFounderReport(
       );
     });
 
-  if (ghostingClients.length > 0) {
+  if (
+    ghostingRelationships.length > 0
+  ) {
     risks.push(
       buildItem(
         "ghosting-risk",
         "Riesgo de pérdida de contacto",
-        `${ghostingClients.length} cliente${
-          ghostingClients.length === 1 ? "" : "s"
-        } muestra${ghostingClients.length === 1 ? "" : "n"} señales de pérdida de momentum.`,
-        ghostingClients.length >= 3 ? "critical" : "warning"
+        `${ghostingRelationships.length} relación${
+          ghostingRelationships.length === 1
+            ? ""
+            : "es"
+        } muestra${
+          ghostingRelationships.length === 1
+            ? ""
+            : "n"
+        } señales de pérdida de momentum.`,
+        ghostingRelationships.length >= 3
+          ? "critical"
+          : "warning"
       )
     );
   }
 
-  if (overdueClients.length > 0) {
+  if (
+    overdueRelationships.length > 0
+  ) {
     risks.push(
       buildItem(
         "overdue-followups",
         "Seguimientos vencidos detectados",
-        `${overdueClients.length} seguimiento${
-          overdueClients.length === 1 ? "" : "s"
-        } requiere${overdueClients.length === 1 ? "" : "n"} ejecución inmediata.`,
-        overdueClients.length >= 5 ? "critical" : "warning"
+        `${overdueRelationships.length} seguimiento${
+          overdueRelationships.length === 1
+            ? ""
+            : "s"
+        } requiere${
+          overdueRelationships.length === 1
+            ? ""
+            : "n"
+        } ejecución inmediata.`,
+        overdueRelationships.length >= 5
+          ? "critical"
+          : "warning"
       )
     );
   }
 
-  if (stalledClients.length > 0) {
+  if (
+    stalledRelationships.length > 0
+  ) {
     risks.push(
       buildItem(
         "stalled-pipeline",
         "Oportunidades detenidas en el pipeline",
-        `${stalledClients.length} oportunidad${
-          stalledClients.length === 1 ? "" : "es"
-        } necesita${stalledClients.length === 1 ? "" : "n"} reactivación o cierre.`,
-        stalledClients.length >= 3 ? "critical" : "warning"
+        `${stalledRelationships.length} oportunidad${
+          stalledRelationships.length === 1
+            ? ""
+            : "es"
+        } necesita${
+          stalledRelationships.length === 1
+            ? ""
+            : "n"
+        } reactivación o cierre.`,
+        stalledRelationships.length >= 3
+          ? "critical"
+          : "warning"
       )
     );
   }
@@ -336,24 +503,30 @@ export function buildWeeklyFounderReport(
         "Proteger ingresos de alta probabilidad",
         `Prioriza ${formatGs(
           likelyRevenue
-        )} en ingresos probables antes de trabajar leads fríos.`,
+        )} en ingresos probables antes de trabajar relaciones frías.`,
         "good"
       )
     );
   }
 
-  if (ghostingClients.length > 0) {
+  if (
+    ghostingRelationships.length > 0
+  ) {
     recommendations.push(
       buildItem(
         "recover-ghosting",
-        "Recuperar primero contactos en riesgo",
+        "Recuperar primero relaciones en riesgo",
         "Ejecuta seguimientos rápidos antes de que las oportunidades pierdan más temperatura comercial.",
-        ghostingClients.length >= 3 ? "critical" : "warning"
+        ghostingRelationships.length >= 3
+          ? "critical"
+          : "warning"
       )
     );
   }
 
-  if (recommendations.length === 0) {
+  if (
+    recommendations.length === 0
+  ) {
     recommendations.push(
       buildItem(
         "pipeline-quality",
@@ -372,10 +545,12 @@ export function buildWeeklyFounderReport(
         : "El momentum comercial se mantiene estable";
 
   const summary =
-    totalClients === 0
-      ? "ClientYA necesita datos activos del pipeline para generar inteligencia semanal."
-      : `ClientYA analizó ${totalClients} cliente${
-          totalClients === 1 ? "" : "s"
+    totalRelationships === 0
+      ? "ClienteYA necesita datos activos del pipeline para generar inteligencia semanal."
+      : `ClienteYA analizó ${totalRelationships} relación${
+          totalRelationships === 1
+            ? ""
+            : "es"
         } y proyecta ${formatGs(
           projectedRevenue
         )} de ingreso ponderado con ${averageProbability}% de probabilidad promedio de conversión.`;
@@ -391,13 +566,23 @@ export function buildWeeklyFounderReport(
     executionDiscipline,
     pipelineHealth,
 
-    totalClients,
-    activeClients: totalClients - inactiveClients.length,
-    inactiveClients: inactiveClients.length,
+    totalRelationships,
 
-    overdueCount: overdueClients.length,
-    ghostingCount: ghostingClients.length,
-    stalledCount: stalledClients.length,
+    activeRelationships:
+      totalRelationships -
+      inactiveRelationships.length,
+
+    inactiveRelationships:
+      inactiveRelationships.length,
+
+    overdueCount:
+      overdueRelationships.length,
+
+    ghostingCount:
+      ghostingRelationships.length,
+
+    stalledCount:
+      stalledRelationships.length,
 
     weeklyRevenue: {
       projectedRevenue,

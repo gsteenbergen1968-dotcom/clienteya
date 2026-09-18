@@ -8,7 +8,7 @@ import {
   type SectorSignal,
 } from "./sector-intelligence";
 
-export type SectorDashboardClient = {
+export type SectorDashboardRelationship = {
   id: string;
   nombre?: string | null;
   estado?: string | null;
@@ -30,8 +30,8 @@ export type SectorDashboardBusiness = {
 
 export type SectorDashboardPriority = {
   id: string;
-  clienteId: string;
-  clienteNombre: string;
+  relationshipId: string;
+  relationshipName: string;
   businessType: BusinessType;
   sectorLabel: string;
   signal: SectorSignal;
@@ -48,6 +48,7 @@ function daysBetween(date?: string | null) {
   if (!date) return 0;
 
   const target = new Date(date);
+
   if (Number.isNaN(target.getTime())) return 0;
 
   const now = new Date();
@@ -60,6 +61,7 @@ function daysUntil(date?: string | null) {
   if (!date) return null;
 
   const target = new Date(date);
+
   if (Number.isNaN(target.getTime())) return null;
 
   const now = new Date();
@@ -68,16 +70,18 @@ function daysUntil(date?: string | null) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-function getClientName(cliente: SectorDashboardClient) {
-  return cliente.nombre?.trim() || "Cliente sin nombre";
+function getRelationshipName(relationship: SectorDashboardRelationship) {
+  return relationship.nombre?.trim() || "Relación sin nombre";
 }
 
-function buildDecisionLabel(cliente: SectorDashboardClient) {
-  const nextContactInDays = daysUntil(cliente.proximo_contacto);
-  const daysSinceUpdate = daysBetween(cliente.updated_at || cliente.created_at);
-  const hasValue = Boolean(cliente.monto && cliente.monto > 0);
+function buildDecisionLabel(relationship: SectorDashboardRelationship) {
+  const nextContactInDays = daysUntil(relationship.proximo_contacto);
+  const daysSinceUpdate = daysBetween(
+    relationship.updated_at || relationship.created_at,
+  );
+  const hasValue = Boolean(relationship.monto && relationship.monto > 0);
 
-  if (cliente.pagado) return "Mantener relación";
+  if (relationship.pagado) return "Mantener relación";
 
   if (typeof nextContactInDays === "number" && nextContactInDays <= 0) {
     return "Actuar hoy";
@@ -85,7 +89,7 @@ function buildDecisionLabel(cliente: SectorDashboardClient) {
 
   if (hasValue) return "Cerrar oportunidad";
 
-  if (daysSinceUpdate >= 10) return "Reactivar cliente";
+  if (daysSinceUpdate >= 10) return "Reactivar relación";
 
   if (typeof nextContactInDays === "number" && nextContactInDays <= 3) {
     return "Preparar seguimiento";
@@ -94,12 +98,14 @@ function buildDecisionLabel(cliente: SectorDashboardClient) {
   return "Dar seguimiento";
 }
 
-function buildReason(cliente: SectorDashboardClient) {
-  const nextContactInDays = daysUntil(cliente.proximo_contacto);
-  const daysSinceUpdate = daysBetween(cliente.updated_at || cliente.created_at);
+function buildReason(relationship: SectorDashboardRelationship) {
+  const nextContactInDays = daysUntil(relationship.proximo_contacto);
+  const daysSinceUpdate = daysBetween(
+    relationship.updated_at || relationship.created_at,
+  );
 
-  if (cliente.pagado) {
-    return "Cliente ya generó valor. Mantén la relación activa.";
+  if (relationship.pagado) {
+    return "La relación ya generó valor. Mantén la relación activa.";
   }
 
   if (typeof nextContactInDays === "number" && nextContactInDays < 0) {
@@ -118,18 +124,20 @@ function buildReason(cliente: SectorDashboardClient) {
     return `Próximo contacto en ${nextContactInDays} día(s).`;
   }
 
-  return "Cliente necesita una acción comercial clara.";
+  return "La relación necesita una acción comercial clara.";
 }
 
-function calculatePriorityScore(cliente: SectorDashboardClient) {
+function calculatePriorityScore(relationship: SectorDashboardRelationship) {
   let score = 40;
 
-  const nextContactInDays = daysUntil(cliente.proximo_contacto);
-  const daysSinceUpdate = daysBetween(cliente.updated_at || cliente.created_at);
+  const nextContactInDays = daysUntil(relationship.proximo_contacto);
+  const daysSinceUpdate = daysBetween(
+    relationship.updated_at || relationship.created_at,
+  );
 
-  if (cliente.pagado) score += 5;
+  if (relationship.pagado) score += 5;
 
-  if (cliente.monto && cliente.monto > 0) score += 20;
+  if (relationship.monto && relationship.monto > 0) score += 20;
 
   if (typeof nextContactInDays === "number" && nextContactInDays < 0) {
     score += 35;
@@ -147,54 +155,63 @@ function calculatePriorityScore(cliente: SectorDashboardClient) {
   else if (daysSinceUpdate >= 7) score += 15;
   else if (daysSinceUpdate >= 3) score += 8;
 
-  if (cliente.telefono) score += 8;
+  if (relationship.telefono) score += 8;
 
   return Math.min(100, Math.max(0, Math.round(score)));
 }
 
 export function buildSectorDashboardPriorities(input: {
-  clientes: SectorDashboardClient[];
+  relationships: SectorDashboardRelationship[];
   business?: SectorDashboardBusiness | null;
   limit?: number;
 }): SectorDashboardPriority[] {
-  const businessType = normalizeBusinessType(input.business?.business_sector);
+  const businessType = normalizeBusinessType(
+    input.business?.business_sector,
+  );
+
   const sectorLabel = getBusinessTypeLabel(businessType);
   const vocabulary = getSectorVocabulary(businessType);
   const limit = input.limit || 3;
 
-  return input.clientes
-    .map((cliente) => {
-      const decisionLabel = buildDecisionLabel(cliente);
-      const reason = buildReason(cliente);
-      const priorityScore = calculatePriorityScore(cliente);
+  return input.relationships
+    .map((relationship) => {
+      const decisionLabel = buildDecisionLabel(relationship);
+      const reason = buildReason(relationship);
+      const priorityScore = calculatePriorityScore(relationship);
 
       const sectorCopy = buildSectorDecisionCopy({
         businessType,
         decisionLabel,
         reason,
-        estado: cliente.estado,
-        daysOverdue: daysBetween(cliente.updated_at || cliente.created_at),
-        hasWhatsapp: Boolean(cliente.telefono),
-        isPaid: Boolean(cliente.pagado),
-        hasValue: Boolean(cliente.monto && cliente.monto > 0),
+        estado: relationship.estado,
+        daysOverdue: daysBetween(
+          relationship.updated_at || relationship.created_at,
+        ),
+        hasWhatsapp: Boolean(relationship.telefono),
+        isPaid: Boolean(relationship.pagado),
+        hasValue: Boolean(
+          relationship.monto && relationship.monto > 0,
+        ),
       });
 
-      const clienteNombre = getClientName(cliente);
+      const relationshipName = getRelationshipName(relationship);
 
       return {
-        id: `sector-priority-${cliente.id}`,
-        clienteId: cliente.id,
-        clienteNombre,
+        id: `sector-priority-${relationship.id}`,
+        relationshipId: relationship.id,
+        relationshipName,
         businessType,
         sectorLabel,
         signal: sectorCopy.signal,
-        title: `${clienteNombre}: ${sectorCopy.headline || vocabulary.followUp}`,
+        title: `${relationshipName}: ${
+          sectorCopy.headline || vocabulary.followUp
+        }`,
         description: sectorCopy.actionPhrase,
         actionLabel: sectorCopy.primaryVerb,
         reason: sectorCopy.humanReason,
         tone: sectorCopy.tone,
         priorityScore,
-        href: `/dashboard/clientes/${cliente.id}`,
+        href: `/dashboard/relationships/${relationship.id}`,
       };
     })
     .sort((a, b) => b.priorityScore - a.priorityScore)
@@ -204,15 +221,18 @@ export function buildSectorDashboardPriorities(input: {
 export function buildSectorDashboardIntro(input: {
   business?: SectorDashboardBusiness | null;
 }) {
-  const businessType = normalizeBusinessType(input.business?.business_sector);
+  const businessType = normalizeBusinessType(
+    input.business?.business_sector,
+  );
+
   const sectorLabel = getBusinessTypeLabel(businessType);
 
   if (businessType === "restaurant") {
     return {
       eyebrow: "Inteligencia para restaurante",
-      title: "Clientes que pueden volver hoy",
+      title: "Relaciones que pueden volver hoy",
       description:
-        "ClienteYA detecta clientes ausentes, reservas pendientes y oportunidades de nueva visita.",
+        "ClienteYA detecta relaciones ausentes, reservas pendientes y oportunidades de nueva visita.",
       sectorLabel,
     };
   }
@@ -240,16 +260,16 @@ export function buildSectorDashboardIntro(input: {
   if (businessType === "retail") {
     return {
       eyebrow: "Inteligencia para retail",
-      title: "Clientes con recompra probable",
+      title: "Relaciones con recompra probable",
       description:
-        "ClienteYA detecta clientes sin retorno, tickets abiertos y oportunidades de recompra.",
+        "ClienteYA detecta relaciones sin retorno, tickets abiertos y oportunidades de recompra.",
       sectorLabel,
     };
   }
 
   return {
     eyebrow: "Inteligencia comercial",
-    title: "Clientes que necesitan acción",
+    title: "Relaciones que necesitan acción",
     description:
       "ClienteYA detecta prioridades comerciales y convierte datos en acciones simples.",
     sectorLabel,

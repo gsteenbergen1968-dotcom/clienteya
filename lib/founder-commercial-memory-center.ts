@@ -12,8 +12,8 @@ export type FounderCommercialMemoryActionType =
 
 export type FounderCommercialMemoryAction = {
   id: string;
-  clientId: string;
-  clientName: string;
+  relationshipId: string;
+  relationshipName: string;
   title: string;
   description: string;
   action: string;
@@ -51,20 +51,27 @@ function getPriority(score: number): CommercialMemoryPriority {
   if (score >= 80) return "critical";
   if (score >= 60) return "high";
   if (score >= 35) return "medium";
+
   return "low";
 }
 
-function getTone(priority: CommercialMemoryPriority): CommercialMemoryTone {
+function getTone(
+  priority: CommercialMemoryPriority
+): CommercialMemoryTone {
   if (priority === "critical") return "red";
   if (priority === "high") return "amber";
   if (priority === "medium") return "sky";
+
   return "emerald";
 }
 
-function getActionTypeLabel(type: FounderCommercialMemoryActionType) {
+function getActionTypeLabel(
+  type: FounderCommercialMemoryActionType
+) {
   if (type === "promise") return "Promesa";
   if (type === "money") return "Dinero";
   if (type === "opportunity") return "Oportunidad";
+
   return "Relación";
 }
 
@@ -86,23 +93,27 @@ function calculateActionImpact(input: {
   if (input.type === "relationship") score += 4;
 
   if (input.protectedAmount > 0) {
-    score += Math.min(15, Math.round(input.protectedAmount / 1000000));
+    score += Math.min(
+      15,
+      Math.round(input.protectedAmount / 1000000)
+    );
   }
 
   return clamp(score);
 }
 
 function getHighestPriority(
-  priorities: CommercialMemoryPriority[],
+  priorities: CommercialMemoryPriority[]
 ): CommercialMemoryPriority {
   if (priorities.includes("critical")) return "critical";
   if (priorities.includes("high")) return "high";
   if (priorities.includes("medium")) return "medium";
+
   return "low";
 }
 
-function buildActionsFromClient(
-  result: CommercialMemoryOSResult,
+function buildActionsFromRelationship(
+  result: CommercialMemoryOSResult
 ): FounderCommercialMemoryAction[] {
   const actions: FounderCommercialMemoryAction[] = [];
 
@@ -110,13 +121,15 @@ function buildActionsFromClient(
     const protectedAmount = signal.amount || 0;
 
     actions.push({
-      id: `${result.clientId}-money-${signal.id}`,
-      clientId: result.clientId,
-      clientName: result.clientName,
+      id: `${result.relationshipId}-money-${signal.id}`,
+      relationshipId: result.relationshipId,
+      relationshipName: result.relationshipName,
       title: signal.title,
       description: signal.description,
-      action: "Revisar el pago y contactar al cliente hoy.",
-      reason: "El dinero pendiente impacta directamente el ingreso del negocio.",
+      action:
+        "Revisar el pago y contactar la relación hoy.",
+      reason:
+        "El dinero pendiente impacta directamente el ingreso del negocio.",
       type: "money",
       priority: signal.priority,
       tone: signal.tone,
@@ -131,13 +144,15 @@ function buildActionsFromClient(
 
   for (const signal of result.promises) {
     actions.push({
-      id: `${result.clientId}-promise-${signal.id}`,
-      clientId: result.clientId,
-      clientName: result.clientName,
+      id: `${result.relationshipId}-promise-${signal.id}`,
+      relationshipId: result.relationshipId,
+      relationshipName: result.relationshipName,
       title: signal.title,
       description: signal.description,
-      action: "Cumplir o cerrar el seguimiento pendiente.",
-      reason: "Una promesa olvidada daña confianza y reduce probabilidad comercial.",
+      action:
+        "Cumplir o cerrar el seguimiento pendiente.",
+      reason:
+        "Una promesa olvidada daña confianza y reduce probabilidad comercial.",
       type: "promise",
       priority: signal.priority,
       tone: signal.tone,
@@ -152,13 +167,15 @@ function buildActionsFromClient(
 
   for (const signal of result.opportunities) {
     actions.push({
-      id: `${result.clientId}-opportunity-${signal.id}`,
-      clientId: result.clientId,
-      clientName: result.clientName,
+      id: `${result.relationshipId}-opportunity-${signal.id}`,
+      relationshipId: result.relationshipId,
+      relationshipName: result.relationshipName,
       title: signal.title,
       description: signal.description,
-      action: "Enviar mensaje claro y avanzar al próximo paso comercial.",
-      reason: "La oportunidad todavía tiene temperatura y puede convertirse en ingreso.",
+      action:
+        "Enviar mensaje claro y avanzar al próximo paso comercial.",
+      reason:
+        "La oportunidad todavía tiene temperatura y puede convertirse en ingreso.",
       type: "opportunity",
       priority: signal.priority,
       tone: signal.tone,
@@ -173,13 +190,15 @@ function buildActionsFromClient(
 
   for (const signal of result.relationshipSignals) {
     actions.push({
-      id: `${result.clientId}-relationship-${signal.id}`,
-      clientId: result.clientId,
-      clientName: result.clientName,
+      id: `${result.relationshipId}-relationship-${signal.id}`,
+      relationshipId: result.relationshipId,
+      relationshipName: result.relationshipName,
       title: signal.title,
       description: signal.description,
-      action: "Reactivar la relación con un mensaje humano y corto.",
-      reason: "Una relación fría responde menos y exige más esfuerzo comercial después.",
+      action:
+        "Reactivar la relación con un mensaje humano y corto.",
+      reason:
+        "Una relación fría responde menos y exige más esfuerzo comercial después.",
       type: "relationship",
       priority: signal.priority,
       tone: signal.tone,
@@ -204,21 +223,29 @@ function buildExecutiveSummary(input: {
   const signals: string[] = [];
 
   if (input.promisesAtRisk > 0) {
-    signals.push(`${input.promisesAtRisk} promesa(s) o seguimiento(s) requieren atención`);
+    signals.push(
+      `${input.promisesAtRisk} promesa(s) o seguimiento(s) requieren atención`
+    );
   }
 
   if (input.moneyAtRisk > 0) {
     signals.push(
-      `Gs. ${input.moneyAtRisk.toLocaleString("es-PY")} están pendientes o en riesgo`,
+      `Gs. ${input.moneyAtRisk.toLocaleString(
+        "es-PY"
+      )} están pendientes o en riesgo`
     );
   }
 
   if (input.activeOpportunities > 0) {
-    signals.push(`${input.activeOpportunities} oportunidad(es) comerciales siguen activas`);
+    signals.push(
+      `${input.activeOpportunities} oportunidad(es) comerciales siguen activas`
+    );
   }
 
   if (input.coolingRelationships > 0) {
-    signals.push(`${input.coolingRelationships} relación(es) se están enfriando`);
+    signals.push(
+      `${input.coolingRelationships} relación(es) se están enfriando`
+    );
   }
 
   if (signals.length === 0) {
@@ -240,19 +267,19 @@ function buildExecutiveRecommendation(input: {
   const firstAction = input.topActions[0];
 
   if (input.priority === "critical") {
-    return `Actuar primero sobre ${firstAction.clientName}. Esta acción puede proteger la relación, el ingreso o una promesa pendiente.`;
+    return `Actuar primero sobre ${firstAction.relationshipName}. Esta acción puede proteger la relación, el ingreso o una promesa pendiente.`;
   }
 
   if (input.priority === "high") {
     return `Ejecutar las primeras ${Math.min(
       3,
-      input.topActions.length,
+      input.topActions.length
     )} acciones hoy para proteger el mayor impacto comercial.`;
   }
 
   if (input.protectedRevenuePotential > 0) {
     return `Revisar oportunidades y pagos pendientes. Hay Gs. ${input.protectedRevenuePotential.toLocaleString(
-      "es-PY",
+      "es-PY"
     )} de ingreso potencial para proteger.`;
   }
 
@@ -260,27 +287,38 @@ function buildExecutiveRecommendation(input: {
 }
 
 export function buildFounderCommercialMemoryCenter(
-  results: CommercialMemoryOSResult[],
+  results: CommercialMemoryOSResult[]
 ): FounderCommercialMemoryCenter {
-  const allActions = results.flatMap((result) => buildActionsFromClient(result));
+  const allActions = results.flatMap((result) =>
+    buildActionsFromRelationship(result)
+  );
 
   const promisesAtRisk = results.reduce(
     (total, result) =>
       total +
       result.promises.filter(
         (signal) =>
-          signal.priority === "critical" || signal.priority === "high",
+          signal.priority === "critical" ||
+          signal.priority === "high"
       ).length,
-    0,
+    0
   );
 
   const moneyAtRisk = results.reduce(
     (total, result) =>
       total +
       result.moneySignals
-        .filter((signal) => signal.priority === "critical" || signal.priority === "high")
-        .reduce((sum, signal) => sum + Number(signal.amount || 0), 0),
-    0,
+        .filter(
+          (signal) =>
+            signal.priority === "critical" ||
+            signal.priority === "high"
+        )
+        .reduce(
+          (sum, signal) =>
+            sum + Number(signal.amount || 0),
+          0
+        ),
+    0
   );
 
   const activeOpportunities = results.reduce(
@@ -288,9 +326,10 @@ export function buildFounderCommercialMemoryCenter(
       total +
       result.opportunities.filter(
         (signal) =>
-          signal.priority === "critical" || signal.priority === "high",
+          signal.priority === "critical" ||
+          signal.priority === "high"
       ).length,
-    0,
+    0
   );
 
   const coolingRelationships = results.reduce(
@@ -300,25 +339,33 @@ export function buildFounderCommercialMemoryCenter(
         (signal) =>
           signal.priority === "critical" ||
           signal.priority === "high" ||
-          signal.priority === "medium",
+          signal.priority === "medium"
       ).length,
-    0,
+    0
   );
 
-  const protectedRevenuePotential = allActions.reduce(
-    (total, action) => total + action.protectedAmount,
-    0,
-  );
+  const protectedRevenuePotential =
+    allActions.reduce(
+      (total, action) =>
+        total + action.protectedAmount,
+      0
+    );
 
   const topActions = allActions
-    .sort((a, b) => b.impactScore - a.impactScore)
+    .sort(
+      (a, b) =>
+        b.impactScore - a.impactScore
+    )
     .slice(0, 5);
 
-  const averageClientRisk =
+  const averageRelationshipRisk =
     results.length > 0
       ? Math.round(
-          results.reduce((total, result) => total + result.priorityScore, 0) /
-            results.length,
+          results.reduce(
+            (total, result) =>
+              total + result.priorityScore,
+            0
+          ) / results.length
         )
       : 0;
 
@@ -326,31 +373,41 @@ export function buildFounderCommercialMemoryCenter(
     promisesAtRisk * 8 +
     activeOpportunities * 6 +
     coolingRelationships * 5 +
-    Math.min(30, Math.round(moneyAtRisk / 1000000));
+    Math.min(
+      30,
+      Math.round(moneyAtRisk / 1000000)
+    );
 
   const memoryRiskScore = clamp(
-    Math.round(averageClientRisk * 0.55 + structuralRisk * 0.45),
+    Math.round(
+      averageRelationshipRisk * 0.55 +
+        structuralRisk * 0.45
+    )
   );
 
   const priority = getHighestPriority([
     getPriority(memoryRiskScore),
-    ...topActions.map((action) => action.priority),
+    ...topActions.map(
+      (action) => action.priority
+    ),
   ]);
 
   const tone = getTone(priority);
 
-  const executiveSummary = buildExecutiveSummary({
-    promisesAtRisk,
-    moneyAtRisk,
-    activeOpportunities,
-    coolingRelationships,
-  });
+  const executiveSummary =
+    buildExecutiveSummary({
+      promisesAtRisk,
+      moneyAtRisk,
+      activeOpportunities,
+      coolingRelationships,
+    });
 
-  const executiveRecommendation = buildExecutiveRecommendation({
-    priority,
-    topActions,
-    protectedRevenuePotential,
-  });
+  const executiveRecommendation =
+    buildExecutiveRecommendation({
+      priority,
+      topActions,
+      protectedRevenuePotential,
+    });
 
   return {
     memoryRiskScore,
@@ -372,16 +429,17 @@ export function buildFounderCommercialMemoryCenter(
 }
 
 export function getFounderCommercialMemoryPriorityLabel(
-  priority: CommercialMemoryPriority,
+  priority: CommercialMemoryPriority
 ) {
   if (priority === "critical") return "Crítica";
   if (priority === "high") return "Alta";
   if (priority === "medium") return "Media";
+
   return "Baja";
 }
 
 export function getFounderCommercialMemoryToneClasses(
-  tone: CommercialMemoryTone,
+  tone: CommercialMemoryTone
 ) {
   if (tone === "red") {
     return "border-red-200 bg-red-50 text-red-900";
@@ -403,7 +461,7 @@ export function getFounderCommercialMemoryToneClasses(
 }
 
 export function getFounderCommercialMemoryActionTypeLabel(
-  type: FounderCommercialMemoryActionType,
+  type: FounderCommercialMemoryActionType
 ) {
   return getActionTypeLabel(type);
 }
