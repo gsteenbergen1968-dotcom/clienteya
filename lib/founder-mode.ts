@@ -7,20 +7,13 @@ export function canUseFounderMode(
     process.env.CLIENTEYA_FOUNDER_MODE ===
     "true";
 
-  console.log("[FOUNDER DEBUG]", {
-    founderModeEnabled,
-    hasFounderEmails: Boolean(
-      process.env.CLIENTEYA_FOUNDER_EMAILS,
-    ),
-    email: email || null,
-  });
-
   if (!founderModeEnabled) {
     return false;
   }
 
   const rawEmails =
-    process.env.CLIENTEYA_FOUNDER_EMAILS || "";
+    process.env
+      .CLIENTEYA_FOUNDER_EMAILS || "";
 
   const allowedEmails =
     rawEmails
