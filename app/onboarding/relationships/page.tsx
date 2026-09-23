@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChangeEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ChangeEvent,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import {
   RelationshipImportSourceRow,
@@ -44,10 +51,6 @@ import {
   deduplicateRelationships,
   type RelationshipDeduplicationRecord,
 } from "../../../lib/relationship-deduplication-engine";
-import {
-  completeOnboarding,
-  isFirstLaunch,
-} from "../../../lib/onboarding-state";
 import { createBrowserSupabaseClient } from "../../../lib/supabase/browser";
 
 type RelationshipOnboardingStep =
@@ -322,7 +325,6 @@ function parseAppleVCard(
   });
 }
 
-
 function normalizeOutlookKey(value: string): string {
   return value
     .trim()
@@ -334,10 +336,15 @@ function getOutlookValue(
   row: RelationshipImportRow,
   aliases: string[],
 ): string | null {
-  const normalizedAliases = aliases.map(normalizeOutlookKey);
+  const normalizedAliases =
+    aliases.map(normalizeOutlookKey);
 
   for (const [key, rawValue] of Object.entries(row)) {
-    if (!normalizedAliases.includes(normalizeOutlookKey(key))) {
+    if (
+      !normalizedAliases.includes(
+        normalizeOutlookKey(key),
+      )
+    ) {
       continue;
     }
 
@@ -542,28 +549,62 @@ function getFileAcceptValue(
 function RelationshipOnboardingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const hasOpenedSourcePickerRef = useRef(false);
+  const fileInputRef =
+    useRef<HTMLInputElement | null>(null);
+  const hasOpenedSourcePickerRef =
+    useRef(false);
 
-  const isSettingsEntry = searchParams.get("entry") === "settings";
-  const requestedSource = searchParams.get("source");
+  const isSettingsEntry =
+    searchParams.get("entry") === "settings";
 
-  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
+  const requestedSource =
+    searchParams.get("source");
+
+  const [
+    checkingOnboarding,
+    setCheckingOnboarding,
+  ] = useState(true);
+
   const [step, setStep] =
     useState<RelationshipOnboardingStep>("intro");
-  const [selectedSource, setSelectedSource] =
-    useState<RelationshipOnboardingSource | null>(null);
-  const [fileName, setFileName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+
+  const [
+    selectedSource,
+    setSelectedSource,
+  ] =
+    useState<RelationshipOnboardingSource | null>(
+      null,
+    );
+
+  const [fileName, setFileName] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
   const [importResult, setImportResult] =
-    useState<RelationshipImportResult | null>(null);
+    useState<RelationshipImportResult | null>(
+      null,
+    );
+
   const [reviewReport, setReviewReport] =
-    useState<RelationshipReviewReport | null>(null);
+    useState<RelationshipReviewReport | null>(
+      null,
+    );
+
   const [analysisResult, setAnalysisResult] =
-    useState<ImportAnalysisResult | null>(null);
+    useState<ImportAnalysisResult | null>(
+      null,
+    );
 
   useEffect(() => {
     if (isSettingsEntry) {
@@ -595,18 +636,81 @@ function RelationshipOnboardingContent() {
       return;
     }
 
-    if (!isFirstLaunch()) {
-      router.replace("/dashboard");
-      return;
+    let cancelled = false;
+
+    async function checkOnboarding() {
+      const supabase =
+        createBrowserSupabaseClient();
+
+      const {
+        data: { user },
+        error: userError,
+      } =
+        await supabase.auth.getUser();
+
+      if (cancelled) {
+        return;
+      }
+
+      if (
+        userError ||
+        !user
+      ) {
+        router.replace("/login");
+        return;
+      }
+
+      const {
+        data: businessSettings,
+        error: settingsError,
+      } =
+        await supabase
+          .from("business_settings")
+          .select("onboarding_completed")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+      if (cancelled) {
+        return;
+      }
+
+      if (settingsError) {
+        setError(
+          "No pudimos verificar el estado de configuración.",
+        );
+        setCheckingOnboarding(false);
+        return;
+      }
+
+      if (
+        businessSettings?.onboarding_completed ===
+        true
+      ) {
+        router.replace("/dashboard");
+        return;
+      }
+
+      setCheckingOnboarding(false);
     }
 
-    setCheckingOnboarding(false);
-  }, [isSettingsEntry, requestedSource, router]);
+    void checkOnboarding();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isSettingsEntry,
+    requestedSource,
+    router,
+  ]);
 
   const selectedOption = useMemo(
     () =>
-      SOURCE_OPTIONS.find((option) => option.key === selectedSource) || null,
-    [selectedSource]
+      SOURCE_OPTIONS.find(
+        (option) =>
+          option.key === selectedSource,
+      ) || null,
+    [selectedSource],
   );
 
   function resetResult() {
@@ -619,29 +723,42 @@ function RelationshipOnboardingContent() {
     setStep("source");
   }
 
-  function chooseSource(option: RelationshipImportSourceOption) {
+  function chooseSource(
+    option: RelationshipImportSourceOption,
+  ) {
     setSelectedSource(option.key);
     resetResult();
 
-    if (option.status === "manual") return;
+    if (option.status === "manual") {
+      return;
+    }
 
     if (option.status === "available") {
-      window.setTimeout(() => fileInputRef.current?.click(), 0);
+      window.setTimeout(
+        () =>
+          fileInputRef.current?.click(),
+        0,
+      );
+
       return;
     }
 
     setMessage(
-      `${option.title} estará disponible en una próxima actualización. Hoy ya puedes comenzar con Apple Contacts, Outlook, Excel, CSV o una relación manual.`
+      `${option.title} estará disponible en una próxima actualización. Hoy ya puedes comenzar con Apple Contacts, Outlook, Excel, CSV o una relación manual.`,
     );
   }
 
   async function handleFileChange(
-    event: ChangeEvent<HTMLInputElement>
+    event: ChangeEvent<HTMLInputElement>,
   ) {
-    const file = event.target.files?.[0];
+    const file =
+      event.target.files?.[0];
+
     event.target.value = "";
 
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -654,32 +771,41 @@ function RelationshipOnboardingContent() {
     try {
       const currentSource =
         selectedSource ||
-        getRequestedSource(requestedSource);
+        getRequestedSource(
+          requestedSource,
+        );
 
       const isAppleFile =
-        currentSource === "apple-contacts" ||
-        file.name.toLowerCase().endsWith(".vcf");
+        currentSource ===
+          "apple-contacts" ||
+        file.name
+          .toLowerCase()
+          .endsWith(".vcf");
 
       const isOutlookFile =
         currentSource === "outlook";
 
       if (
         isOutlookFile &&
-        !file.name.toLowerCase().endsWith(".csv")
+        !file.name
+          .toLowerCase()
+          .endsWith(".csv")
       ) {
         throw new RelationshipFileParserError(
           "unsupported-file",
-          "Outlook debe exportarse como archivo CSV."
+          "Outlook debe exportarse como archivo CSV.",
         );
       }
 
       if (
         !isAppleFile &&
-        !isSupportedRelationshipFile(file.name)
+        !isSupportedRelationshipFile(
+          file.name,
+        )
       ) {
         throw new RelationshipFileParserError(
           "unsupported-file",
-          "ClienteYA puede leer archivos VCF, CSV, XLSX y XLS."
+          "ClienteYA puede leer archivos VCF, CSV, XLSX y XLS.",
         );
       }
 
@@ -696,7 +822,7 @@ function RelationshipOnboardingContent() {
         if (rows.length === 0) {
           throw new RelationshipFileParserError(
             "unsupported-file",
-            "No encontramos contactos válidos dentro del archivo vCard."
+            "No encontramos contactos válidos dentro del archivo vCard.",
           );
         }
 
@@ -708,14 +834,18 @@ function RelationshipOnboardingContent() {
         );
       } else {
         const parsedFile =
-          await parseRelationshipBrowserFile(file);
+          await parseRelationshipBrowserFile(
+            file,
+          );
 
         const parsedRows =
           parsedFile.rows as RelationshipImportRow[];
 
         if (isOutlookFile) {
           rows =
-            normalizeOutlookRows(parsedRows);
+            normalizeOutlookRows(
+              parsedRows,
+            );
 
           source =
             "outlook" as RelationshipSource;
@@ -726,13 +856,18 @@ function RelationshipOnboardingContent() {
         } else {
           rows =
             parsedRows;
+
           source =
-            file.name.toLowerCase().endsWith(".csv")
+            file.name
+              .toLowerCase()
+              .endsWith(".csv")
               ? ("csv" as RelationshipSource)
               : ("excel" as RelationshipSource);
 
           setSelectedSource(
-            file.name.toLowerCase().endsWith(".csv")
+            file.name
+              .toLowerCase()
+              .endsWith(".csv")
               ? "csv"
               : "excel",
           );
@@ -740,8 +875,10 @@ function RelationshipOnboardingContent() {
       }
 
       const parserSource =
-        source === ("apple-contacts" as RelationshipSource) ||
-        source === ("outlook" as RelationshipSource)
+        source ===
+          ("apple-contacts" as RelationshipSource) ||
+        source ===
+          ("outlook" as RelationshipSource)
           ? ("csv" as RelationshipSource)
           : source;
 
@@ -758,10 +895,14 @@ function RelationshipOnboardingContent() {
       } as RelationshipImportResult;
 
       const review =
-        buildRelationshipReviewReport(result);
+        buildRelationshipReviewReport(
+          result,
+        );
 
       const analysis =
-        buildImportAnalysisResult(result);
+        buildImportAnalysisResult(
+          result,
+        );
 
       setFileName(file.name);
       setImportResult(result);
@@ -771,7 +912,7 @@ function RelationshipOnboardingContent() {
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : "No pudimos preparar el archivo para ClienteYA."
+          : "No pudimos preparar el archivo para ClienteYA.",
       );
     } finally {
       setLoading(false);
@@ -779,14 +920,21 @@ function RelationshipOnboardingContent() {
   }
 
   function handleReviewContinue() {
-    if (!importResult || !analysisResult) {
-      setError("No pudimos preparar el análisis de tus relaciones.");
+    if (
+      !importResult ||
+      !analysisResult
+    ) {
+      setError(
+        "No pudimos preparar el análisis de tus relaciones.",
+      );
       return;
     }
 
-    if (importResult.status !== "ready") {
+    if (
+      importResult.status !== "ready"
+    ) {
       setError(
-        "Revisa las relaciones señaladas antes de continuar con el análisis."
+        "Revisa las relaciones señaladas antes de continuar con el análisis.",
       );
       return;
     }
@@ -796,64 +944,85 @@ function RelationshipOnboardingContent() {
   }
 
   async function handleConfirmImport(
-    decision: ImportAnalysisDecision
+    decision: ImportAnalysisDecision,
   ) {
-    if (!importResult || !analysisResult) {
-      setError("No encontramos relaciones listas para guardar.");
+    if (
+      !importResult ||
+      !analysisResult
+    ) {
+      setError(
+        "No encontramos relaciones listas para guardar.",
+      );
       return;
     }
 
-    const selectedSourceIndexes = new Set(
-      analysisResult.relationships
-        .filter((relationship) => {
-          if (
-            relationship.category === "commercial" &&
-            !decision.includeCommercial
-          ) {
-            return false;
-          }
+    const selectedSourceIndexes =
+      new Set(
+        analysisResult.relationships
+          .filter((relationship) => {
+            if (
+              relationship.category ===
+                "commercial" &&
+              !decision.includeCommercial
+            ) {
+              return false;
+            }
 
-          if (
-            relationship.category === "private" &&
-            !decision.includePrivate
-          ) {
-            return false;
-          }
+            if (
+              relationship.category ===
+                "private" &&
+              !decision.includePrivate
+            ) {
+              return false;
+            }
 
-          if (
-            relationship.category === "unknown" &&
-            !decision.includeUnknown
-          ) {
-            return false;
-          }
+            if (
+              relationship.category ===
+                "unknown" &&
+              !decision.includeUnknown
+            ) {
+              return false;
+            }
 
-          if (
-            relationship.issueTypes.includes("possible-duplicate") &&
-            !decision.includeDuplicates
-          ) {
-            return false;
-          }
+            if (
+              relationship.issueTypes.includes(
+                "possible-duplicate",
+              ) &&
+              !decision.includeDuplicates
+            ) {
+              return false;
+            }
 
-          if (
-            relationship.issueTypes.includes("missing-name") &&
-            !decision.includeMissingName
-          ) {
-            return false;
-          }
+            if (
+              relationship.issueTypes.includes(
+                "missing-name",
+              ) &&
+              !decision.includeMissingName
+            ) {
+              return false;
+            }
 
-          return true;
-        })
-        .map((relationship) => relationship.sourceIndex)
-    );
+            return true;
+          })
+          .map(
+            (relationship) =>
+              relationship.sourceIndex,
+          ),
+      );
 
-    const selectedRelationships = importResult.relationships.filter(
-      (relationship) =>
-        selectedSourceIndexes.has(relationship.sourceIndex)
-    );
+    const selectedRelationships =
+      importResult.relationships.filter(
+        (relationship) =>
+          selectedSourceIndexes.has(
+            relationship.sourceIndex,
+          ),
+      );
 
-    if (selectedRelationships.length === 0) {
+    if (
+      selectedRelationships.length === 0
+    ) {
       setError(
-        "Selecciona al menos un grupo de relaciones antes de continuar."
+        "Selecciona al menos un grupo de relaciones antes de continuar.",
       );
       return;
     }
@@ -863,72 +1032,115 @@ function RelationshipOnboardingContent() {
     setMessage("");
 
     try {
-      const supabase = createBrowserSupabaseClient();
+      const supabase =
+        createBrowserSupabaseClient();
 
       const {
         data: { user },
         error: userError,
-      } = await supabase.auth.getUser();
+      } =
+        await supabase.auth.getUser();
 
-      if (userError || !user) {
+      if (
+        userError ||
+        !user
+      ) {
         throw new Error(
-          "Tu sesión no está disponible. Inicia sesión nuevamente para continuar."
+          "Tu sesión no está disponible. Inicia sesión nuevamente para continuar.",
         );
       }
 
-      const { data: existingRelationshipsData, error: existingError } =
+      const {
+        data:
+          existingRelationshipsData,
+        error: existingError,
+      } =
         await supabase
           .from("relationships")
-          .select("id,name,company,phone,email")
-          .eq("owner_id", user.id);
+          .select(
+            "id,name,company,phone,email",
+          )
+          .eq(
+            "owner_id",
+            user.id,
+          );
 
       if (existingError) {
         throw existingError;
       }
 
-      const existingRelationships: RelationshipDeduplicationRecord[] =
-        existingRelationshipsData || [];
+      const existingRelationships:
+        RelationshipDeduplicationRecord[] =
+          existingRelationshipsData || [];
 
-      const deduplicationResult = deduplicateRelationships(
-        selectedRelationships.map((relationship) => ({
-          ...relationship,
-          name: relationship.name,
-          company: relationship.company,
-          phone: relationship.phone,
-          email: relationship.email,
-        })),
-        existingRelationships,
-        {
-          countryCallingCode: "595",
-          localPhoneLengths: [9],
-          matchByNameAndCompany: true,
-        }
-      );
+      const deduplicationResult =
+        deduplicateRelationships(
+          selectedRelationships.map(
+            (relationship) => ({
+              ...relationship,
+              name:
+                relationship.name,
+              company:
+                relationship.company,
+              phone:
+                relationship.phone,
+              email:
+                relationship.email,
+            }),
+          ),
+          existingRelationships,
+          {
+            countryCallingCode:
+              "595",
+            localPhoneLengths: [
+              9,
+            ],
+            matchByNameAndCompany:
+              true,
+          },
+        );
 
-      const importBatchId = crypto.randomUUID();
+      const importBatchId =
+        crypto.randomUUID();
 
-      const rows = deduplicationResult.newRelationships.map(
-        (relationship) => ({
-          owner_id: user.id,
-          name: relationship.name,
-          company: relationship.company,
-          phone: relationship.phone,
-          email: relationship.email,
-          relationship_type: relationship.relationshipType,
-          status: relationship.status,
-          birthday: relationship.birthday,
-          notes: relationship.notes,
-          last_contact_at: relationship.lastContactAt,
-          country: relationship.country,
-          source: importResult.source,
-          import_batch_id: importBatchId,
-        })
-      );
+      const rows =
+        deduplicationResult.newRelationships.map(
+          (relationship) => ({
+            owner_id: user.id,
+            name:
+              relationship.name,
+            company:
+              relationship.company,
+            phone:
+              relationship.phone,
+            email:
+              relationship.email,
+            relationship_type:
+              relationship.relationshipType,
+            status:
+              relationship.status,
+            birthday:
+              relationship.birthday,
+            notes:
+              relationship.notes,
+            last_contact_at:
+              relationship.lastContactAt,
+            country:
+              relationship.country,
+            source:
+              importResult.source,
+            import_batch_id:
+              importBatchId,
+          }),
+        );
 
       if (rows.length > 0) {
-        const { error: insertError } = await supabase
-          .from("relationships")
-          .insert(rows);
+        const {
+          error: insertError,
+        } =
+          await supabase
+            .from("relationships")
+            .insert(rows);
 
         if (insertError) {
           throw insertError;
@@ -936,22 +1148,47 @@ function RelationshipOnboardingContent() {
       }
 
       if (!isSettingsEntry) {
-        completeOnboarding();
+        const {
+          error: onboardingError,
+        } =
+          await supabase
+            .from("business_settings")
+            .update({
+              onboarding_completed:
+                true,
+            })
+            .eq(
+              "user_id",
+              user.id,
+            );
+
+        if (onboardingError) {
+          throw onboardingError;
+        }
       }
 
-      const dashboardParams = new URLSearchParams({
-        imported: String(rows.length),
-        duplicates: String(deduplicationResult.totalDuplicates),
-        batch: importBatchId,
-      });
+      const dashboardParams =
+        new URLSearchParams({
+          imported: String(
+            rows.length,
+          ),
+          duplicates: String(
+            deduplicationResult.totalDuplicates,
+          ),
+          batch:
+            importBatchId,
+        });
 
-      router.push(`/dashboard/relationships?${dashboardParams.toString()}`);
+      router.push(
+        `/dashboard/relationships?${dashboardParams.toString()}`,
+      );
+
       router.refresh();
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : "No pudimos guardar tus relaciones. Inténtalo nuevamente."
+          : "No pudimos guardar tus relaciones. Inténtalo nuevamente.",
       );
     } finally {
       setSaving(false);
@@ -975,7 +1212,9 @@ function RelationshipOnboardingContent() {
           selectedSource,
           requestedSource,
         )}
-        onChange={handleFileChange}
+        onChange={
+          handleFileChange
+        }
         className="hidden"
       />
 
@@ -998,7 +1237,10 @@ function RelationshipOnboardingContent() {
 
               <div className="min-w-0">
                 <h2 className="truncate text-base font-black tracking-tight text-slate-950">
-                  Cliente<span className="text-red-600">YA</span>
+                  Cliente
+                  <span className="text-red-600">
+                    YA
+                  </span>
                 </h2>
 
                 <p className="mt-0.5 truncate text-sm text-slate-500">
@@ -1012,7 +1254,9 @@ function RelationshipOnboardingContent() {
         {step === "intro" && (
           <div className="mx-auto mt-8 max-w-2xl sm:mt-10 lg:mt-12">
             <RelationshipWelcome
-              onContinue={() => setStep("welcome")}
+              onContinue={() =>
+                setStep("welcome")
+              }
             />
           </div>
         )}
@@ -1020,7 +1264,9 @@ function RelationshipOnboardingContent() {
         {step === "welcome" && (
           <div className="mx-auto mt-8 max-w-2xl sm:mt-10 lg:mt-12">
             <RelationshipWhatsAppWelcome
-              onContinue={() => setStep("source")}
+              onContinue={() =>
+                setStep("source")
+              }
             />
           </div>
         )}
@@ -1034,8 +1280,7 @@ function RelationshipOnboardingContent() {
                 </h1>
 
                 <p className="mx-auto mt-5 max-w-lg text-base leading-7 text-slate-600 lg:max-w-2xl lg:text-lg lg:leading-8">
-                  Nosotros organizamos tus relaciones para que puedas empezar
-                  más rápido.
+                  Nosotros organizamos tus relaciones para que puedas empezar más rápido.
                 </p>
               </div>
             </header>
@@ -1047,8 +1292,7 @@ function RelationshipOnboardingContent() {
                 </h2>
 
                 <p className="mt-1 text-sm leading-6 text-slate-500 lg:mt-2">
-                  Empieza con una fuente. Más adelante podrás añadir otras
-                  desde Configuración.
+                  Empieza con una fuente. Más adelante podrás añadir otras desde Configuración.
                 </p>
               </div>
 
@@ -1059,21 +1303,37 @@ function RelationshipOnboardingContent() {
                   </p>
 
                   <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-                    {SOURCE_OPTIONS.filter((option) =>
-                      [
-                        "whatsapp",
-                        "apple-contacts",
-                        "google-contacts",
-                        "outlook",
-                      ].includes(option.key)
-                    ).map((option) => (
-                      <RelationshipImportSourceRow
-                        key={option.key}
-                        option={option}
-                        selected={selectedSource === option.key}
-                        onSelect={() => chooseSource(option)}
-                      />
-                    ))}
+                    {SOURCE_OPTIONS.filter(
+                      (option) =>
+                        [
+                          "whatsapp",
+                          "apple-contacts",
+                          "google-contacts",
+                          "outlook",
+                        ].includes(
+                          option.key,
+                        ),
+                    ).map(
+                      (option) => (
+                        <RelationshipImportSourceRow
+                          key={
+                            option.key
+                          }
+                          option={
+                            option
+                          }
+                          selected={
+                            selectedSource ===
+                            option.key
+                          }
+                          onSelect={() =>
+                            chooseSource(
+                              option,
+                            )
+                          }
+                        />
+                      ),
+                    )}
                   </div>
                 </div>
 
@@ -1083,16 +1343,35 @@ function RelationshipOnboardingContent() {
                   </p>
 
                   <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-                    {SOURCE_OPTIONS.filter((option) =>
-                      ["excel", "csv"].includes(option.key)
-                    ).map((option) => (
-                      <RelationshipImportSourceRow
-                        key={option.key}
-                        option={option}
-                        selected={selectedSource === option.key}
-                        onSelect={() => chooseSource(option)}
-                      />
-                    ))}
+                    {SOURCE_OPTIONS.filter(
+                      (option) =>
+                        [
+                          "excel",
+                          "csv",
+                        ].includes(
+                          option.key,
+                        ),
+                    ).map(
+                      (option) => (
+                        <RelationshipImportSourceRow
+                          key={
+                            option.key
+                          }
+                          option={
+                            option
+                          }
+                          selected={
+                            selectedSource ===
+                            option.key
+                          }
+                          onSelect={() =>
+                            chooseSource(
+                              option,
+                            )
+                          }
+                        />
+                      ),
+                    )}
                   </div>
                 </div>
 
@@ -1102,114 +1381,164 @@ function RelationshipOnboardingContent() {
                   </p>
 
                   {SOURCE_OPTIONS.filter(
-                    (option) => option.status === "manual"
-                  ).map((option) => (
-                    <Link
-                      key={option.key}
-                      href="/dashboard/new"
-                      className="group flex min-h-16 w-full items-center gap-4 rounded-[24px] border border-slate-200 bg-white px-4 py-3.5 text-left shadow-sm transition hover:border-blue-200 hover:bg-slate-50 hover:shadow-md sm:px-5"
-                    >
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-lg font-black text-slate-700">
-                        {option.symbol}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <h2 className="text-base font-black text-slate-950">
-                          {option.title}
-                        </h2>
-
-                        {option.description && (
-                          <p className="mt-1 text-sm leading-5 text-slate-500">
-                            {option.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <div
-                        className="shrink-0 text-lg font-black text-blue-700"
-                        aria-hidden="true"
+                    (option) =>
+                      option.status ===
+                      "manual",
+                  ).map(
+                    (option) => (
+                      <Link
+                        key={
+                          option.key
+                        }
+                        href="/dashboard/new"
+                        className="group flex min-h-16 w-full items-center gap-4 rounded-[24px] border border-slate-200 bg-white px-4 py-3.5 text-left shadow-sm transition hover:border-blue-200 hover:bg-slate-50 hover:shadow-md sm:px-5"
                       >
-                        →
-                      </div>
-                    </Link>
-                  ))}
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-lg font-black text-slate-700">
+                          {
+                            option.symbol
+                          }
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <h2 className="text-base font-black text-slate-950">
+                            {
+                              option.title
+                            }
+                          </h2>
+
+                          {option.description && (
+                            <p className="mt-1 text-sm leading-5 text-slate-500">
+                              {
+                                option.description
+                              }
+                            </p>
+                          )}
+                        </div>
+
+                        <div
+                          className="shrink-0 text-lg font-black text-blue-700"
+                          aria-hidden="true"
+                        >
+                          →
+                        </div>
+                      </Link>
+                    ),
+                  )}
                 </div>
               </div>
             </section>
 
-            {(loading || message || error || importResult) && (
+            {(loading ||
+              message ||
+              error ||
+              importResult) && (
               <section className="mt-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                {loading && <RelationshipImportLoading />}
-
-                {!loading && message && (
-                  <RelationshipImportMessage
-                    title={
-                      selectedOption?.title ?? "Importación de relaciones"
-                    }
-                    message={message}
-                  />
+                {loading && (
+                  <RelationshipImportLoading />
                 )}
 
-                {!loading && error && (
-                  <RelationshipImportError
-                    title="Necesitamos revisar el archivo"
-                    message={error}
-                    onRetry={() => fileInputRef.current?.click()}
-                  />
-                )}
+                {!loading &&
+                  message && (
+                    <RelationshipImportMessage
+                      title={
+                        selectedOption?.title ??
+                        "Importación de relaciones"
+                      }
+                      message={
+                        message
+                      }
+                    />
+                  )}
 
-                {!loading && importResult && reviewReport && (
-                  <RelationshipImportReview
-                    fileName={fileName}
-                    importResult={importResult}
-                    reviewReport={reviewReport}
-                    saving={saving}
-                    onContinue={handleReviewContinue}
-                    onChooseAnotherFile={() =>
-                      fileInputRef.current?.click()
-                    }
-                  />
-                )}
+                {!loading &&
+                  error && (
+                    <RelationshipImportError
+                      title="Necesitamos revisar el archivo"
+                      message={
+                        error
+                      }
+                      onRetry={() =>
+                        fileInputRef.current?.click()
+                      }
+                    />
+                  )}
+
+                {!loading &&
+                  importResult &&
+                  reviewReport && (
+                    <RelationshipImportReview
+                      fileName={
+                        fileName
+                      }
+                      importResult={
+                        importResult
+                      }
+                      reviewReport={
+                        reviewReport
+                      }
+                      saving={
+                        saving
+                      }
+                      onContinue={
+                        handleReviewContinue
+                      }
+                      onChooseAnotherFile={() =>
+                        fileInputRef.current?.click()
+                      }
+                    />
+                  )}
               </section>
             )}
 
             <footer className="mx-auto mt-8 max-w-xl text-center text-[11px] leading-5 text-slate-400 lg:mt-10">
-              ClienteYA organiza la información y solo te pide revisar lo que
-              realmente necesita una decisión.
+              ClienteYA organiza la información y solo te pide revisar lo que realmente necesita una decisión.
             </footer>
           </>
         )}
 
-        {step === "analysis" && analysisResult && (
-          <div className="mx-auto mt-8 max-w-3xl sm:mt-10 lg:mt-12">
-            <RelationshipImportAnalysis
-              analysis={analysisResult}
-              onConfirm={handleConfirmImport}
-              isSubmitting={saving}
-            />
+        {step === "analysis" &&
+          analysisResult && (
+            <div className="mx-auto mt-8 max-w-3xl sm:mt-10 lg:mt-12">
+              <RelationshipImportAnalysis
+                analysis={
+                  analysisResult
+                }
+                onConfirm={
+                  handleConfirmImport
+                }
+                isSubmitting={
+                  saving
+                }
+              />
 
-            {error && (
-              <div className="mt-5">
-                <RelationshipImportError
-                  title="Necesitamos revisar tu selección"
-                  message={error}
-                  onRetry={() => setError("")}
-                />
-              </div>
-            )}
+              {error && (
+                <div className="mt-5">
+                  <RelationshipImportError
+                    title="Necesitamos revisar tu selección"
+                    message={
+                      error
+                    }
+                    onRetry={() =>
+                      setError("")
+                    }
+                  />
+                </div>
+              )}
 
-            <button
-              type="button"
-              onClick={() => {
-                setError("");
-                setStep("source");
-              }}
-              className="mx-auto mt-5 block text-sm font-semibold text-slate-600 transition hover:text-slate-950"
-            >
-              Volver al resumen
-            </button>
-          </div>
-        )}
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setStep(
+                    "source",
+                  );
+                }}
+                className="mx-auto mt-5 block text-sm font-semibold text-slate-600 transition hover:text-slate-950"
+              >
+                Volver al resumen
+              </button>
+            </div>
+          )}
       </div>
     </main>
   );

@@ -40,10 +40,12 @@ type Profile = ProfileAccess & {
   email?: string | null;
   full_name?: string | null;
   created_at?: string | null;
+  onboarding_completed?: boolean | null;
 };
 
 type BusinessSettings = {
   user_id?: string | null;
+  onboarding_completed?: boolean | null;
   company_name?: string | null;
   business_name?: string | null;
   name?: string | null;
@@ -729,6 +731,15 @@ export default async function DashboardPage() {
       relationshipsData ||
       []
     ) as RelationshipRecord[];
+
+  if (
+    businessSettings?.onboarding_completed ===
+    false
+  ) {
+    redirect(
+      "/onboarding/relationships",
+    );
+  }
 
   const profileAccess = {
     ...(profile || {}),

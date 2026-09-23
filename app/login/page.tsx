@@ -3,6 +3,29 @@ import { redirect } from "next/navigation";
 import { BrandMark } from "../components/BrandMark";
 import { createAuthServerClient } from "../../lib/supabase/auth-server";
 
+async function getLoginDestination(
+  userId: string,
+) {
+  const supabase =
+    await createAuthServerClient();
+
+  const {
+    data: businessSettings,
+  } = await supabase
+    .from("business_settings")
+    .select("onboarding_completed")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (
+    businessSettings?.onboarding_completed === true
+  ) {
+    return "/dashboard";
+  }
+
+  return "/onboarding/relationships";
+}
+
 export default async function LoginPage({
   searchParams,
 }: {
@@ -22,7 +45,12 @@ export default async function LoginPage({
     await supabase.auth.getUser();
 
   if (user) {
-    redirect("/dashboard");
+    const destination =
+      await getLoginDestination(
+        user.id,
+      );
+
+    redirect(destination);
   }
 
   async function signIn(
@@ -51,19 +79,41 @@ export default async function LoginPage({
       );
     }
 
-    const { error } =
+    const {
+      data,
+      error,
+    } =
       await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-    if (error) {
+    if (
+      error ||
+      !data.user
+    ) {
       redirect(
         "/login?error=credentials",
       );
     }
 
-    redirect("/dashboard");
+    const {
+      data: businessSettings,
+    } = await supabase
+      .from("business_settings")
+      .select("onboarding_completed")
+      .eq("user_id", data.user.id)
+      .maybeSingle();
+
+    if (
+      businessSettings?.onboarding_completed === true
+    ) {
+      redirect("/dashboard");
+    }
+
+    redirect(
+      "/onboarding/relationships",
+    );
   }
 
   function getErrorMessage() {

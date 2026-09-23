@@ -8,6 +8,29 @@ import { ensureProfileForNewUser } from "../../lib/onboarding";
 const MONTHLY_PRICE = "Gs. 200.000";
 const YEARLY_PRICE = "Gs. 2.000.000";
 
+async function getSignupDestination(
+  userId: string,
+) {
+  const supabase =
+    await createAuthServerClient();
+
+  const {
+    data: businessSettings,
+  } = await supabase
+    .from("business_settings")
+    .select("onboarding_completed")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (
+    businessSettings?.onboarding_completed === true
+  ) {
+    return "/dashboard";
+  }
+
+  return "/onboarding/relationships";
+}
+
 export default async function SignupPage({
   searchParams,
 }: {
@@ -18,63 +41,105 @@ export default async function SignupPage({
 }) {
   const { error, ok } = await searchParams;
 
-  const supabase = await createAuthServerClient();
+  const supabase =
+    await createAuthServerClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   if (user) {
-    redirect("/dashboard");
+    const destination =
+      await getSignupDestination(
+        user.id,
+      );
+
+    redirect(destination);
   }
 
-  async function signup(formData: FormData) {
+  async function signup(
+    formData: FormData,
+  ) {
     "use server";
 
-    const name = String(formData.get("nombre") || "").trim();
+    const name =
+      String(
+        formData.get("nombre") || "",
+      ).trim();
 
-    const email = String(formData.get("email") || "")
-      .trim()
-      .toLowerCase();
+    const email =
+      String(
+        formData.get("email") || "",
+      )
+        .trim()
+        .toLowerCase();
 
-    const password = String(formData.get("password") || "");
+    const password =
+      String(
+        formData.get("password") || "",
+      );
 
-    const supabase = await createAuthServerClient();
+    const supabase =
+      await createAuthServerClient();
 
-    if (!name || !email || !password) {
-      redirect("/signup?error=missing");
+    if (
+      !name ||
+      !email ||
+      !password
+    ) {
+      redirect(
+        "/signup?error=missing",
+      );
     }
 
-    if (password.length < 6) {
-      redirect("/signup?error=password");
+    if (
+      password.length < 6
+    ) {
+      redirect(
+        "/signup?error=password",
+      );
     }
 
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL ||
       "http://localhost:3000";
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: appUrl,
-        data: {
-          nombre: name,
-          full_name: name,
+    const {
+      data,
+      error,
+    } =
+      await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo:
+            appUrl,
+          data: {
+            nombre: name,
+            full_name: name,
+          },
         },
-      },
-    });
+      });
 
     if (error) {
-      console.error("SIGNUP ERROR:", error);
+      console.error(
+        "SIGNUP ERROR:",
+        error,
+      );
 
-      redirect("/signup?error=signup");
+      redirect(
+        "/signup?error=signup",
+      );
     }
 
-    const userId = data.user?.id;
+    const userId =
+      data.user?.id;
 
     if (!userId) {
-      redirect("/signup?error=signup");
+      redirect(
+        "/signup?error=signup",
+      );
     }
 
     await ensureProfileForNewUser({
@@ -83,52 +148,75 @@ export default async function SignupPage({
       name,
     });
 
-    const authCheck = await createAuthServerClient();
+    const authCheck =
+      await createAuthServerClient();
 
     const {
       data: { session },
-    } = await authCheck.auth.getSession();
+    } =
+      await authCheck.auth.getSession();
 
     if (!session) {
-      redirect("/login?ok=check-email");
+      redirect(
+        "/login?ok=check-email",
+      );
     }
 
-    redirect("/dashboard");
+    const destination =
+      await getSignupDestination(
+        userId,
+      );
+
+    redirect(destination);
   }
 
   function getMessage() {
-    if (error === "missing") {
+    if (
+      error === "missing"
+    ) {
       return "Completa nombre, email y contraseña.";
     }
 
-    if (error === "password") {
+    if (
+      error === "password"
+    ) {
       return "La contraseña debe tener al menos 6 caracteres.";
     }
 
-    if (error === "signup") {
+    if (
+      error === "signup"
+    ) {
       return "No pudimos crear tu cuenta. Intenta otra vez.";
     }
 
-    if (ok === "created") {
+    if (
+      ok === "created"
+    ) {
       return "Cuenta creada correctamente. Ahora puedes iniciar sesión.";
     }
 
     return null;
   }
 
-  const message = getMessage();
+  const message =
+    getMessage();
 
   return (
     <main className="min-h-screen bg-white">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
         <div className="mb-8">
-          <BrandMark showTagline />
+          <BrandMark
+            showTagline
+          />
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[1fr_460px] lg:items-start">
           <section className="min-w-0">
             <div className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-              Prueba gratis · {BRANDING.trialDaysLabel}
+              Prueba gratis ·{" "}
+              {
+                BRANDING.trialDaysLabel
+              }
             </div>
 
             <h1 className="mt-5 max-w-3xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
@@ -146,7 +234,9 @@ export default async function SignupPage({
 
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="font-bold text-slate-950">Relaciones</p>
+                <p className="font-bold text-slate-950">
+                  Relaciones
+                </p>
 
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   Personas, empresas, contexto y próximos pasos en una sola
@@ -155,7 +245,9 @@ export default async function SignupPage({
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="font-bold text-slate-950">Prioridades</p>
+                <p className="font-bold text-slate-950">
+                  Prioridades
+                </p>
 
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   ClienteYA identifica qué necesita atención y cuándo conviene
@@ -164,7 +256,9 @@ export default async function SignupPage({
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="font-bold text-slate-950">Inteligencia</p>
+                <p className="font-bold text-slate-950">
+                  Inteligencia
+                </p>
 
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   Señales, riesgos, oportunidades y recomendaciones a partir del
@@ -187,13 +281,22 @@ export default async function SignupPage({
 
             <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5">
               <p className="text-sm font-bold text-amber-950">
-                Prueba gratis: {BRANDING.trialDaysLabel}
+                Prueba gratis:{" "}
+                {
+                  BRANDING.trialDaysLabel
+                }
               </p>
 
               <p className="mt-2 text-sm leading-6 text-amber-900">
                 Después de la prueba puedes continuar con Profesional por{" "}
-                <span className="font-black">{MONTHLY_PRICE} al mes</span> o{" "}
-                <span className="font-black">{YEARLY_PRICE} al año</span>.
+                <span className="font-black">
+                  {MONTHLY_PRICE} al mes
+                </span>{" "}
+                o{" "}
+                <span className="font-black">
+                  {YEARLY_PRICE} al año
+                </span>
+                .
               </p>
             </div>
           </section>
@@ -221,12 +324,17 @@ export default async function SignupPage({
                     : "border border-red-200 bg-red-50 text-red-800"
                 }`}
               >
-                {ok ? "✅ " : "⚠️ "}
+                {ok
+                  ? "✅ "
+                  : "⚠️ "}
                 {message}
               </div>
             ) : null}
 
-            <form action={signup} className="space-y-5">
+            <form
+              action={signup}
+              className="space-y-5"
+            >
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-700">
                   Nombre
