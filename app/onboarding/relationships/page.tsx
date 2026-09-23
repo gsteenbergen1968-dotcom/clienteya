@@ -675,12 +675,12 @@ function RelationshipOnboardingContent() {
       }
 
       if (settingsError) {
-        setError(
-          "No pudimos verificar el estado de configuración.",
-        );
-        setCheckingOnboarding(false);
-        return;
-      }
+  setError(
+    `Supabase error: ${settingsError.message} | code: ${settingsError.code}`,
+  );
+  setCheckingOnboarding(false);
+  return;
+}
 
       if (
         businessSettings?.onboarding_completed ===
