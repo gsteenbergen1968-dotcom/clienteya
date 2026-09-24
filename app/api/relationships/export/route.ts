@@ -42,8 +42,8 @@ export async function GET(request: NextRequest): Promise<Response> {
   const { data, error } = await supabase
     .from("relationships")
     .select(`
-      full_name,
-      company_name,
+      name,
+      company,
       phone,
       status,
       notes,
@@ -65,8 +65,8 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
 
   const headers = [
-    "full_name",
-    "company_name",
+    "name",
+    "company",
     "phone",
     "status",
     "notes",
@@ -77,8 +77,8 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   const rows = (data ?? []).map((relationship) =>
     [
-      escapeCsvValue(relationship.full_name),
-      escapeCsvValue(relationship.company_name),
+      escapeCsvValue(relationship.name),
+      escapeCsvValue(relationship.company),
       escapeCsvValue(relationship.phone),
       escapeCsvValue(relationship.status),
       escapeCsvValue(relationship.notes),
