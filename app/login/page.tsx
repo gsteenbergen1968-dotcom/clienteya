@@ -10,16 +10,20 @@ async function getLoginDestination(
     await createAuthServerClient();
 
   const {
-    data: businessSettings,
+    data: relationship,
+    error,
   } = await supabase
-    .from("business_settings")
-    .select("onboarding_completed")
-    .eq("user_id", userId)
+    .from("relationships")
+    .select("id")
+    .eq("owner_id", userId)
+    .limit(1)
     .maybeSingle();
 
-  if (
-    businessSettings?.onboarding_completed === true
-  ) {
+  if (error) {
+    return "/dashboard";
+  }
+
+  if (relationship) {
     return "/dashboard";
   }
 
@@ -97,23 +101,12 @@ export default async function LoginPage({
       );
     }
 
-    const {
-      data: businessSettings,
-    } = await supabase
-      .from("business_settings")
-      .select("onboarding_completed")
-      .eq("user_id", data.user.id)
-      .maybeSingle();
+    const destination =
+      await getLoginDestination(
+        data.user.id,
+      );
 
-    if (
-      businessSettings?.onboarding_completed === true
-    ) {
-      redirect("/dashboard");
-    }
-
-    redirect(
-      "/onboarding/relationships",
-    );
+    redirect(destination);
   }
 
   function getErrorMessage() {
