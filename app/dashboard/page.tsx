@@ -732,14 +732,7 @@ export default async function DashboardPage() {
       []
     ) as RelationshipRecord[];
 
-  if (
-    businessSettings?.onboarding_completed ===
-    false
-  ) {
-    redirect(
-      "/onboarding/relationships",
-    );
-  }
+  
 
   const profileAccess = {
     ...(profile || {}),
