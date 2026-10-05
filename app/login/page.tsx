@@ -125,13 +125,17 @@ export default async function LoginPage({
     return null;
   }
 
-  function getSuccessMessage() {
-    if (ok === "check-email") {
-      return "Cuenta creada. Revisa tu correo electrónico para confirmar tu cuenta antes de iniciar sesión.";
-    }
-
-    return null;
+ function getSuccessMessage() {
+  if (ok === "check-email") {
+    return "Cuenta creada. Revisa tu correo electrónico para confirmar tu cuenta antes de iniciar sesión.";
   }
+
+  if (ok === "password-updated") {
+    return "Tu contraseña fue actualizada correctamente. Ya puedes iniciar sesión.";
+  }
+
+  return null;
+}
 
   const errorMessage =
     getErrorMessage();
@@ -201,6 +205,15 @@ export default async function LoginPage({
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
                 required
               />
+
+              <div className="mt-2 text-right">
+                <a
+                  href="/forgot-password"
+                  className="text-sm font-bold text-blue-600 hover:underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </a>
+              </div>
             </div>
           </div>
 
