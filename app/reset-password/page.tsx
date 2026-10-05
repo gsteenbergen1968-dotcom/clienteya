@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+  type FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import { createBrowserClient } from "@supabase/ssr";
 
 import { BrandMark } from "../components/BrandMark";
 
 export default function ResetPasswordPage() {
-  const router = useRouter();
-
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [password, setPassword] = useState("");
@@ -39,27 +42,48 @@ export default function ResetPasswordPage() {
   }, []);
 
   useEffect(() => {
-    async function checkRecoverySession() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    async function prepareRecovery() {
+      const searchParams =
+        new URLSearchParams(
+          window.location.search,
+        );
 
-      if (!session) {
+      const code =
+        searchParams.get("code");
+
+      if (!code) {
         setError(
           "El enlace no es válido o ha expirado. Solicita uno nuevo.",
         );
-        setReady(true);
         return;
       }
+
+      const { error: sessionError } =
+        await supabase.auth.exchangeCodeForSession(
+          code,
+        );
+
+      if (sessionError) {
+        setError(
+          "No pudimos abrir la sesión de recuperación. Solicita un nuevo enlace.",
+        );
+        return;
+      }
+
+      window.history.replaceState(
+        null,
+        "",
+        "/reset-password",
+      );
 
       setReady(true);
     }
 
-    void checkRecoverySession();
+    void prepareRecovery();
   }, [supabase]);
 
-  async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>,
+  async function submit(
+    event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
@@ -87,28 +111,17 @@ export default function ResetPasswordPage() {
       });
 
     if (updateError) {
+      setSaving(false);
       setError(
         "No pudimos cambiar tu contraseña. Intenta nuevamente.",
       );
-      setSaving(false);
       return;
     }
 
     await supabase.auth.signOut();
 
-    router.replace(
-      "/login?ok=password-updated",
-    );
-  }
-
-  if (!ready) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <p className="text-sm font-semibold text-slate-500">
-          Verificando enlace...
-        </p>
-      </main>
-    );
+    window.location.href =
+      "/login?ok=password-updated";
   }
 
   return (
@@ -118,10 +131,7 @@ export default function ResetPasswordPage() {
           <BrandMark showTagline />
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7"
-        >
+        <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
           <div className="mb-6">
             <h1 className="text-2xl font-black tracking-tight text-slate-950">
               Nueva contraseña
@@ -138,53 +148,66 @@ export default function ResetPasswordPage() {
             </div>
           ) : null}
 
-          <div className="space-y-4">
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
-                Nueva contraseña
-              </label>
+          {!ready && !error ? (
+            <p className="text-sm font-semibold text-slate-500">
+              Verificando enlace...
+            </p>
+          ) : null}
 
-              <input
-                type="password"
-                value={password}
-                onChange={(event) =>
-                  setPassword(event.target.value)
-                }
-                autoComplete="new-password"
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
-                required
-              />
-            </div>
+          {ready ? (
+            <form
+              onSubmit={submit}
+              className="space-y-4"
+            >
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Nueva contraseña
+                </label>
 
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
-                Confirmar contraseña
-              </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(
+                      event.target.value,
+                    )
+                  }
+                  autoComplete="new-password"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
+                  required
+                />
+              </div>
 
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(event) =>
-                  setConfirmPassword(
-                    event.target.value,
-                  )
-                }
-                autoComplete="new-password"
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
-                required
-              />
-            </div>
-          </div>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Confirmar contraseña
+                </label>
 
-          <button
-            type="submit"
-            disabled={saving || Boolean(error && !password)}
-            className="mt-6 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving
-              ? "Guardando..."
-              : "Guardar nueva contraseña"}
-          </button>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) =>
+                    setConfirmPassword(
+                      event.target.value,
+                    )
+                  }
+                  autoComplete="new-password"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="mt-2 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving
+                  ? "Guardando..."
+                  : "Guardar nueva contraseña"}
+              </button>
+            </form>
+          ) : null}
 
           <div className="mt-5 text-center">
             <a
@@ -194,7 +217,7 @@ export default function ResetPasswordPage() {
               ← Volver a iniciar sesión
             </a>
           </div>
-        </form>
+        </div>
       </div>
     </main>
   );
